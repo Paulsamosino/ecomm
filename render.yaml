@@ -1,28 +1,34 @@
 services:
+  # Backend API service
   - type: web
-    name: poultrymart-server
+    name: poultrymart-api
     env: node
-    buildCommand: npm run build:server
+    plan: free
+    buildCommand: cd server && npm install
     startCommand: cd server && npm start
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
-    healthCheckPath: /api/health
-    autoDeploy: true
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
 
+  # Frontend static site
   - type: web
     name: poultrymart-client
-    env: node
-    buildCommand: npm run build:client
-    startCommand: cd client && npm start
+    env: static
+    buildCommand: cd client && npm install && npm run build
+    staticPublishPath: ./client/dist
+    pullRequestPreviewsEnabled: true
     envVars:
-      - key: NODE_ENV
-        value: production
-      - key: REACT_APP_API_URL
-        fromService:
-          name: poultrymart-server
-          type: web
-          property: url
-    autoDeploy: true
+      - key: VITE_API_URL
+        value: https://poultrymart-api.onrender.com

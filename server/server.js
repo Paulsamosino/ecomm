@@ -22,52 +22,36 @@ const allowedDomains = [
   "https://chickenpoultry.netlify.app",
   "https://poultrymart-client.onrender.com",
   "https://poultrymart-api.onrender.com",
+  "https://*.onrender.com", // Allow all Render.com subdomains
 ];
 
-// CORS configuration with enhanced preflight handling
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl requests)
-    if (!origin) return callback(null, true);
+// CORS configuration
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps, curl requests)
+      if (!origin) return callback(null, true);
 
-    // Check if the origin is in the allowed list
-    if (allowedDomains.indexOf(origin) !== -1) {
-      return callback(null, origin);
-    }
-
-    // Allow any vercel.app domain
-    if (origin && origin.endsWith(".vercel.app")) {
-      return callback(null, origin);
-    }
-
-    // Allow chickenpoultry.shop subdomains
-    if (origin && origin.endsWith(".chickenpoultry.shop")) {
-      return callback(null, origin);
-    }
-
-    // Allow any render.com domain
-    if (origin.endsWith(".render.com")) {
-      return callback(null, origin);
-    }
-
-    // By default, deny the request
-    callback(new Error("Not allowed by CORS"));
-  },
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "Origin",
-    "X-Requested-With",
-    "Accept",
-  ],
-  credentials: true,
-  preflightContinue: false,
-  optionsSuccessStatus: 204,
-};
-
-// Apply CORS middleware
-app.use(cors(corsOptions));
+      // Check if the origin is allowed
+      if (
+        allowedDomains.some((domain) => {
+          if (domain.includes("*")) {
+            const domainRegex = new RegExp(domain.replace("*", ".*"));
+            return domainRegex.test(origin);
+          }
+          return origin.startsWith(domain);
+        })
+      ) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  })
+);
 
 // Handle OPTIONS requests explicitly
 app.options("*", function (req, res) {
@@ -191,7 +175,9 @@ const sellerRoutes = require("./src/routes/seller");
 const blogRoutes = require("./src/routes/blog");
 
 // Serve static files from the React app
-app.use(express.static(path.join(__dirname, "dist")));
+if (process.env.NODE_ENV === "production") {
+  app.use(express.static(path.join(__dirname, "../client/dist")));
+}
 
 // Register routes with proper error handling
 app.use("/api/auth", authRoutes);
@@ -270,9 +256,11 @@ app.get("/health", async (req, res) => {
 });
 
 // Handle React routing, return all requests to React app
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "dist/index.html"));
-});
+if (process.env.NODE_ENV === "production") {
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+  });
+}
 
 // Error handling middleware
 app.use((err, req, res, next) => {

@@ -10,17 +10,17 @@ console.log("Environment Variables:", {
 // Get the API URL based on environment
 const getApiUrl = () => {
   if (import.meta.env.VITE_API_URL) {
-    return `${import.meta.env.VITE_API_URL}/api`;
+    return import.meta.env.VITE_API_URL;
   }
   if (import.meta.env.PROD) {
-    return "https://poultrymart.onrender.com/api";
+    return "https://poultrymart-api.onrender.com";
   }
-  return "http://localhost:3001/api";
+  return "http://localhost:3001";
 };
 
 // Create axios instance with custom config
 const instance = axios.create({
-  baseURL: getApiUrl(),
+  baseURL: `${getApiUrl()}/api`,
   headers: {
     "Content-Type": "application/json",
   },

@@ -11,14 +11,6 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  optimizeDeps: {
-    include: ["@radix-ui/react-checkbox"],
-  },
-  esbuild: {
-    loader: "jsx",
-    include: /src\/.*\.jsx?$/,
-    exclude: [],
-  },
   build: {
     outDir: "dist",
     assetsDir: "assets",
@@ -31,7 +23,8 @@ export default defineConfig({
     chunkSizeWarningLimit: 1500,
   },
   server: {
-    port: 5173,
+    port: process.env.PORT || 5173,
+    host: true,
     proxy: {
       "/api": {
         target: process.env.VITE_API_URL || "http://localhost:3001",
@@ -39,7 +32,7 @@ export default defineConfig({
         secure: false,
       },
       "/socket.io": {
-        target: process.env.VITE_SOCKET_URL || "http://localhost:3001",
+        target: process.env.VITE_API_URL || "http://localhost:3001",
         ws: true,
       },
     },
