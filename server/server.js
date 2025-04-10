@@ -82,17 +82,27 @@ app.options("*", function (req, res) {
 
 // Custom preflight handler for auth endpoints
 app.options("/api/auth/*", (req, res) => {
-  res
-    .status(204)
-    .set({
-      "Access-Control-Allow-Origin": req.headers.origin,
-      "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE",
-      "Access-Control-Allow-Headers":
-        "Content-Type, Authorization, Origin, X-Requested-With, Accept",
-      "Access-Control-Allow-Credentials": "true",
-      "Access-Control-Max-Age": "86400",
-    })
-    .send();
+  const origin = req.headers.origin;
+
+  if (
+    allowedDomains.includes(origin) ||
+    (origin && origin.endsWith(".vercel.app")) ||
+    (origin && origin.endsWith(".chickenpoultry.shop"))
+  ) {
+    res
+      .status(204)
+      .set({
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE",
+        "Access-Control-Allow-Headers":
+          "Content-Type, Authorization, Origin, X-Requested-With, Accept",
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Max-Age": "86400",
+      })
+      .send();
+  } else {
+    res.sendStatus(403);
+  }
 });
 
 // Log all requests for debugging CORS issues
