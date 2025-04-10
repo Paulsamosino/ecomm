@@ -1,7 +1,7 @@
 services:
   # Backend API Service
   - type: web
-    name: poultrymart
+    name: poultrymart-api
     runtime: node
     buildCommand: cd server && npm install
     startCommand: cd server && npm start
@@ -24,27 +24,38 @@ services:
         value: 283288589219278
       - key: CLOUDINARY_API_SECRET
         sync: false
+      - key: CLIENT_URL
+        value: https://poultrymart-web.onrender.com
 
   # Frontend Client Service
-  - type: static
-    name: poultrymart-client
+  - type: web
+    name: poultrymart-web
+    runtime: static
     buildCommand: cd client && npm install && npm run build
-    publishPath: client/dist
+    staticPublishPath: client/dist
     envVars:
       - key: NODE_VERSION
         value: 18
       - key: VITE_API_URL
-        value: https://poultrymart.onrender.com
+        value: https://poultrymart-api.onrender.com
       - key: VITE_SOCKET_URL
-        value: https://poultrymart.onrender.com
+        value: https://poultrymart-api.onrender.com
       - key: VITE_PAYPAL_CLIENT_ID
         value: AYkrBEqm9dM5MUBk32oRp5T67oVJqi3m4CrtCkLTdvfDJ135RFSy0wC2M8Mb7wlIWXndWc9KiLOTITyT
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
+    headers:
+      - source: /*
+        headers:
+          - key: X-Frame-Options
+            value: DENY
+          - key: X-Content-Type-Options
+            value: nosniff
+          - key: Referrer-Policy
+            value: strict-origin-when-cross-origin
 
-# Database configuration
 databases:
   - name: poultrymart-db
     plan: free

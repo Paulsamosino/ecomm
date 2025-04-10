@@ -22,24 +22,26 @@ export default defineConfig({
   build: {
     outDir: "dist",
     assetsDir: "assets",
+    sourcemap: true,
     rollupOptions: {
       output: {
         manualChunks: undefined,
       },
     },
-    sourcemap: true,
+    chunkSizeWarningLimit: 1500,
   },
   server: {
     port: 5173,
     proxy: {
       "/api": {
-        target: "http://localhost:3001",
+        target: process.env.VITE_API_URL || "http://localhost:3001",
         changeOrigin: true,
         secure: false,
       },
+      "/socket.io": {
+        target: process.env.VITE_SOCKET_URL || "http://localhost:3001",
+        ws: true,
+      },
     },
-  },
-  define: {
-    "process.env": process.env,
   },
 });
