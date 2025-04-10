@@ -25,7 +25,7 @@ app.use(
     origin: function (origin, callback) {
       // Allow requests with no origin (like mobile apps, curl requests)
       if (!origin) return callback(null, true);
-      
+
       // List of specific allowed domains
       const allowedOrigins = [
         "http://localhost:5173",
@@ -33,32 +33,38 @@ app.use(
         "https://ecomm-bi2h8n95p-ecomms-projects-807aa19d.vercel.app",
         "https://chickenpoultry.shop",
         "https://www.chickenpoultry.shop",
-        "https://api.chickenpoultry.shop"
+        "https://api.chickenpoultry.shop",
       ];
-      
+
       // Check if the origin is in the allowed list
       if (allowedOrigins.indexOf(origin) !== -1) {
         return callback(null, true);
       }
-      
+
       // Allow any vercel.app domain
       if (origin.endsWith(".vercel.app")) {
         return callback(null, true);
       }
-      
+
       // Allow chickenpoultry.shop subdomains
-      if (origin.endsWith('.chickenpoultry.shop')) {
+      if (origin.endsWith(".chickenpoultry.shop")) {
         return callback(null, true);
       }
-      
+
       // By default, allow the request
       callback(null, true);
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Origin", "X-Requested-With", "Accept"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Origin",
+      "X-Requested-With",
+      "Accept",
+    ],
     preflightContinue: false,
-    optionsSuccessStatus: 204
+    optionsSuccessStatus: 204,
   })
 );
 

@@ -22,7 +22,7 @@ const corsOptions = {
       "https://ecomm-bi2h8n95p-ecomms-projects-807aa19d.vercel.app",
       "https://chickenpoultry.shop",
       "https://www.chickenpoultry.shop",
-      "https://api.chickenpoultry.shop"
+      "https://api.chickenpoultry.shop",
     ];
 
     // Check if the origin is in the allowed list
@@ -34,9 +34,9 @@ const corsOptions = {
     if (origin.endsWith(".vercel.app")) {
       return callback(null, true);
     }
-    
+
     // Allow chickenpoultry.shop subdomains
-    if (origin.endsWith('.chickenpoultry.shop')) {
+    if (origin.endsWith(".chickenpoultry.shop")) {
       return callback(null, true);
     }
 
