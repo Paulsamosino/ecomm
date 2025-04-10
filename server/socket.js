@@ -34,17 +34,23 @@ const setupSocketServer = (server) => {
   const io = socketIo(server, {
     cors: {
       origin: function (origin, callback) {
+        // Allow all origins in development
+        if (process.env.NODE_ENV !== "production") {
+          return callback(null, true);
+        }
+
+        // In production, check against allowed domains
         if (!origin) return callback(null, true);
 
         if (
           allowedDomains.includes(origin) ||
-          origin.endsWith(".vercel.app") ||
-          origin.endsWith(".chickenpoultry.shop") ||
-          origin.endsWith(".render.com")
+          origin.includes("chickenpoultry.shop") ||
+          origin.includes(".vercel.app") ||
+          origin.includes(".render.com")
         ) {
-          return callback(null, origin);
+          return callback(null, true);
         }
-        callback(null, origin);
+        return callback(new Error("Not allowed by CORS"));
       },
       methods: ["GET", "POST", "OPTIONS"],
       credentials: true,
@@ -59,11 +65,13 @@ const setupSocketServer = (server) => {
     transports: ["websocket", "polling"],
     pingTimeout: 60000,
     pingInterval: 25000,
+    path: "/socket.io/",
     secure: process.env.NODE_ENV === "production",
     cookie: {
       name: "io",
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
+      sameSite: "none",
     },
   });
 

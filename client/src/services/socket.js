@@ -25,7 +25,7 @@ class SocketService {
       const socketServerUrl =
         import.meta.env.VITE_SOCKET_URL ||
         (window.location.hostname.includes("chickenpoultry.shop")
-          ? "wss://api.chickenpoultry.shop"
+          ? "https://api.chickenpoultry.shop" // Changed from wss:// to https://
           : "http://localhost:3001");
 
       this.socket = io(socketServerUrl, {
@@ -35,9 +35,9 @@ class SocketService {
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
         timeout: 10000,
-        transports: ["websocket", "polling"],
-        secure: true,
-        rejectUnauthorized: false,
+        transports: ["websocket"], // Try WebSocket first
+        autoConnect: false, // Prevent auto-connection
+        path: "/socket.io/",
         withCredentials: true,
         forceNew: true,
       });
@@ -66,6 +66,7 @@ class SocketService {
         }
       });
 
+      // Handle transport errors specifically
       this.socket.on("connect_error", (error) => {
         console.error("Socket connection error:", error.message);
         this.connected = false;
@@ -82,6 +83,12 @@ class SocketService {
           this.connecting = false;
           toast.error("Unable to connect to chat. Please refresh the page.");
         } else {
+          // On first error, try falling back to polling
+          if (this.connectionAttempts === 1) {
+            console.log("Retrying with polling transport...");
+            this.socket.io.opts.transports = ["polling", "websocket"];
+          }
+
           // Don't show too many error toasts
           if (this.connectionAttempts === 1) {
             toast.error("Connection error. Retrying...");
