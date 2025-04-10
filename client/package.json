@@ -5,11 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node build.js",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "setup": "node setup.js",
-    "render-build": "bash ./render-build.sh"
+    "setup": "node setup.js"
   },
   "dependencies": {
     "@paypal/react-paypal-js": "^8.8.2",

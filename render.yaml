@@ -1,9 +1,13 @@
 services:
-  # Backend API Service
+  # Combined service for both frontend and backend
   - type: web
-    name: poultrymart-api
+    name: poultrymart
     runtime: node
-    buildCommand: cd server && npm install
+    buildCommand: |
+      # Install and build client
+      cd client && npm install && npm run build && cd ..
+      # Install server dependencies
+      cd server && npm install
     startCommand: cd server && npm start
     envVars:
       - key: NODE_VERSION
@@ -26,16 +30,6 @@ services:
         sync: false
       - key: CLIENT_URL
         value: https://poultrymart-web.onrender.com
-
-  # Frontend Client Service
-  - type: web
-    name: poultrymart-web
-    runtime: static
-    buildCommand: cd client && npm install && npm run build
-    staticPublishPath: client/dist
-    envVars:
-      - key: NODE_VERSION
-        value: 18
       - key: VITE_API_URL
         value: https://poultrymart-api.onrender.com
       - key: VITE_SOCKET_URL

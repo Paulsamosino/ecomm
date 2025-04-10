@@ -183,6 +183,9 @@ const chatRoutes = require("./src/routes/chat");
 const sellerRoutes = require("./src/routes/seller");
 const blogRoutes = require("./src/routes/blog");
 
+// Serve static files from the React app
+app.use(express.static(path.join(__dirname, "../client/dist")));
+
 // Register routes with proper error handling
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
@@ -257,6 +260,11 @@ app.get("/health", async (req, res) => {
   // Return status code based on health
   const statusCode = healthStatus.status === "ok" ? 200 : 503;
   res.status(statusCode).json(healthStatus);
+});
+
+// Handle React routing, return all requests to React app
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../client/dist/index.html"));
 });
 
 // Error handling middleware
