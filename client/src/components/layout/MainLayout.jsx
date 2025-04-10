@@ -2,7 +2,6 @@ import React from "react";
 import { Outlet } from "react-router-dom";
 import Footer from "./Footer";
 import Navbar from "./Navbar";
-import ApiDebug from "../common/ApiDebug";
 
 const MainLayout = () => {
   return (
@@ -23,9 +22,6 @@ const MainLayout = () => {
 
       {/* Footer */}
       <Footer />
-
-      {/* Debug component - shows in all environments temporarily */}
-      <ApiDebug />
     </div>
   );
 };

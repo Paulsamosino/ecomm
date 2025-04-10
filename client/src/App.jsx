@@ -8,7 +8,6 @@ import { CartProvider } from "@/contexts/CartContext";
 import { PayPalProvider } from "@/config/paypal";
 import MainLayout from "@/components/layout/MainLayout";
 import SellerLayout from "@/components/layout/SellerLayout";
-import ApiDebug from "@/components/common/ApiDebug";
 
 import HomePage from "@/pages/HomePage";
 import ProductListPage from "@/pages/ProductListPage";
@@ -150,7 +149,6 @@ const App = () => {
               },
             }}
           />
-          <ApiDebug />
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<MainLayout />}>
