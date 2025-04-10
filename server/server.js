@@ -15,15 +15,15 @@ const corsOptions = {
     // Allow requests with no origin (like mobile apps, curl requests)
     if (!origin) return callback(null, true);
 
-    // List of specific allowed domains
+    // List of specific allowed domains - ensure exact match for your custom domains
     const allowedOrigins = [
       "http://localhost:5173",
       "https://ecomm-server-vercel.vercel.app",
       "https://ecomm-bi2h8n95p-ecomms-projects-807aa19d.vercel.app",
+      "https://ecomm-owdh0fr7x-ecomms-projects-807aa19d.vercel.app",
       "https://chickenpoultry.shop",
       "https://www.chickenpoultry.shop",
       "https://api.chickenpoultry.shop",
-      "https://www.chickenpoultry.shop",
     ];
 
     // Check if the origin is in the allowed list
@@ -32,12 +32,12 @@ const corsOptions = {
     }
 
     // Allow any vercel.app domain
-    if (origin.endsWith(".vercel.app")) {
+    if (origin && origin.endsWith(".vercel.app")) {
       return callback(null, true);
     }
 
     // Allow chickenpoultry.shop subdomains
-    if (origin.endsWith(".chickenpoultry.shop")) {
+    if (origin && origin.endsWith(".chickenpoultry.shop")) {
       return callback(null, true);
     }
 
@@ -62,6 +62,14 @@ app.use(cors(corsOptions));
 
 // Handle OPTIONS requests explicitly
 app.options("*", cors(corsOptions));
+
+// Log all requests for debugging CORS issues
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  console.log("Request origin:", req.headers.origin);
+  console.log("Request headers:", req.headers);
+  next();
+});
 
 // Other middleware
 app.use(express.json());

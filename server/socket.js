@@ -33,6 +33,7 @@ const setupSocketServer = (server) => {
           "http://localhost:5173",
           "https://ecomm-server-vercel.vercel.app",
           "https://ecomm-bi2h8n95p-ecomms-projects-807aa19d.vercel.app",
+          "https://ecomm-owdh0fr7x-ecomms-projects-807aa19d.vercel.app",
           "https://chickenpoultry.shop",
           "https://www.chickenpoultry.shop",
           "https://api.chickenpoultry.shop",
@@ -44,12 +45,12 @@ const setupSocketServer = (server) => {
         }
 
         // Allow any vercel.app domain
-        if (origin.endsWith(".vercel.app")) {
+        if (origin && origin.endsWith(".vercel.app")) {
           return callback(null, true);
         }
 
         // Allow chickenpoultry.shop subdomains
-        if (origin.endsWith(".chickenpoultry.shop")) {
+        if (origin && origin.endsWith(".chickenpoultry.shop")) {
           return callback(null, true);
         }
 

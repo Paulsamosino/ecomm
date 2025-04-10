@@ -23,7 +23,7 @@ const MainLayout = () => {
 
       {/* Footer */}
       <Footer />
-      
+
       {/* Debug component - shows in all environments temporarily */}
       <ApiDebug />
     </div>
