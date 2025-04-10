@@ -33,7 +33,7 @@ git push -u origin main
    - Fill in these settings:
      - Name: `poultrymart-client`
      - Environment: `Node`
-     - Build Command: `npm install && cd client && npm install && npm run build`
+     - Build Command: `npm install && cd client && npm install && npm install -g vite && npm run build`
      - Start Command: `cd client && npm start`
      - Click "Create Web Service"
 
