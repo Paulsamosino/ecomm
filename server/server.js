@@ -3,15 +3,18 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 const path = require("path");
 const http = require("http");
-const setupSocketServer = require("./socket"); // Fixed import
+const setupSocketServer = require("./socket");
 require("dotenv").config();
 
 const app = express();
 const server = http.createServer(app);
 
-// CORS configuration
+// CORS configuration with specific allowed origins
 const corsOptions = {
-  origin: process.env.CLIENT_URL || "http://localhost:5173",
+  origin: [
+    "https://ecomm-tau-nine.vercel.app", 
+    "http://localhost:5173"
+  ],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
@@ -32,7 +35,7 @@ mongoose
   .catch((err) => console.error("MongoDB connection error:", err));
 
 // Initialize Socket.IO
-setupSocketServer(server); // Fixed function call
+setupSocketServer(server);
 
 // Import routes
 const authRoutes = require("./src/routes/auth");
