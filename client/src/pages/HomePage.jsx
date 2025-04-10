@@ -18,14 +18,14 @@ import {
   ArrowRight,
   Check,
 } from "lucide-react";
+import chickenIcon from "/chicken.svg";
 
-// Mock data - in a real application, this would come from an API
 const FEATURED_PRODUCTS = [
   {
     id: 1,
     title: "Premium Layer Hens",
     price: 25.99,
-    image: "/public/chicken.svg", // Using existing image
+    image: chickenIcon,
     rating: 4.8,
     reviews: 124,
     seller: "Green Valley Farm",
@@ -37,7 +37,7 @@ const FEATURED_PRODUCTS = [
     id: 2,
     title: "Organic Feed Mix",
     price: 45.99,
-    image: "/public/chicken.svg", // Using existing image
+    image: chickenIcon,
     rating: 4.9,
     reviews: 89,
     seller: "Nature's Best",
@@ -48,7 +48,7 @@ const FEATURED_PRODUCTS = [
     id: 3,
     title: "Breeding Equipment Set",
     price: 199.99,
-    image: "/public/chicken.svg", // Using existing image
+    image: chickenIcon,
     rating: 4.7,
     reviews: 56,
     seller: "Pro Breeder Tools",
@@ -59,7 +59,7 @@ const FEATURED_PRODUCTS = [
     id: 4,
     title: "Free Range Chickens",
     price: 35.99,
-    image: "/public/chicken.svg", // Using existing image
+    image: chickenIcon,
     rating: 4.9,
     reviews: 112,
     seller: "Happy Hens Farm",
@@ -69,17 +69,16 @@ const FEATURED_PRODUCTS = [
 ];
 
 const CATEGORIES = [
-  { id: 1, name: "Chicken", count: 145, image: "/public/chicken.svg" },
-  { id: 2, name: "Eggs", count: 89, image: "/public/chicken.svg" },
-  { id: 3, name: "Feed", count: 67, image: "/public/chicken.svg" },
-  { id: 4, name: "Equipment", count: 103, image: "/public/chicken.svg" },
+  { id: 1, name: "Chicken", count: 145, image: chickenIcon },
+  { id: 2, name: "Eggs", count: 89, image: chickenIcon },
+  { id: 3, name: "Feed", count: 67, image: chickenIcon },
+  { id: 4, name: "Equipment", count: 103, image: chickenIcon },
 ];
 
 const HomePage = () => {
   const { user } = useAuth();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
-  // Handle window resize
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
@@ -90,7 +89,6 @@ const HomePage = () => {
 
   return (
     <div className="pb-16">
-      {/* Hero Section */}
       <section className="relative bg-gradient-to-r from-primary/5 to-primary/10 pt-8 pb-16 md:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
@@ -126,7 +124,6 @@ const HomePage = () => {
                   )}
                 </div>
 
-                {/* Trust badges */}
                 <div className="flex items-center gap-4 mt-8">
                   <div className="flex items-center text-gray-500 text-sm">
                     <Check className="h-4 w-4 text-primary mr-1" />
@@ -146,7 +143,7 @@ const HomePage = () => {
             <div className="order-1 md:order-2 relative">
               <div className="relative rounded-2xl overflow-hidden aspect-[4/3] bg-white shadow-xl">
                 <img
-                  src="/public/chicken.svg"
+                  src={chickenIcon}
                   alt="Premium Chicken"
                   className="w-2/3 h-2/3 object-contain absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
                 />
@@ -155,7 +152,6 @@ const HomePage = () => {
                 </div>
               </div>
 
-              {/* Floating stats */}
               <div className="absolute -right-4 -bottom-4 bg-white rounded-lg shadow-lg p-3 flex items-center">
                 <Star className="h-5 w-5 text-yellow-400 fill-yellow-400 mr-1" />
                 <span className="font-semibold">4.9/5</span>
@@ -168,7 +164,6 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Categories Section */}
       <section className="py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -209,7 +204,6 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Featured Products Section */}
       <section className="py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center mb-10">
@@ -235,7 +229,6 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Benefits Section */}
       <section className="py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -270,7 +263,6 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Testimonials Section */}
       <section className="py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -305,7 +297,6 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
       <section className="py-16 bg-primary">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
@@ -369,7 +360,6 @@ const ProductCard = ({ product }) => {
           </div>
         </Link>
 
-        {/* Product tags */}
         <div className="absolute top-2 left-2 flex flex-col gap-2">
           {discount > 0 && (
             <span className="inline-block px-2 py-1 bg-red-500 text-white text-xs font-bold rounded-md">
@@ -388,7 +378,6 @@ const ProductCard = ({ product }) => {
           )}
         </div>
 
-        {/* Quick action buttons */}
         <div className="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <button className="p-2 bg-white rounded-full shadow hover:bg-primary hover:text-white transition-colors">
             <Heart className="h-4 w-4" />

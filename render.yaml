@@ -29,6 +29,14 @@ services:
     buildCommand: cd client && npm install && npm run build
     staticPublishPath: ./client/dist
     pullRequestPreviewsEnabled: true
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
     envVars:
       - key: VITE_API_URL
         value: https://poultrymart-api.onrender.com
