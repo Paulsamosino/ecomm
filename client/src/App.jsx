@@ -8,6 +8,7 @@ import { CartProvider } from "@/contexts/CartContext";
 import { PayPalProvider } from "@/config/paypal";
 import MainLayout from "@/components/layout/MainLayout";
 import SellerLayout from "@/components/layout/SellerLayout";
+import ApiDebug from "@/components/common/ApiDebug";
 
 import HomePage from "@/pages/HomePage";
 import ProductListPage from "@/pages/ProductListPage";
@@ -126,9 +127,9 @@ const AppContent = () => {
 
 const App = () => {
   return (
-    <PayPalProvider>
-      <AuthProvider>
-        <CartProvider>
+    <AuthProvider>
+      <CartProvider>
+        <PayPalProvider>
           <Toaster
             position="top-right"
             toastOptions={{
@@ -149,10 +150,72 @@ const App = () => {
               },
             }}
           />
-          <AppContent />
-        </CartProvider>
-      </AuthProvider>
-    </PayPalProvider>
+          <ApiDebug />
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<MainLayout />}>
+              <Route index element={<HomePage />} />
+              <Route path="login" element={<LoginPage />} />
+              <Route path="register" element={<RegisterPage />} />
+              <Route path="register/seller" element={<SellerRegisterPage />} />
+              <Route path="products" element={<ProductListPage />} />
+              <Route path="products/:id" element={<ProductDetailPage />} />
+              <Route path="help-center" element={<HelpCenterPage />} />
+              <Route path="contact" element={<ContactUsPage />} />
+              <Route path="cart" element={<CartPage />} />
+              <Route path="checkout" element={<CheckoutPage />} />
+              <Route path="wishlist" element={<WishlistPage />} />
+            </Route>
+
+            {/* Protected Buyer Routes */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/" element={<MainLayout />}>
+                <Route path="buyer-dashboard" element={<BuyerDashboardPage />}>
+                  <Route index element={<BuyerMyPurchase />} />
+                  <Route path="purchases" element={<BuyerMyPurchase />} />
+                  <Route path="profile" element={<BuyerManageProfile />} />
+                </Route>
+                <Route path="chat" element={<EnhancedChatPage />} />
+                <Route path="chat/:chatId" element={<EnhancedChatPage />} />
+              </Route>
+            </Route>
+
+            {/* Protected Seller Routes */}
+            <Route path="/seller" element={<SellerRoute />}>
+              <Route element={<SellerLayout />}>
+                <Route index element={<SellerDashboard />} />
+                <Route path="dashboard" element={<SellerDashboard />} />
+                <Route path="messages" element={<SellerMessages />} />
+                <Route path="messages/:chatId" element={<SellerMessages />} />
+                <Route path="analytics" element={<SellerAnalytics />} />
+                <Route path="products" element={<SellerProducts />} />
+                <Route path="products/new" element={<AddProduct />} />
+                <Route path="products/edit/:id" element={<EditProduct />} />
+                <Route path="orders" element={<SellerOrders />} />
+                <Route path="reviews" element={<SellerReviews />} />
+                <Route path="customers" element={<SellerCustomers />} />
+                <Route path="cart" element={<SellerCartManagement />} />
+                <Route path="payments" element={<SellerPayments />} />
+                <Route path="settings" element={<SellerSettings />} />
+                <Route path="help" element={<SellerHelp />} />
+              </Route>
+            </Route>
+
+            {/* Protected Admin Routes */}
+            <Route path="/admin" element={<ProtectedRoute />}>
+              <Route element={<MainLayout />}>
+                <Route index element={<AdminManageUsers />} />
+                <Route path="users" element={<AdminManageUsers />} />
+                <Route path="listings" element={<AdminManageListings />} />
+              </Route>
+            </Route>
+
+            {/* Redirect to home if no route matches */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </PayPalProvider>
+      </CartProvider>
+    </AuthProvider>
   );
 };
 

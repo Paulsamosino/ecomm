@@ -1,13 +1,17 @@
 [build]
+  command = "cd client && npm install && npm run build"
+  publish = "client/dist"
   base = "client"
-  command = "npm run build"
-  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "18"
+  VITE_API_URL = "https://api.chickenpoultry.shop"
+  VITE_SOCKET_URL = "https://api.chickenpoultry.shop"
+  VITE_PAYPAL_CLIENT_ID = "AYkrBEqm9dM5MUBk32oRp5T67oVJqi3m4CrtCkLTdvfDJ135RFSy0wC2M8Mb7wlIWXndWc9KiLOTITyT"
+  VITE_PAYPAL_MODE = "sandbox"
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-  force = true
-
-[build.environment]
-  NODE_VERSION = "18" 
+  force = true 
