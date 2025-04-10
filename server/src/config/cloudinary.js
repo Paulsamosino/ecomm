@@ -2,30 +2,52 @@ const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const multer = require("multer");
 
-// Validate Cloudinary configuration
-if (
-  !process.env.CLOUDINARY_CLOUD_NAME ||
-  !process.env.CLOUDINARY_API_KEY ||
-  !process.env.CLOUDINARY_API_SECRET
-) {
-  console.error(
-    "Missing Cloudinary configuration. Please check your .env file."
-  );
-  process.exit(1);
+// Enhanced error handling for Cloudinary configuration
+const validateCloudinaryConfig = () => {
+  const missingVars = [];
+
+  if (!process.env.CLOUDINARY_CLOUD_NAME)
+    missingVars.push("CLOUDINARY_CLOUD_NAME");
+  if (!process.env.CLOUDINARY_API_KEY) missingVars.push("CLOUDINARY_API_KEY");
+  if (!process.env.CLOUDINARY_API_SECRET)
+    missingVars.push("CLOUDINARY_API_SECRET");
+
+  if (missingVars.length > 0) {
+    console.error(
+      `Missing Cloudinary configuration: ${missingVars.join(", ")}`
+    );
+    console.error(
+      "Please set these environment variables in your Render.com dashboard"
+    );
+
+    // In production, don't exit the process as it will cause the deployment to fail
+    // Instead, we'll log errors but continue - this allows the API to start even if uploads won't work
+    if (process.env.NODE_ENV !== "production") {
+      process.exit(1);
+    }
+    return false;
+  }
+  return true;
+};
+
+const isConfigValid = validateCloudinaryConfig();
+
+// Only configure Cloudinary if config is valid
+if (isConfigValid) {
+  console.log("Initializing Cloudinary with config:", {
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: "***", // Don't log the actual secret
+  });
+
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
 }
 
-console.log("Initializing Cloudinary with config:", {
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: "***", // Don't log the actual secret
-});
-
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
+// Create storage even if config isn't valid - it will just fail gracefully later
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
@@ -41,14 +63,23 @@ const upload = multer({
     fileSize: 5 * 1024 * 1024, // 5MB limit
   },
   fileFilter: (req, file, cb) => {
-    console.log("Processing file:", file.originalname);
-    if (file.mimetype.startsWith("image/")) {
-      cb(null, true);
-    } else {
-      console.error("Invalid file type:", file.mimetype);
-      cb(new Error("Not an image! Please upload only images."), false);
+    try {
+      console.log("Processing file:", file.originalname);
+      if (file.mimetype.startsWith("image/")) {
+        cb(null, true);
+      } else {
+        console.error("Invalid file type:", file.mimetype);
+        cb(new Error("Not an image! Please upload only images."), false);
+      }
+    } catch (error) {
+      console.error("Error in file upload filter:", error);
+      cb(new Error("Error processing upload"), false);
     }
   },
 });
 
-module.exports = { cloudinary, upload };
+module.exports = {
+  cloudinary,
+  upload,
+  isCloudinaryConfigured: isConfigValid,
+};

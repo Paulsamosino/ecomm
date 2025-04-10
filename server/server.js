@@ -20,6 +20,8 @@ const allowedDomains = [
   "https://www.chickenpoultry.shop",
   "https://api.chickenpoultry.shop",
   "https://chickenpoultry.netlify.app",
+  "https://poultrymart-client.onrender.com",
+  "https://poultrymart-api.onrender.com",
 ];
 
 // CORS configuration with enhanced preflight handling
@@ -125,9 +127,25 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Connect to MongoDB
 mongoose
-  .connect(process.env.MONGODB_URI)
-  .then(() => console.log("Connected to MongoDB"))
-  .catch((err) => console.error("MongoDB connection error:", err));
+  .connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 45000,
+    family: 4, // Force IPv4
+  })
+  .then(() => {
+    console.log("Connected to MongoDB");
+    console.log("Database:", mongoose.connection.db.databaseName);
+    console.log("Host:", mongoose.connection.host);
+  })
+  .catch((err) => {
+    console.error("MongoDB connection error details:");
+    console.error("Error name:", err.name);
+    console.error("Error message:", err.message);
+    console.error("Error code:", err.code);
+    console.error("Full error:", err);
+  });
 
 // Initialize Socket.IO
 setupSocketServer(server);
@@ -150,6 +168,69 @@ app.use("/api/orders", require("./src/routes/orders"));
 // Basic route for testing
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to PoultryMart API" });
+});
+
+// Health check endpoint for Render.com and monitoring
+app.get("/health", async (req, res) => {
+  const healthStatus = {
+    status: "ok",
+    timestamp: new Date(),
+    services: {
+      server: "up",
+      mongodb: "unknown",
+      cloudinary: "unknown",
+    },
+    uptime: process.uptime(),
+  };
+
+  // Check MongoDB connection
+  try {
+    const mongoStatus = mongoose.connection.readyState;
+    switch (mongoStatus) {
+      case 0:
+        healthStatus.services.mongodb = "disconnected";
+        break;
+      case 1:
+        healthStatus.services.mongodb = "connected";
+        break;
+      case 2:
+        healthStatus.services.mongodb = "connecting";
+        break;
+      case 3:
+        healthStatus.services.mongodb = "disconnecting";
+        break;
+      default:
+        healthStatus.services.mongodb = "unknown";
+    }
+  } catch (error) {
+    healthStatus.services.mongodb = "error";
+    healthStatus.mongoError = error.message;
+  }
+
+  // Check Cloudinary connection
+  try {
+    const { isCloudinaryConfigured } = require("./src/config/cloudinary");
+    if (isCloudinaryConfigured) {
+      healthStatus.services.cloudinary = "configured";
+    } else {
+      healthStatus.services.cloudinary = "not_configured";
+    }
+  } catch (error) {
+    healthStatus.services.cloudinary = "error";
+    healthStatus.cloudinaryError = error.message;
+  }
+
+  // Set overall status
+  if (
+    healthStatus.services.mongodb !== "connected" ||
+    healthStatus.services.cloudinary !== "configured"
+  ) {
+    healthStatus.status = "degraded";
+  }
+
+  // Return status code based on health
+  const statusCode = healthStatus.status === "ok" ? 200 : 503;
+  res.status(statusCode).json(healthStatus);
 });
 
 // Error handling middleware
