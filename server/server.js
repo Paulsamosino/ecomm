@@ -123,12 +123,12 @@ app.use((req, res, next) => {
 });
 
 // Check for required dependencies and setup uploads directory
-const fs = require('fs');
+const fs = require("fs");
 const uploadDir = path.join(__dirname, "uploads");
 const productUploadsDir = path.join(uploadDir, "products");
 
 // Ensure upload directories exist
-[uploadDir, productUploadsDir].forEach(dir => {
+[uploadDir, productUploadsDir].forEach((dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
     console.log(`Created directory: ${dir}`);
@@ -136,12 +136,14 @@ const productUploadsDir = path.join(uploadDir, "products");
 });
 
 // Verify critical dependencies
-['multer', 'cloudinary', 'mongoose'].forEach(dep => {
+["multer", "cloudinary", "mongoose"].forEach((dep) => {
   try {
     require.resolve(dep);
     console.log(`✓ ${dep} is installed`);
   } catch (err) {
-    console.error(`Critical dependency ${dep} is missing. Please run npm install`);
+    console.error(
+      `Critical dependency ${dep} is missing. Please run npm install`
+    );
     process.exit(1);
   }
 });
