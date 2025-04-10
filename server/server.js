@@ -122,6 +122,22 @@ app.use((req, res, next) => {
   next();
 });
 
+// Check for required dependencies
+try {
+  require.resolve('multer');
+  console.log('Multer is installed.');
+} catch (err) {
+  console.error('Multer is not installed. Installing now...');
+  const { execSync } = require('child_process');
+  try {
+    execSync('npm install multer@1.4.5-lts.1 --save', { stdio: 'inherit' });
+    console.log('Multer installed successfully.');
+  } catch (installError) {
+    console.error('Failed to install multer:', installError);
+    process.exit(1);
+  }
+}
+
 // Serve uploaded files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
@@ -144,6 +160,7 @@ mongoose
     console.error("Error name:", err.name);
     console.error("Error message:", err.message);
     console.error("Error code:", err.code);
+    console.error("Full error:", err);
   });
 
 // Initialize Socket.IO

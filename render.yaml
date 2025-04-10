@@ -3,7 +3,7 @@ services:
   - type: web
     name: poultrymart-api
     runtime: node
-    buildCommand: cd server && npm install
+    buildCommand: cd server && npm install && npm install multer@1.4.5-lts.1 multer-storage-cloudinary --save
     startCommand: cd server && npm start
     envVars:
       - key: NODE_VERSION
