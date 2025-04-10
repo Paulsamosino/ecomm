@@ -23,7 +23,7 @@ export default defineConfig({
   },
   server: {
     port: process.env.PORT || 5173,
-    host: true, // Required for Render.com
+    host: true,
     proxy: {
       "/api": {
         target: process.env.VITE_API_URL || "http://localhost:3001",
