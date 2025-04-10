@@ -27,13 +27,19 @@ const setupSocketServer = (server) => {
       origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps, curl requests)
         if (!origin) return callback(null, true);
-        
+
         // Always allow the request with a specific origin
         callback(null, origin);
       },
       methods: ["GET", "POST", "OPTIONS"],
       credentials: true,
-      allowedHeaders: ["Content-Type", "Authorization", "Origin", "X-Requested-With", "Accept"],
+      allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "Origin",
+        "X-Requested-With",
+        "Accept",
+      ],
     },
   });
 

@@ -37,6 +37,20 @@ app.use(cors(corsOptions));
 // Handle OPTIONS requests explicitly
 app.options("*", cors(corsOptions));
 
+// Custom preflight handler for auth endpoints (helps with Vercel serverless functions)
+app.options("/api/auth/*", (req, res) => {
+  res
+    .status(200)
+    .set({
+      "Access-Control-Allow-Origin": req.headers.origin || "*",
+      "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Credentials": "true",
+      "Content-Length": "0",
+    })
+    .send();
+});
+
 // Log all requests for debugging CORS issues
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
