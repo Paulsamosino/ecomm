@@ -45,6 +45,11 @@ const corsOptions = {
       return callback(null, origin);
     }
 
+    // Allow any render.com domain
+    if (origin.endsWith(".render.com")) {
+      return callback(null, origin);
+    }
+
     // By default, deny the request
     callback(new Error("Not allowed by CORS"));
   },
@@ -72,7 +77,8 @@ app.options("*", function (req, res) {
   if (
     allowedDomains.includes(origin) ||
     (origin && origin.endsWith(".vercel.app")) ||
-    (origin && origin.endsWith(".chickenpoultry.shop"))
+    (origin && origin.endsWith(".chickenpoultry.shop")) ||
+    (origin && origin.endsWith(".render.com"))
   ) {
     res.header("Access-Control-Allow-Origin", origin);
     res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
@@ -94,7 +100,8 @@ app.options("/api/auth/*", (req, res) => {
   if (
     allowedDomains.includes(origin) ||
     (origin && origin.endsWith(".vercel.app")) ||
-    (origin && origin.endsWith(".chickenpoultry.shop"))
+    (origin && origin.endsWith(".chickenpoultry.shop")) ||
+    (origin && origin.endsWith(".render.com"))
   ) {
     res
       .status(204)
