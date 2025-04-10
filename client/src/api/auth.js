@@ -1,8 +1,14 @@
 import { axiosInstance } from "../contexts/axios";
 
 export const apiLogin = async (credentials) => {
-  const response = await axiosInstance.post("/auth/login", credentials);
-  return response.data;
+  try {
+    console.log("Login attempt with:", { email: credentials.email, passwordProvided: !!credentials.password });
+    const response = await axiosInstance.post("/auth/login", credentials);
+    return response.data;
+  } catch (error) {
+    console.error("Login error details:", error);
+    throw error;
+  }
 };
 
 export const apiRegister = async (userData) => {

@@ -103,9 +103,10 @@ app.options("/api/auth/*", (req, res) => {
         "Access-Control-Allow-Credentials": "true",
         "Access-Control-Max-Age": "86400",
       })
-      .send();
+      .end();
   } else {
-    res.sendStatus(403);
+    // Make sure we respond with 204 for OPTIONS requests, not 403
+    res.status(204).end();
   }
 });
 
