@@ -23,7 +23,7 @@ git push -u origin main
 
    - Name: `poultrymart-server`
    - Environment: `Node`
-   - Build Command: `npm install`
+   - Build Command: `npm install && cd server && npm install`
    - Start Command: `cd server && npm start`
    - Click "Create Web Service"
 
