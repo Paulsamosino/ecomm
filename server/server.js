@@ -15,34 +15,8 @@ const corsOptions = {
     // Allow requests with no origin (like mobile apps, curl requests)
     if (!origin) return callback(null, true);
 
-    // List of specific allowed domains - ensure exact match for your custom domains
-    const allowedOrigins = [
-      "http://localhost:5173",
-      "https://ecomm-server-vercel.vercel.app",
-      "https://ecomm-bi2h8n95p-ecomms-projects-807aa19d.vercel.app",
-      "https://ecomm-owdh0fr7x-ecomms-projects-807aa19d.vercel.app",
-      "https://chickenpoultry.shop",
-      "https://www.chickenpoultry.shop",
-      "https://api.chickenpoultry.shop",
-    ];
-
-    // Check if the origin is in the allowed list
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      return callback(null, true);
-    }
-
-    // Allow any vercel.app domain
-    if (origin && origin.endsWith(".vercel.app")) {
-      return callback(null, true);
-    }
-
-    // Allow chickenpoultry.shop subdomains
-    if (origin && origin.endsWith(".chickenpoultry.shop")) {
-      return callback(null, true);
-    }
-
-    // By default, allow the request
-    callback(null, true);
+    // Always allow the request with a specific origin
+    callback(null, origin);
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: [
