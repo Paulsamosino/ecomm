@@ -34,25 +34,16 @@ const setupSocketServer = (server) => {
   const io = socketIo(server, {
     cors: {
       origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps, curl requests)
         if (!origin) return callback(null, true);
 
-        // Check if the origin is in the allowed list
-        if (allowedDomains.indexOf(origin) !== -1) {
+        if (
+          allowedDomains.includes(origin) ||
+          origin.endsWith(".vercel.app") ||
+          origin.endsWith(".chickenpoultry.shop") ||
+          origin.endsWith(".render.com")
+        ) {
           return callback(null, origin);
         }
-
-        // Allow any vercel.app domain
-        if (origin && origin.endsWith(".vercel.app")) {
-          return callback(null, origin);
-        }
-
-        // Allow chickenpoultry.shop subdomains
-        if (origin && origin.endsWith(".chickenpoultry.shop")) {
-          return callback(null, origin);
-        }
-
-        // By default, allow the request but with specific origin
         callback(null, origin);
       },
       methods: ["GET", "POST", "OPTIONS"],
@@ -64,6 +55,15 @@ const setupSocketServer = (server) => {
         "X-Requested-With",
         "Accept",
       ],
+    },
+    transports: ["websocket", "polling"],
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    secure: process.env.NODE_ENV === "production",
+    cookie: {
+      name: "io",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
     },
   });
 

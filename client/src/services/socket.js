@@ -23,7 +23,10 @@ class SocketService {
 
       console.log("Connecting to socket server...");
       const socketServerUrl =
-        import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
+        import.meta.env.VITE_SOCKET_URL ||
+        (window.location.hostname.includes("chickenpoultry.shop")
+          ? "wss://api.chickenpoultry.shop"
+          : "http://localhost:3001");
 
       this.socket = io(socketServerUrl, {
         auth: { token },
@@ -32,6 +35,11 @@ class SocketService {
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
         timeout: 10000,
+        transports: ["websocket", "polling"],
+        secure: true,
+        rejectUnauthorized: false,
+        withCredentials: true,
+        forceNew: true,
       });
 
       this.socket.on("connect", () => {

@@ -3,27 +3,9 @@ import axios from "axios";
 // Create a custom event for auth errors
 export const AUTH_ERROR_EVENT = "auth_error";
 
-// Debug the environment variables
-console.log("Environment Variables:", {
-  VITE_API_URL: import.meta.env.VITE_API_URL,
-  MODE: import.meta.env.MODE,
-  PROD: import.meta.env.PROD,
-});
-
-// Get the API URL based on environment
-const getApiUrl = () => {
-  if (import.meta.env.VITE_API_URL) {
-    return `${import.meta.env.VITE_API_URL}/api`;
-  }
-  if (import.meta.env.PROD) {
-    return "https://poultrymart-api.onrender.com/api";
-  }
-  return "http://localhost:3001/api";
-};
-
-// Create axios instance with custom config
+// Create axios instance with base URL
 const axiosInstance = axios.create({
-  baseURL: getApiUrl(),
+  baseURL: `${import.meta.env.VITE_API_URL || "http://localhost:3001"}/api`,
   headers: {
     "Content-Type": "application/json",
   },
