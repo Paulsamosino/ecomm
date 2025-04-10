@@ -9,24 +9,60 @@ require("dotenv").config();
 const app = express();
 const server = http.createServer(app);
 
-// CORS configuration with specific allowed origins
+// CORS configuration with enhanced preflight handling
 const corsOptions = {
-  origin: [
-    "https://ecomm-tau-nine.vercel.app",
-    "https://ecomm-peach-five.vercel.app",
-    "http://localhost:5173",
-    "https://ecomm-mbnor9lqm-ecomms-projects-807aa19d.vercel.app",
-    "https://ecomm-server-vercel.vercel.app",
-    // Allow any subdomain of vercel.app
-    /\.vercel\.app$/
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl requests)
+    if (!origin) return callback(null, true);
+
+    // List of specific allowed domains
+    const allowedOrigins = [
+      "http://localhost:5173",
+      "https://ecomm-server-vercel.vercel.app",
+      "https://ecomm-bi2h8n95p-ecomms-projects-807aa19d.vercel.app",
+      "https://chickenpoultry.shop",
+      "https://www.chickenpoultry.shop",
+      "https://api.chickenpoultry.shop"
+    ];
+
+    // Check if the origin is in the allowed list
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    }
+
+    // Allow any vercel.app domain
+    if (origin.endsWith(".vercel.app")) {
+      return callback(null, true);
+    }
+    
+    // Allow chickenpoultry.shop subdomains
+    if (origin.endsWith('.chickenpoultry.shop')) {
+      return callback(null, true);
+    }
+
+    // By default, allow the request
+    callback(null, true);
+  },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "Origin",
+    "X-Requested-With",
+    "Accept",
+  ],
   credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
 };
 
-// Middleware
+// Apply CORS middleware early in the middleware chain
 app.use(cors(corsOptions));
+
+// Handle OPTIONS requests explicitly
+app.options("*", cors(corsOptions));
+
+// Other middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
