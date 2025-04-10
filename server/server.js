@@ -23,6 +23,7 @@ const corsOptions = {
       "https://chickenpoultry.shop",
       "https://www.chickenpoultry.shop",
       "https://api.chickenpoultry.shop",
+      "https://www.chickenpoultry.shop",
     ];
 
     // Check if the origin is in the allowed list
