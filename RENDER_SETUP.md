@@ -23,7 +23,7 @@ git push -u origin main
 
    - Name: `poultrymart-server`
    - Environment: `Node`
-   - Build Command: `npm run build:server`
+   - Build Command: `npm install`
    - Start Command: `cd server && npm start`
    - Click "Create Web Service"
 
@@ -33,9 +33,9 @@ git push -u origin main
    - Fill in these settings:
      - Name: `poultrymart-client`
      - Environment: `Node`
-     - Build Command: `npm run build:client`
+     - Build Command: `npm install && cd client && npm install && npm run build`
      - Start Command: `cd client && npm start`
-     - Click "Create Web Service`
+     - Click "Create Web Service"
 
 ## Step 3: Set Environment Variables
 
