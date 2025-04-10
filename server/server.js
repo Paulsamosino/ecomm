@@ -19,6 +19,8 @@ const allowedDomains = [
   "http://localhost:3000",
   "https://poultrymart-client.onrender.com",
   "https://poultrymart-api.onrender.com",
+  "https://chickenpoultry.shop",
+  "https://www.chickenpoultry.shop",
 ];
 
 // CORS configuration
@@ -26,7 +28,11 @@ app.use(
   cors({
     origin: function (origin, callback) {
       if (!origin) return callback(null, true);
-      if (allowedDomains.includes(origin) || origin.endsWith(".onrender.com")) {
+      if (
+        allowedDomains.includes(origin) ||
+        origin.endsWith(".render.com") ||
+        origin.endsWith(".chickenpoultry.shop")
+      ) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
@@ -34,7 +40,13 @@ app.use(
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "Origin",
+      "Accept",
+    ],
   })
 );
 
