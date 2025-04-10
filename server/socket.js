@@ -27,8 +27,9 @@ const setupSocketServer = (server) => {
       origin: [
         "https://ecomm-tau-nine.vercel.app",
         "https://ecomm-peach-five.vercel.app",
-        "https://ecomm-qzuwuf475-ecomms-projects-807aa19d.vercel.app",
-        "http://localhost:5173"
+        "https://ecomm-mbnor9lqm-ecomms-projects-807aa19d.vercel.app",
+        "http://localhost:5173",
+        /\.vercel\.app$/
       ],
       methods: ["GET", "POST"],
       credentials: true,

@@ -13,9 +13,12 @@ const server = http.createServer(app);
 const corsOptions = {
   origin: [
     "https://ecomm-tau-nine.vercel.app",
-    "https://ecomm-peach-five.vercel.app", 
-    "https://ecomm-qzuwuf475-ecomms-projects-807aa19d.vercel.app",
-    "http://localhost:5173"
+    "https://ecomm-peach-five.vercel.app",
+    "http://localhost:5173",
+    "https://ecomm-mbnor9lqm-ecomms-projects-807aa19d.vercel.app",
+    "https://ecomm-server-vercel.vercel.app",
+    // Allow any subdomain of vercel.app
+    /\.vercel\.app$/
   ],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],

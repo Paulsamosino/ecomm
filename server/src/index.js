@@ -22,7 +22,14 @@ app.use((req, res, next) => {
 // CORS configuration
 app.use(
   cors({
-    origin: "http://localhost:5173", // Vite's default port
+    origin: [
+      "http://localhost:5173", // Vite's default port
+      "https://ecomm-tau-nine.vercel.app",
+      "https://ecomm-peach-five.vercel.app",
+      "https://ecomm-mbnor9lqm-ecomms-projects-807aa19d.vercel.app",
+      "https://ecomm-server-vercel.vercel.app",
+      /\.vercel\.app$/
+    ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
