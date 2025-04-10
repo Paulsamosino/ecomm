@@ -11,7 +11,11 @@ const server = http.createServer(app);
 
 // CORS configuration with specific allowed origins
 const corsOptions = {
-  origin: ["https://ecomm-tau-nine.vercel.app", "http://localhost:5173"],
+  origin: [
+    "https://ecomm-tau-nine.vercel.app",
+    "https://ecomm-peach-five.vercel.app",
+    "http://localhost:5173",
+  ],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,

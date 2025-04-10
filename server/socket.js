@@ -24,7 +24,11 @@ const compareIds = (id1, id2) => {
 const setupSocketServer = (server) => {
   const io = socketIo(server, {
     cors: {
-      origin: ["https://ecomm-tau-nine.vercel.app", "http://localhost:5173"],
+      origin: [
+        "https://ecomm-tau-nine.vercel.app",
+        "https://ecomm-peach-five.vercel.app",
+        "http://localhost:5173",
+      ],
       methods: ["GET", "POST"],
       credentials: true,
     },
