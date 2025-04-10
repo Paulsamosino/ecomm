@@ -1,9 +1,9 @@
 services:
   # Backend API Service
   - type: web
-    name: poultrymart-api
+    name: poultrymart
     runtime: node
-    buildCommand: chmod +x server/render-build.sh && ./server/render-build.sh
+    buildCommand: cd server && npm install
     startCommand: cd server && npm start
     envVars:
       - key: NODE_VERSION
@@ -19,44 +19,33 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CLOUDINARY_CLOUD_NAME
-        sync: false
+        value: dzeub4jji
       - key: CLOUDINARY_API_KEY
-        sync: false
+        value: 283288589219278
       - key: CLOUDINARY_API_SECRET
         sync: false
-      - key: CLIENT_URL
-        value: https://poultrymart-client.onrender.com
-      - key: SOCKET_URL
-        value: https://poultrymart-api.onrender.com
-    healthCheckPath: /health
-    envVarGroups:
-      - name: cloudinary-config
 
   # Frontend Client Service
-  - type: web
+  - type: static
     name: poultrymart-client
-    runtime: static
     buildCommand: cd client && npm install && npm run build
-    staticPublishPath: client/dist
+    publishPath: client/dist
     envVars:
       - key: NODE_VERSION
         value: 18
       - key: VITE_API_URL
-        value: https://poultrymart-api.onrender.com
+        value: https://poultrymart.onrender.com
       - key: VITE_SOCKET_URL
-        value: https://poultrymart-api.onrender.com
+        value: https://poultrymart.onrender.com
       - key: VITE_PAYPAL_CLIENT_ID
         value: AYkrBEqm9dM5MUBk32oRp5T67oVJqi3m4CrtCkLTdvfDJ135RFSy0wC2M8Mb7wlIWXndWc9KiLOTITyT
-      - key: VITE_PAYPAL_MODE
-        value: sandbox
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
 
-# Define the MongoDB database
+# Database configuration
 databases:
   - name: poultrymart-db
     plan: free
-    ipAllowList: [] # Allow all IPs to access the database
-    databaseName: poultrymart
+    ipAllowList: []

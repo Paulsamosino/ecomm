@@ -13,7 +13,7 @@ const getApiUrl = () => {
     return `${import.meta.env.VITE_API_URL}/api`;
   }
   if (import.meta.env.PROD) {
-    return "https://api.chickenpoultry.shop/api";
+    return "https://poultrymart.onrender.com/api";
   }
   return "http://localhost:3001/api";
 };
