@@ -15,7 +15,6 @@ const allowedDomains = [
   "https://chickenpoultry.shop",
   "https://www.chickenpoultry.shop",
   "https://api.chickenpoultry.shop",
-  "https://ecomm-git-main-ecomms-projects-807aa19d.vercel.app",
 ];
 
 // CORS configuration with enhanced preflight handling
@@ -39,8 +38,8 @@ const corsOptions = {
       return callback(null, origin);
     }
 
-    // By default, allow the request but with specific origin
-    callback(null, origin);
+    // By default, deny the request
+    callback(new Error("Not allowed by CORS"));
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: [
@@ -60,15 +59,25 @@ app.use(cors(corsOptions));
 
 // Handle OPTIONS requests explicitly
 app.options("*", function (req, res) {
-  // Set CORS headers specifically for OPTIONS requests
-  res.header("Access-Control-Allow-Origin", req.headers.origin);
-  res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, Content-Length, X-Requested-With, Accept, Origin"
-  );
-  res.header("Access-Control-Allow-Credentials", "true");
-  res.sendStatus(204);
+  const origin = req.headers.origin;
+
+  // Check if the origin is allowed
+  if (
+    allowedDomains.includes(origin) ||
+    (origin && origin.endsWith(".vercel.app")) ||
+    (origin && origin.endsWith(".chickenpoultry.shop"))
+  ) {
+    res.header("Access-Control-Allow-Origin", origin);
+    res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
+    res.header(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization, Content-Length, X-Requested-With, Accept, Origin"
+    );
+    res.header("Access-Control-Allow-Credentials", "true");
+    res.sendStatus(204);
+  } else {
+    res.sendStatus(403);
+  }
 });
 
 // Custom preflight handler for auth endpoints
