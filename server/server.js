@@ -144,7 +144,6 @@ mongoose
     console.error("Error name:", err.name);
     console.error("Error message:", err.message);
     console.error("Error code:", err.code);
-    console.error("Full error:", err);
   });
 
 // Initialize Socket.IO
