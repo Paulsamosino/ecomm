@@ -1,13 +1,9 @@
 services:
-  # Combined service for both frontend and backend
+  # Combined frontend and backend service
   - type: web
     name: poultrymart
     runtime: node
-    buildCommand: |
-      # Install and build client
-      cd client && npm install && npm run build && cd ..
-      # Install server dependencies
-      cd server && npm install
+    buildCommand: chmod +x render-build.sh && ./render-build.sh
     startCommand: cd server && npm start
     envVars:
       - key: NODE_VERSION
@@ -31,9 +27,9 @@ services:
       - key: CLIENT_URL
         value: https://poultrymart-web.onrender.com
       - key: VITE_API_URL
-        value: https://poultrymart-api.onrender.com
+        value: https://poultrymart.onrender.com
       - key: VITE_SOCKET_URL
-        value: https://poultrymart-api.onrender.com
+        value: https://poultrymart.onrender.com
       - key: VITE_PAYPAL_CLIENT_ID
         value: AYkrBEqm9dM5MUBk32oRp5T67oVJqi3m4CrtCkLTdvfDJ135RFSy0wC2M8Mb7wlIWXndWc9KiLOTITyT
     routes:

@@ -184,7 +184,7 @@ const sellerRoutes = require("./src/routes/seller");
 const blogRoutes = require("./src/routes/blog");
 
 // Serve static files from the React app
-app.use(express.static(path.join(__dirname, "../client/dist")));
+app.use(express.static(path.join(__dirname, "dist")));
 
 // Register routes with proper error handling
 app.use("/api/auth", authRoutes);
@@ -264,7 +264,7 @@ app.get("/health", async (req, res) => {
 
 // Handle React routing, return all requests to React app
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+  res.sendFile(path.join(__dirname, "dist/index.html"));
 });
 
 // Error handling middleware
