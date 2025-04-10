@@ -117,11 +117,14 @@ router.post("/register", async (req, res) => {
 // Login user
 router.post("/login", async (req, res) => {
   try {
+    console.log("Login attempt:", req.body);
+
     const { email, password } = req.body;
 
     // Validate required fields
     if (!email || !password) {
       return res.status(400).json({
+        success: false,
         message: "Please provide both email and password",
         missingFields: {
           email: !email,
@@ -133,13 +136,19 @@ router.post("/login", async (req, res) => {
     // Check if user exists
     const user = await User.findOne({ email }).select("+password");
     if (!user) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
     }
 
     // Check password
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
     }
 
     // Create token
@@ -158,7 +167,11 @@ router.post("/login", async (req, res) => {
     });
   } catch (err) {
     console.error("Login error:", err);
-    res.status(500).json({ message: "Server error during login" });
+    res.status(500).json({
+      success: false,
+      message: "Server error during login",
+      error: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
   }
 });
 

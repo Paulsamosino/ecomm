@@ -9,6 +9,10 @@ require("dotenv").config();
 const app = express();
 const server = http.createServer(app);
 
+// Basic middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 // List of specific allowed domains
 const allowedDomains = [
   "http://localhost:5173",
@@ -16,10 +20,6 @@ const allowedDomains = [
   "https://www.chickenpoultry.shop",
   "https://api.chickenpoultry.shop",
 ];
-
-// Basic middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
 // CORS configuration with enhanced preflight handling
 const corsOptions = {
@@ -109,11 +109,12 @@ app.options("/api/auth/*", (req, res) => {
   }
 });
 
-// Log all requests for debugging CORS issues
+// Log all requests for debugging
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   console.log("Request origin:", req.headers.origin);
   console.log("Request headers:", req.headers);
+  console.log("Request body:", req.body);
   next();
 });
 
@@ -136,7 +137,7 @@ const chatRoutes = require("./src/routes/chat");
 const sellerRoutes = require("./src/routes/seller");
 const blogRoutes = require("./src/routes/blog");
 
-// Register routes
+// Register routes with proper error handling
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/chat", chatRoutes);
@@ -151,8 +152,14 @@ app.get("/", (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({
+  console.error("Error stack:", err.stack);
+  console.error("Error details:", {
+    message: err.message,
+    name: err.name,
+    code: err.code,
+  });
+
+  res.status(err.status || 500).json({
     success: false,
     message: err.message || "Something went wrong!",
     error: process.env.NODE_ENV === "development" ? err.stack : undefined,
@@ -161,6 +168,7 @@ app.use((err, req, res, next) => {
 
 // 404 handler
 app.use((req, res) => {
+  console.log("404 - Route not found:", req.method, req.url);
   res.status(404).json({
     success: false,
     message: "Route not found",
