@@ -17,6 +17,10 @@ const allowedDomains = [
   "https://api.chickenpoultry.shop",
 ];
 
+// Basic middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 // CORS configuration with enhanced preflight handling
 const corsOptions = {
   origin: function (origin, callback) {
@@ -54,7 +58,7 @@ const corsOptions = {
   optionsSuccessStatus: 204,
 };
 
-// Apply CORS middleware early in the middleware chain
+// Apply CORS middleware
 app.use(cors(corsOptions));
 
 // Handle OPTIONS requests explicitly
@@ -112,10 +116,6 @@ app.use((req, res, next) => {
   console.log("Request headers:", req.headers);
   next();
 });
-
-// Other middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
 // Serve uploaded files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
