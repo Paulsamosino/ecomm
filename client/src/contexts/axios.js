@@ -19,10 +19,13 @@ axiosInstance.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
+
     // Log request details for debugging
-    console.log(`Request: ${config.method.toUpperCase()} ${config.url}`, config);
-    
+    console.log(
+      `Request: ${config.method.toUpperCase()} ${config.url}`,
+      config
+    );
+
     return config;
   },
   (error) => {
@@ -42,7 +45,7 @@ axiosInstance.interceptors.response.use(
       statusText: error.response?.statusText,
       data: error.response?.data,
       headers: error.response?.headers,
-      message: error.message
+      message: error.message,
     });
 
     if (error.response?.status === 401) {
@@ -50,7 +53,9 @@ axiosInstance.interceptors.response.use(
       // Emit auth error event instead of direct redirect
       window.dispatchEvent(new CustomEvent(AUTH_ERROR_EVENT));
     } else if (error.response?.status === 405) {
-      console.error("Method Not Allowed: The API doesn't support this HTTP method for this endpoint. Check server configuration.");
+      console.error(
+        "Method Not Allowed: The API doesn't support this HTTP method for this endpoint. Check server configuration."
+      );
     } else if (error.response?.status === 403) {
       console.error("Access forbidden. Please check your permissions.");
     }

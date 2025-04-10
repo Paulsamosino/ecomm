@@ -2,7 +2,10 @@ import { axiosInstance } from "../contexts/axios";
 
 export const apiLogin = async (credentials) => {
   try {
-    console.log("Login attempt with:", { email: credentials.email, passwordProvided: !!credentials.password });
+    console.log("Login attempt with:", {
+      email: credentials.email,
+      passwordProvided: !!credentials.password,
+    });
     const response = await axiosInstance.post("/auth/login", credentials);
     return response.data;
   } catch (error) {

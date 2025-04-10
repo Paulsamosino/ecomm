@@ -18,6 +18,7 @@ const allowedDomains = [
   "https://www.chickenpoultry.shop",
   "https://api.chickenpoultry.shop",
   "https://ecomm-git-main-ecomms-projects-807aa19d.vercel.app",
+  "https://chickenpoultry.netlify.app",
 ];
 
 // Request logging middleware

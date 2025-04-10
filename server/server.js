@@ -19,6 +19,7 @@ const allowedDomains = [
   "https://chickenpoultry.shop",
   "https://www.chickenpoultry.shop",
   "https://api.chickenpoultry.shop",
+  "https://chickenpoultry.netlify.app",
 ];
 
 // CORS configuration with enhanced preflight handling
