@@ -4,10 +4,10 @@ services:
     name: poultrymart
     runtime: node
     buildCommand: chmod +x render-build.sh && ./render-build.sh
-    startCommand: cd server && npm start
+    startCommand: cd server && node server.js
+    plan: free
+    autoDeploy: true
     envVars:
-      - key: NODE_VERSION
-        value: 18
       - key: NODE_ENV
         value: production
       - key: PORT
