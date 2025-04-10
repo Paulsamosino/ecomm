@@ -9,13 +9,37 @@ require("dotenv").config();
 const app = express();
 const server = http.createServer(app);
 
+// List of specific allowed domains
+const allowedDomains = [
+  "http://localhost:5173",
+  "https://chickenpoultry.shop",
+  "https://www.chickenpoultry.shop",
+  "https://api.chickenpoultry.shop",
+  "https://ecomm-git-main-ecomms-projects-807aa19d.vercel.app",
+];
+
 // CORS configuration with enhanced preflight handling
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps, curl requests)
     if (!origin) return callback(null, true);
 
-    // Always allow the request with a specific origin
+    // Check if the origin is in the allowed list
+    if (allowedDomains.indexOf(origin) !== -1) {
+      return callback(null, origin);
+    }
+
+    // Allow any vercel.app domain
+    if (origin && origin.endsWith(".vercel.app")) {
+      return callback(null, origin);
+    }
+
+    // Allow chickenpoultry.shop subdomains
+    if (origin && origin.endsWith(".chickenpoultry.shop")) {
+      return callback(null, origin);
+    }
+
+    // By default, allow the request but with specific origin
     callback(null, origin);
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -35,18 +59,29 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Handle OPTIONS requests explicitly
-app.options("*", cors(corsOptions));
+app.options("*", function (req, res) {
+  // Set CORS headers specifically for OPTIONS requests
+  res.header("Access-Control-Allow-Origin", req.headers.origin);
+  res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, Content-Length, X-Requested-With, Accept, Origin"
+  );
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.sendStatus(204);
+});
 
-// Custom preflight handler for auth endpoints (helps with Vercel serverless functions)
+// Custom preflight handler for auth endpoints
 app.options("/api/auth/*", (req, res) => {
   res
-    .status(200)
+    .status(204)
     .set({
-      "Access-Control-Allow-Origin": req.headers.origin || "*",
+      "Access-Control-Allow-Origin": req.headers.origin,
       "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Headers":
+        "Content-Type, Authorization, Origin, X-Requested-With, Accept",
       "Access-Control-Allow-Credentials": "true",
-      "Content-Length": "0",
+      "Access-Control-Max-Age": "86400",
     })
     .send();
 });

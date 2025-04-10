@@ -20,6 +20,15 @@ const compareIds = (id1, id2) => {
   return String(id1) === String(id2);
 };
 
+// List of specific allowed domains
+const allowedDomains = [
+  "http://localhost:5173",
+  "https://chickenpoultry.shop",
+  "https://www.chickenpoultry.shop",
+  "https://api.chickenpoultry.shop",
+  "https://ecomm-git-main-ecomms-projects-807aa19d.vercel.app",
+];
+
 // Function to setup socket server
 const setupSocketServer = (server) => {
   const io = socketIo(server, {
@@ -28,7 +37,22 @@ const setupSocketServer = (server) => {
         // Allow requests with no origin (like mobile apps, curl requests)
         if (!origin) return callback(null, true);
 
-        // Always allow the request with a specific origin
+        // Check if the origin is in the allowed list
+        if (allowedDomains.indexOf(origin) !== -1) {
+          return callback(null, origin);
+        }
+
+        // Allow any vercel.app domain
+        if (origin && origin.endsWith(".vercel.app")) {
+          return callback(null, origin);
+        }
+
+        // Allow chickenpoultry.shop subdomains
+        if (origin && origin.endsWith(".chickenpoultry.shop")) {
+          return callback(null, origin);
+        }
+
+        // By default, allow the request but with specific origin
         callback(null, origin);
       },
       methods: ["GET", "POST", "OPTIONS"],
