@@ -16,32 +16,17 @@ app.use(express.urlencoded({ extended: true }));
 // List of specific allowed domains
 const allowedDomains = [
   "http://localhost:5173",
-  "https://chickenpoultry.shop",
-  "https://www.chickenpoultry.shop",
-  "https://api.chickenpoultry.shop",
-  "https://chickenpoultry.netlify.app",
+  "http://localhost:3000",
   "https://poultrymart-client.onrender.com",
   "https://poultrymart-api.onrender.com",
-  "https://*.onrender.com", // Allow all Render.com subdomains
 ];
 
 // CORS configuration
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps, curl requests)
       if (!origin) return callback(null, true);
-
-      // Check if the origin is allowed
-      if (
-        allowedDomains.some((domain) => {
-          if (domain.includes("*")) {
-            const domainRegex = new RegExp(domain.replace("*", ".*"));
-            return domainRegex.test(origin);
-          }
-          return origin.startsWith(domain);
-        })
-      ) {
+      if (allowedDomains.includes(origin) || origin.endsWith(".onrender.com")) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
