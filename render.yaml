@@ -3,7 +3,7 @@ services:
   - type: web
     name: poultrymart-api
     runtime: node
-    buildCommand: cd server && npm install && npm install multer@1.4.5-lts.1 multer-storage-cloudinary --save
+    buildCommand: chmod +x server/render-build.sh && ./server/render-build.sh
     startCommand: cd server && npm start
     envVars:
       - key: NODE_VERSION
@@ -31,13 +31,6 @@ services:
     healthCheckPath: /health
     envVarGroups:
       - name: cloudinary-config
-        envVars:
-          - key: CLOUDINARY_CLOUD_NAME
-            value: dzeub4jji
-          - key: CLOUDINARY_API_KEY
-            value: 283288589219278
-          - key: CLOUDINARY_API_SECRET
-            sync: false
 
   # Frontend Client Service
   - type: web

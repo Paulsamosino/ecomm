@@ -122,24 +122,32 @@ app.use((req, res, next) => {
   next();
 });
 
-// Check for required dependencies
-try {
-  require.resolve('multer');
-  console.log('Multer is installed.');
-} catch (err) {
-  console.error('Multer is not installed. Installing now...');
-  const { execSync } = require('child_process');
+// Check for required dependencies and setup uploads directory
+const fs = require('fs');
+const uploadDir = path.join(__dirname, "uploads");
+const productUploadsDir = path.join(uploadDir, "products");
+
+// Ensure upload directories exist
+[uploadDir, productUploadsDir].forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+    console.log(`Created directory: ${dir}`);
+  }
+});
+
+// Verify critical dependencies
+['multer', 'cloudinary', 'mongoose'].forEach(dep => {
   try {
-    execSync('npm install multer@1.4.5-lts.1 --save', { stdio: 'inherit' });
-    console.log('Multer installed successfully.');
-  } catch (installError) {
-    console.error('Failed to install multer:', installError);
+    require.resolve(dep);
+    console.log(`✓ ${dep} is installed`);
+  } catch (err) {
+    console.error(`Critical dependency ${dep} is missing. Please run npm install`);
     process.exit(1);
   }
-}
+});
 
 // Serve uploaded files
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static(uploadDir));
 
 // Connect to MongoDB
 mongoose
