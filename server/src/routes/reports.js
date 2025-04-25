@@ -3,7 +3,7 @@ const router = express.Router();
 const Report = require("../models/Report");
 const User = require("../models/User");
 const { protect } = require("../middleware/authMiddleware");
-const { checkRole } = require("../middleware/checkRole");
+const checkRole = require("../middleware/checkRole");
 
 // Submit a report
 router.post("/", protect, async (req, res) => {
@@ -70,12 +70,12 @@ router.post("/", protect, async (req, res) => {
       description,
       category,
       evidence: evidence || [],
-      status: "pending"
+      status: "pending",
     });
 
     await report.populate([
       { path: "reportedUser", select: "name email" },
-      { path: "reporter", select: "name email" }
+      { path: "reporter", select: "name email" },
     ]);
 
     res.status(201).json({
@@ -127,7 +127,7 @@ router.get("/", protect, checkRole(["admin"]), async (req, res) => {
       .populate("resolvedBy", "name email")
       .sort("-createdAt");
 
-    const formattedReports = reports.map(report => ({
+    const formattedReports = reports.map((report) => ({
       _id: report._id,
       status: report.status,
       reason: report.reason,
@@ -138,23 +138,31 @@ router.get("/", protect, checkRole(["admin"]), async (req, res) => {
       resolvedAt: report.resolvedAt,
       reporterRole: report.reporterRole,
       reporterName: report.reporter ? report.reporter.name : "Unknown",
-      reportedUserName: report.reportedUser ? report.reportedUser.name : "Unknown User",
+      reportedUserName: report.reportedUser
+        ? report.reportedUser.name
+        : "Unknown User",
       evidence: report.evidence || [],
-      reporterDetails: report.reporter ? {
-        id: report.reporter._id,
-        name: report.reporter.name,
-        email: report.reporter.email
-      } : null,
-      reportedUserDetails: report.reportedUser ? {
-        id: report.reportedUser._id,
-        name: report.reportedUser.name,
-        email: report.reportedUser.email
-      } : null,
-      resolverDetails: report.resolvedBy ? {
-        id: report.resolvedBy._id,
-        name: report.resolvedBy.name,
-        email: report.resolvedBy.email
-      } : null
+      reporterDetails: report.reporter
+        ? {
+            id: report.reporter._id,
+            name: report.reporter.name,
+            email: report.reporter.email,
+          }
+        : null,
+      reportedUserDetails: report.reportedUser
+        ? {
+            id: report.reportedUser._id,
+            name: report.reportedUser.name,
+            email: report.reportedUser.email,
+          }
+        : null,
+      resolverDetails: report.resolvedBy
+        ? {
+            id: report.resolvedBy._id,
+            name: report.resolvedBy.name,
+            email: report.resolvedBy.email,
+          }
+        : null,
     }));
 
     res.json(formattedReports);
@@ -162,7 +170,7 @@ router.get("/", protect, checkRole(["admin"]), async (req, res) => {
     console.error("Error fetching reports:", error);
     res.status(500).json({
       success: false,
-      message: "Error fetching reports"
+      message: "Error fetching reports",
     });
   }
 });
@@ -172,10 +180,12 @@ router.put("/:id/status", protect, checkRole(["admin"]), async (req, res) => {
   try {
     const { status, resolution } = req.body;
 
-    if (!["pending", "investigating", "resolved", "dismissed"].includes(status)) {
+    if (
+      !["pending", "investigating", "resolved", "dismissed"].includes(status)
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Invalid status"
+        message: "Invalid status",
       });
     }
 
@@ -185,31 +195,31 @@ router.put("/:id/status", protect, checkRole(["admin"]), async (req, res) => {
         status,
         resolution,
         resolvedBy: status === "resolved" ? req.user._id : undefined,
-        resolvedAt: status === "resolved" ? new Date() : undefined
+        resolvedAt: status === "resolved" ? new Date() : undefined,
       },
       { new: true }
     )
-    .populate("reporter", "name email")
-    .populate("reportedUser", "name email")
-    .populate("resolvedBy", "name email");
+      .populate("reporter", "name email")
+      .populate("reportedUser", "name email")
+      .populate("resolvedBy", "name email");
 
     if (!report) {
       return res.status(404).json({
         success: false,
-        message: "Report not found"
+        message: "Report not found",
       });
     }
 
     res.json({
       success: true,
       message: "Report status updated successfully",
-      report
+      report,
     });
   } catch (error) {
     console.error("Error updating report status:", error);
     res.status(500).json({
       success: false,
-      message: "Error updating report status"
+      message: "Error updating report status",
     });
   }
 });
