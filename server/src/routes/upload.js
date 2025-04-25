@@ -4,7 +4,7 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
-const { authenticateToken } = require("../middleware/auth");
+const auth = require("../middleware/auth");
 const cloudinary = require("cloudinary").v2;
 
 // Configure multer for temporary storage
@@ -39,7 +39,7 @@ const upload = multer({
 });
 
 // Handle image upload
-router.post("/image", authenticateToken, upload.single("image"), async (req, res) => {
+router.post("/image", auth, upload.single("image"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: "No image file provided" });
