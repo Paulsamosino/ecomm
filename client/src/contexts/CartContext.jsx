@@ -4,26 +4,52 @@ import toast from "react-hot-toast";
 
 const CartContext = createContext();
 
+const CART_STORAGE_KEY = "cart";
+const WISHLIST_STORAGE_KEY = "wishlist";
+
 export const CartProvider = ({ children }) => {
   const { user } = useAuth();
   const [cartItems, setCartItems] = useState([]);
   const [wishlistItems, setWishlistItems] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Load cart and wishlist from localStorage on mount and when user changes
   useEffect(() => {
     const loadCartFromStorage = () => {
       try {
-        const savedCart = localStorage.getItem("cart");
-        const savedWishlist = localStorage.getItem("wishlist");
+        setLoading(true);
+        // Get data from localStorage
+        const savedCart = localStorage.getItem(CART_STORAGE_KEY);
+        const savedWishlist = localStorage.getItem(WISHLIST_STORAGE_KEY);
 
-        if (savedCart) setCartItems(JSON.parse(savedCart));
-        if (savedWishlist) setWishlistItems(JSON.parse(savedWishlist));
+        // Parse and validate cart data
+        if (savedCart) {
+          const parsedCart = JSON.parse(savedCart);
+          if (Array.isArray(parsedCart)) {
+            setCartItems(parsedCart);
+          } else {
+            console.error("Invalid cart data format");
+            setCartItems([]);
+          }
+        }
+
+        // Parse and validate wishlist data
+        if (savedWishlist) {
+          const parsedWishlist = JSON.parse(savedWishlist);
+          if (Array.isArray(parsedWishlist)) {
+            setWishlistItems(parsedWishlist);
+          } else {
+            console.error("Invalid wishlist data format");
+            setWishlistItems([]);
+          }
+        }
       } catch (error) {
         console.error("Error loading cart from storage:", error);
         // Reset if there's an error
         setCartItems([]);
         setWishlistItems([]);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -32,15 +58,36 @@ export const CartProvider = ({ children }) => {
 
   // Save cart to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(cartItems));
-  }, [cartItems]);
+    try {
+      if (!loading) {
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
+      }
+    } catch (error) {
+      console.error("Error saving cart to storage:", error);
+    }
+  }, [cartItems, loading]);
 
   // Save wishlist to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem("wishlist", JSON.stringify(wishlistItems));
-  }, [wishlistItems]);
+    try {
+      if (!loading) {
+        localStorage.setItem(
+          WISHLIST_STORAGE_KEY,
+          JSON.stringify(wishlistItems)
+        );
+      }
+    } catch (error) {
+      console.error("Error saving wishlist to storage:", error);
+    }
+  }, [wishlistItems, loading]);
 
   const addToCart = (product, quantity = 1) => {
+    if (!product?._id) {
+      console.error("Invalid product data:", product);
+      toast.error("Could not add item to cart");
+      return;
+    }
+
     setCartItems((prevItems) => {
       // Check if product already exists in cart
       const existingItemIndex = prevItems.findIndex(
@@ -65,6 +112,11 @@ export const CartProvider = ({ children }) => {
   };
 
   const removeFromCart = (productId) => {
+    if (!productId) {
+      console.error("Invalid product ID for removal");
+      return;
+    }
+
     setCartItems((prevItems) => {
       const updatedItems = prevItems.filter((item) => item._id !== productId);
       toast.success("Removed from cart");
@@ -73,6 +125,11 @@ export const CartProvider = ({ children }) => {
   };
 
   const updateCartItemQuantity = (productId, quantity) => {
+    if (!productId) {
+      console.error("Invalid product ID for quantity update");
+      return;
+    }
+
     if (quantity <= 0) {
       removeFromCart(productId);
       return;
@@ -92,6 +149,12 @@ export const CartProvider = ({ children }) => {
 
   // Wishlist functionality
   const addToWishlist = (product) => {
+    if (!product?._id) {
+      console.error("Invalid product data:", product);
+      toast.error("Could not add item to wishlist");
+      return;
+    }
+
     setWishlistItems((prevItems) => {
       // Check if product already exists in wishlist
       const exists = prevItems.some((item) => item._id === product._id);
@@ -107,6 +170,11 @@ export const CartProvider = ({ children }) => {
   };
 
   const removeFromWishlist = (productId) => {
+    if (!productId) {
+      console.error("Invalid product ID for wishlist removal");
+      return;
+    }
+
     setWishlistItems((prevItems) => {
       const updatedItems = prevItems.filter((item) => item._id !== productId);
       toast.success("Removed from wishlist");

@@ -30,11 +30,11 @@ const userSchema = new Schema(
       enum: ["user", "seller", "admin"],
       default: "user",
     },
-    isSeller: {
+    isAdmin: {
       type: Boolean,
       default: false,
     },
-    isAdmin: {
+    isSeller: {
       type: Boolean,
       default: false,
     },
@@ -88,6 +88,22 @@ const userSchema = new Schema(
   }
 );
 
+// Set isAdmin based on role
+userSchema.pre("save", function (next) {
+  if (this.isModified("role")) {
+    this.isAdmin = this.role === "admin";
+  }
+  next();
+});
+
+// Set isSeller based on role
+userSchema.pre("save", function (next) {
+  if (this.isModified("role")) {
+    this.isSeller = this.role === "seller";
+  }
+  next();
+});
+
 // Encrypt password using bcrypt
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) {
@@ -127,6 +143,8 @@ userSchema.methods.getAverageRating = function () {
 // Add indexes
 userSchema.index({ email: 1 });
 userSchema.index({ isSeller: 1 });
+userSchema.index({ isAdmin: 1 });
+userSchema.index({ role: 1 });
 
 const User = mongoose.model("User", userSchema);
 

@@ -54,6 +54,11 @@ const SellerLayout = () => {
           path: "/seller/orders",
           icon: ShoppingCart,
         },
+        {
+          name: "Breeding Management",
+          path: "/seller/breeding-management",
+          icon: Store,
+        },
       ],
     },
     {
@@ -99,17 +104,17 @@ const SellerLayout = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navbar */}
-      <SellerNavbar />
+      {/* Navbar - Fixed at top */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200">
+        <SellerNavbar />
+      </div>
 
-      {/* Sidebar */}
+      {/* Sidebar - Fixed at left */}
       <aside
-        className={`fixed top-16 left-0 bottom-0 w-64 bg-white border-r border-gray-200 transition-transform duration-200 ease-in-out z-20 ${
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed top-16 left-0 bottom-0 w-64 bg-white border-r border-gray-200 overflow-y-auto z-40`}
       >
-        <div className="flex flex-col h-full py-4">
-          <div className="flex-1 space-y-1 px-3">
+        <div className="flex flex-col h-full">
+          <div className="flex-1 space-y-1 px-3 py-4">
             {navigation.map((group) => (
               <div key={group.group} className="mb-6">
                 <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -143,8 +148,8 @@ const SellerLayout = () => {
             ))}
           </div>
 
-          {/* Store Info */}
-          <div className="px-3 py-4 mt-6 border-t border-gray-200">
+          {/* Store Info - Always at bottom of sidebar */}
+          <div className="px-3 py-4 border-t border-gray-200">
             <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-50">
               <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                 <Store className="h-5 w-5 text-primary" />
@@ -163,20 +168,16 @@ const SellerLayout = () => {
         </div>
       </aside>
 
-      {/* Main Content */}
-      <div
-        className={`pt-16 ${
-          isSidebarOpen ? "md:pl-64" : ""
-        } transition-all duration-200`}
-      >
+      {/* Main Content - Adjusted margin to account for fixed navbar and sidebar */}
+      <main className="ml-64 pt-16 min-h-screen">
         <div className="p-6">
           <Outlet />
         </div>
-      </div>
+      </main>
 
-      {/* Mobile Sidebar Toggle */}
+      {/* Mobile Sidebar Toggle - Higher z-index to stay on top */}
       <button
-        className="fixed bottom-4 right-4 md:hidden z-30 p-3 bg-primary text-white rounded-full shadow-lg"
+        className="fixed bottom-4 right-4 md:hidden z-50 p-3 bg-primary text-white rounded-full shadow-lg"
         onClick={() => setSidebarOpen(!isSidebarOpen)}
       >
         {isSidebarOpen ? (

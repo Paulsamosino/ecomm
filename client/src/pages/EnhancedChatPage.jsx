@@ -77,9 +77,22 @@ const EnhancedChatPage = () => {
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    socketService.connect(token);
+    const initializeSocketConnection = async () => {
+      try {
+        await socketService.connect(token);
+        console.log("Socket connected in EnhancedChatPage");
+      } catch (error) {
+        console.error("Socket connection error:", error);
+        toast.error(
+          "Failed to connect to chat server. Please refresh the page."
+        );
+      }
+    };
+
+    initializeSocketConnection();
 
     const handleNewMessage = (data) => {
+      console.log("New message received:", data);
       if (data.chatId === chatId) {
         // Check for duplicate messages before adding
         setMessages((prev) => {
@@ -102,6 +115,15 @@ const EnhancedChatPage = () => {
             data.message._id,
             MESSAGE_STATUS.DELIVERED
           );
+
+          // If window is in focus, mark as read immediately
+          if (document.hasFocus()) {
+            socketService.updateMessageStatus(
+              chatId,
+              data.message._id,
+              MESSAGE_STATUS.READ
+            );
+          }
         }
       }
 
@@ -152,14 +174,37 @@ const EnhancedChatPage = () => {
       }
     };
 
+    // Set up event listeners
     socketService.onNewMessage(handleNewMessage);
     socketService.onMessageStatus(handleMessageStatus);
     socketService.on("user_status", handleUserStatus);
+
+    // Handle window focus/blur for read receipts
+    const handleWindowFocus = () => {
+      if (chatId && messages.length > 0) {
+        const unreadMessages = messages.filter(
+          (msg) =>
+            msg.senderId !== normalizeUserId(user) &&
+            msg.status !== MESSAGE_STATUS.READ
+        );
+
+        unreadMessages.forEach((msg) => {
+          socketService.updateMessageStatus(
+            chatId,
+            msg._id,
+            MESSAGE_STATUS.READ
+          );
+        });
+      }
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
 
     return () => {
       socketService.off("new_message", handleNewMessage);
       socketService.off("message_status", handleMessageStatus);
       socketService.off("user_status", handleUserStatus);
+      window.removeEventListener("focus", handleWindowFocus);
     };
   }, [user?._id, chatId]);
 

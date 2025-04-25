@@ -280,12 +280,24 @@ const SellerPostProduct = () => {
           {previewImages.length > 0 && (
             <div className="mt-4 grid grid-cols-5 gap-4">
               {previewImages.map((preview, index) => (
-                <div key={index} className="relative aspect-square">
-                  <img
-                    src={preview}
-                    alt={`Preview ${index + 1}`}
-                    className="w-full h-full object-cover rounded-lg"
-                  />
+                <div key={index} className="aspect-square relative">
+                  <div className="w-full h-full overflow-hidden rounded-lg bg-amber-50">
+                    {preview === "🐣" ? (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <img
+                          src="/1f425.png"
+                          alt="Baby chick"
+                          className="w-16 h-16 hover:scale-110 transition-transform"
+                        />
+                      </div>
+                    ) : (
+                      <img
+                        src={preview}
+                        alt={`Preview ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

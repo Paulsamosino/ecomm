@@ -21,43 +21,44 @@ axiosInstance.interceptors.request.use(
     }
 
     // Log request details for debugging
-    console.log(
-      `Request: ${config.method.toUpperCase()} ${config.url}`,
-      config
-    );
+    console.log(`${config.method.toUpperCase()} ${config.url}`, {
+      headers: config.headers,
+      data: config.data,
+    });
 
     return config;
   },
   (error) => {
+    console.error("Request error:", error);
     return Promise.reject(error);
   }
 );
 
 // Add response interceptor to handle token expiration and errors
 axiosInstance.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Log successful responses for debugging
+    console.log(`Response ${response.config.url}:`, {
+      status: response.status,
+      data: response.data,
+    });
+    return response;
+  },
   (error) => {
     // Enhanced error logging
     console.error("API Error:", {
       url: error.config?.url,
       method: error.config?.method,
       status: error.response?.status,
-      statusText: error.response?.statusText,
       data: error.response?.data,
-      headers: error.response?.headers,
-      message: error.message,
+      headers: error.config?.headers,
     });
 
     if (error.response?.status === 401) {
+      // Clear token on auth error
       localStorage.removeItem("token");
       // Emit auth error event instead of direct redirect
       window.dispatchEvent(new CustomEvent(AUTH_ERROR_EVENT));
-    } else if (error.response?.status === 405) {
-      console.error(
-        "Method Not Allowed: The API doesn't support this HTTP method for this endpoint. Check server configuration."
-      );
-    } else if (error.response?.status === 403) {
-      console.error("Access forbidden. Please check your permissions.");
     }
     return Promise.reject(error);
   }

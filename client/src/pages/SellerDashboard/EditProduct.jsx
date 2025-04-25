@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiGetProduct, apiUpdateProduct } from "@/api/products";
-import { Loader2 } from "lucide-react";
+import { Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
+import BreedSelect from "@/components/ui/breed-select";
 
 const EditProduct = () => {
   const navigate = useNavigate();
@@ -27,7 +28,7 @@ const EditProduct = () => {
     name: "",
     description: "",
     price: "",
-    category: "",
+    category: "chicken",
     breed: "",
     age: "",
     quantity: "",
@@ -35,6 +36,10 @@ const EditProduct = () => {
     location: "",
     shippingInfo: "",
   });
+
+  const [errors, setErrors] = useState({});
+  const [previewImages, setPreviewImages] = useState([]);
+  const [existingImages, setExistingImages] = useState([]);
 
   useEffect(() => {
     fetchProduct();
@@ -44,21 +49,27 @@ const EditProduct = () => {
     try {
       setIsFetching(true);
       const product = await apiGetProduct(id);
+      if (product.seller._id !== user.id && product.seller !== user.id) {
+        toast.error("Unauthorized access");
+        navigate("/seller/products");
+        return;
+      }
       setFormData({
         name: product.name,
         description: product.description,
-        price: product.price,
+        price: product.price.toString(),
         category: product.category,
         breed: product.breed,
-        age: product.age,
-        quantity: product.quantity,
-        images: product.images,
-        location: product.location || "",
-        shippingInfo: product.shippingInfo || "",
+        age: product.age.toString(),
+        quantity: product.quantity.toString(),
+        location: product.location,
+        shippingInfo: product.shippingInfo,
+        images: [],
       });
+      setExistingImages(product.images);
     } catch (error) {
       console.error("Error fetching product:", error);
-      toast.error("Failed to fetch product details");
+      toast.error("Error fetching product details");
       navigate("/seller/products");
     } finally {
       setIsFetching(false);
@@ -67,7 +78,17 @@ const EditProduct = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    // Clear error when user types
+    if (errors[name]) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "",
+      }));
+    }
   };
 
   const handleImageChange = (e) => {
@@ -76,39 +97,69 @@ const EditProduct = () => {
       toast.error("Maximum 5 images allowed");
       return;
     }
-    setFormData((prev) => ({ ...prev, images: files }));
+
+    // Preview images
+    const previews = files.map((file) => URL.createObjectURL(file));
+    setPreviewImages(previews);
+    setFormData((prev) => ({
+      ...prev,
+      images: files,
+    }));
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    if (!formData.name) errors.name = "Product name is required";
+    if (!formData.description) errors.description = "Description is required";
+    if (!formData.price) errors.price = "Price is required";
+    if (isNaN(formData.price)) errors.price = "Price must be a number";
+    if (!formData.quantity) errors.quantity = "Quantity is required";
+    if (isNaN(formData.quantity)) errors.quantity = "Quantity must be a number";
+    if (!formData.breed) errors.breed = "Breed is required";
+    if (!formData.age) errors.age = "Age is required";
+    if (!formData.location) errors.location = "Location is required";
+    if (!formData.shippingInfo)
+      errors.shippingInfo = "Shipping information is required";
+    if (formData.images.length === 0 && existingImages.length === 0) {
+      errors.images = "At least one image is required";
+    }
+
+    setErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
+    if (!validateForm()) return;
 
+    setIsLoading(true);
     try {
       const formDataToSend = new FormData();
       Object.keys(formData).forEach((key) => {
         if (key === "images") {
-          if (Array.isArray(formData.images) && formData.images.length > 0) {
-            // Only append new images if they were selected
-            if (formData.images[0] instanceof File) {
-              formData.images.forEach((image) => {
-                formDataToSend.append("images", image);
-              });
-            }
-          }
+          formData.images.forEach((image) => {
+            formDataToSend.append("images", image);
+          });
         } else {
           formDataToSend.append(key, formData[key]);
         }
       });
+      // Add existing images that should be kept
+      formDataToSend.append("existingImages", JSON.stringify(existingImages));
 
       await apiUpdateProduct(id, formDataToSend);
-      toast.success("Product updated successfully!");
+      toast.success("Product updated successfully");
       navigate("/seller/products");
     } catch (error) {
       console.error("Error updating product:", error);
-      toast.error(error.response?.data?.message || "Failed to update product");
+      toast.error(error.message || "Error updating product");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleRemoveExistingImage = (index) => {
+    setExistingImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   if (isFetching) {
@@ -134,7 +185,7 @@ const EditProduct = () => {
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                required
+                error={errors.name}
                 placeholder="Enter product name"
               />
             </div>
@@ -146,7 +197,7 @@ const EditProduct = () => {
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
-                required
+                error={errors.description}
                 placeholder="Enter product description"
                 rows={4}
               />
@@ -161,7 +212,7 @@ const EditProduct = () => {
                   type="number"
                   value={formData.price}
                   onChange={handleChange}
-                  required
+                  error={errors.price}
                   min="0"
                   step="0.01"
                   placeholder="Enter price"
@@ -176,7 +227,7 @@ const EditProduct = () => {
                   type="number"
                   value={formData.quantity}
                   onChange={handleChange}
-                  required
+                  error={errors.quantity}
                   min="0"
                   placeholder="Enter quantity"
                 />
@@ -189,7 +240,11 @@ const EditProduct = () => {
                 <Select
                   value={formData.category}
                   onValueChange={(value) =>
-                    handleChange({ target: { name: "category", value } })
+                    setFormData((prev) => ({
+                      ...prev,
+                      category: value,
+                      breed: "",
+                    }))
                   }
                 >
                   <SelectTrigger>
@@ -198,7 +253,6 @@ const EditProduct = () => {
                   <SelectContent>
                     <SelectItem value="chicken">Chicken</SelectItem>
                     <SelectItem value="duck">Duck</SelectItem>
-                    <SelectItem value="quail">Quail</SelectItem>
                     <SelectItem value="turkey">Turkey</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
@@ -206,15 +260,18 @@ const EditProduct = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="breed">Breed</Label>
-                <Input
-                  id="breed"
-                  name="breed"
+                <Label>Breed</Label>
+                <BreedSelect
+                  category={formData.category}
                   value={formData.breed}
-                  onChange={handleChange}
-                  required
-                  placeholder="Enter breed"
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({ ...prev, breed: value }))
+                  }
+                  className={errors.breed ? "border-red-500" : ""}
                 />
+                {errors.breed && (
+                  <p className="mt-1 text-xs text-red-500">{errors.breed}</p>
+                )}
               </div>
             </div>
 
@@ -227,7 +284,7 @@ const EditProduct = () => {
                   type="number"
                   value={formData.age}
                   onChange={handleChange}
-                  required
+                  error={errors.age}
                   min="0"
                   placeholder="Enter age in months"
                 />
@@ -240,6 +297,7 @@ const EditProduct = () => {
                   name="location"
                   value={formData.location}
                   onChange={handleChange}
+                  error={errors.location}
                   placeholder="Enter location"
                 />
               </div>
@@ -252,6 +310,7 @@ const EditProduct = () => {
                 name="shippingInfo"
                 value={formData.shippingInfo}
                 onChange={handleChange}
+                error={errors.shippingInfo}
                 placeholder="Enter shipping information"
                 rows={2}
               />
@@ -259,35 +318,91 @@ const EditProduct = () => {
 
             <div className="space-y-2">
               <Label htmlFor="images">Product Images</Label>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
-                {formData.images.map((image, index) => (
-                  <div
-                    key={index}
-                    className="relative aspect-square rounded-lg overflow-hidden"
-                  >
-                    <img
-                      src={
-                        typeof image === "string"
-                          ? image
-                          : URL.createObjectURL(image)
-                      }
-                      alt={`Product ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
+              {existingImages.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-sm text-gray-600 mb-2">Current Images:</p>
+                  <div className="grid grid-cols-5 gap-4">
+                    {existingImages.map((image, index) => (
+                      <div key={index} className="aspect-square relative">
+                        <div className="w-full h-full overflow-hidden rounded-lg bg-amber-50">
+                          {image === "🐣" ? (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <img
+                                src="/1f425.png"
+                                alt="Baby chick"
+                                className="w-16 h-16 hover:scale-110 transition-transform"
+                              />
+                            </div>
+                          ) : (
+                            <img
+                              src={image}
+                              alt={`Product ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveExistingImage(index)}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
+              )}
+              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg">
+                <div className="space-y-1 text-center">
+                  <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                  <div className="flex text-sm text-gray-600">
+                    <label
+                      htmlFor="images"
+                      className="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary/80 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary"
+                    >
+                      <span>Upload images</span>
+                      <input
+                        id="images"
+                        name="images"
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={handleImageChange}
+                      />
+                    </label>
+                    <p className="pl-1">or drag and drop</p>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    PNG, JPG, GIF up to 10MB (max. 5 images)
+                  </p>
+                </div>
               </div>
-              <Input
-                id="images"
-                name="images"
-                type="file"
-                multiple
-                accept="image/*"
-                onChange={handleImageChange}
-              />
-              <p className="text-sm text-gray-500">
-                Upload new images (max 5) or keep existing ones
-              </p>
+              {errors.images && (
+                <p className="mt-1 text-xs text-red-500">{errors.images}</p>
+              )}
+              {previewImages.length > 0 && (
+                <div className="mt-4 grid grid-cols-5 gap-4">
+                  {previewImages.map((preview, index) => (
+                    <div key={index} className="aspect-square relative">
+                      <div className="w-full h-full overflow-hidden rounded-lg bg-amber-50">
+                        {preview === "🐣" ? (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <span className="text-4xl">🐣</span>
+                          </div>
+                        ) : (
+                          <img
+                            src={preview}
+                            alt={`Preview ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end space-x-4">

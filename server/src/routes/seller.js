@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const mongoose = require("mongoose");
 const { protect } = require("../middleware/authMiddleware");
 const Product = require("../models/Product");
 const Order = require("../models/Order");
@@ -143,20 +144,80 @@ router.get("/orders", protect, async (req, res) => {
 });
 
 // Update order status
-router.put("/orders/:id", protect, async (req, res) => {
+router.put("/orders/:id/status", protect, async (req, res) => {
   try {
-    const { status } = req.body;
-    const order = await Order.findOneAndUpdate(
-      { _id: req.params.id, seller: req.user.id },
-      { status },
-      { new: true }
-    );
+    const { status, trackingNumber } = req.body;
+
+    // Validate status
+    const validStatuses = [
+      "pending",
+      "processing",
+      "shipped",
+      "delivered",
+      "completed",
+      "cancelled",
+    ];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ message: "Invalid order status" });
+    }
+
+    // Find the order
+    const order = await Order.findOne({
+      _id: req.params.id,
+      seller: req.user.id,
+    });
+
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
-    res.json(order);
+
+    // Update order
+    order.status = status;
+    if (trackingNumber) {
+      order.trackingNumber = trackingNumber;
+    }
+
+    // Save and populate
+    await order.save();
+    const updatedOrder = await Order.findById(order._id)
+      .populate("buyer", "name email")
+      .populate("items.product");
+
+    // Emit socket event for real-time updates
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`user:${order.buyer.toString()}`).emit("orderUpdate", {
+        orderId: order._id,
+        status,
+        trackingNumber: order.trackingNumber,
+      });
+    }
+
+    res.json(updatedOrder);
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Error updating order status:", error);
+    res.status(500).json({ message: "Error updating order status" });
+  }
+});
+
+// Get order metrics
+router.get("/orders/metrics", protect, async (req, res) => {
+  try {
+    const timeframe = parseInt(req.query.timeframe) || 30;
+    const metrics = await Order.getSellerMetrics(req.user._id, timeframe);
+
+    // Get seller profile for additional statistics
+    const seller = await User.findById(req.user._id);
+
+    if (seller?.sellerProfile?.statistics) {
+      metrics.conversionRate =
+        seller.sellerProfile.statistics.conversionRate || 0;
+    }
+
+    res.json(metrics);
+  } catch (error) {
+    console.error("Error fetching order metrics:", error);
+    res.status(500).json({ message: "Error fetching order metrics" });
   }
 });
 
@@ -182,11 +243,11 @@ router.get("/customers", protect, async (req, res) => {
           totalSpent: 0,
           lastPurchase: null,
           status: "active",
-          averageRating: 4.5, // Placeholder - implement actual rating system
+          averageRating: 4.5,
         };
       }
       acc[buyer._id].totalOrders++;
-      acc[buyer._id].totalSpent += order.total;
+      acc[buyer._id].totalSpent += order.totalAmount; // Fix: changed from order.total to order.totalAmount
       if (
         !acc[buyer._id].lastPurchase ||
         new Date(order.createdAt) > new Date(acc[buyer._id].lastPurchase)
@@ -198,7 +259,8 @@ router.get("/customers", protect, async (req, res) => {
 
     res.json(Object.values(customers));
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Error fetching customers:", error);
+    res.status(500).json({ message: "Error fetching customers" });
   }
 });
 
@@ -208,10 +270,12 @@ router.get("/analytics", protect, async (req, res) => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+    const sellerId = new mongoose.Types.ObjectId(req.user.id);
+
     const dailyRevenue = await Order.aggregate([
       {
         $match: {
-          seller: req.user.id,
+          seller: sellerId,
           status: "completed",
           createdAt: { $gte: thirtyDaysAgo },
         },
@@ -219,7 +283,7 @@ router.get("/analytics", protect, async (req, res) => {
       {
         $group: {
           _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-          revenue: { $sum: "$total" },
+          revenue: { $sum: "$totalAmount" },
           orders: { $sum: 1 },
         },
       },
@@ -227,7 +291,7 @@ router.get("/analytics", protect, async (req, res) => {
     ]);
 
     const categoryBreakdown = await Order.aggregate([
-      { $match: { seller: req.user.id, status: "completed" } },
+      { $match: { seller: sellerId, status: "completed" } },
       { $unwind: "$items" },
       {
         $lookup: {
@@ -241,7 +305,7 @@ router.get("/analytics", protect, async (req, res) => {
       {
         $group: {
           _id: "$product.category",
-          total: { $sum: { $multiply: ["$items.quantity", "$items.price"] } },
+          total: { $sum: { $multiply: ["$items.quantity", "$totalAmount"] } },
         },
       },
     ]);
@@ -251,7 +315,8 @@ router.get("/analytics", protect, async (req, res) => {
       categoryBreakdown,
     });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Error fetching analytics:", error);
+    res.status(500).json({ message: "Error fetching analytics data" });
   }
 });
 
@@ -289,6 +354,155 @@ router.get("/reviews", protect, async (req, res) => {
     res.json(reviews);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Get seller payment statistics
+router.get("/payments/stats", protect, async (req, res) => {
+  try {
+    const { start, end } = req.query;
+    const startDate = start
+      ? new Date(start)
+      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const endDate = end ? new Date(end) : new Date();
+
+    const orders = await Order.find({
+      seller: req.user.id,
+      createdAt: { $gte: startDate, $lte: endDate },
+    });
+
+    const stats = orders.reduce(
+      (acc, order) => {
+        const amount = order.totalAmount;
+        const platformFee = order.paymentInfo.platformFee;
+
+        switch (order.paymentInfo.status) {
+          case "completed":
+            acc.totalRevenue += amount;
+            acc.successfulPayments++;
+            break;
+          case "pending":
+            acc.pendingPayments += amount;
+            break;
+          case "refunded":
+            acc.refundedAmount += amount;
+            break;
+        }
+
+        acc.platformFees += platformFee;
+        return acc;
+      },
+      {
+        totalRevenue: 0,
+        pendingPayments: 0,
+        successfulPayments: 0,
+        refundedAmount: 0,
+        platformFees: 0,
+      }
+    );
+
+    res.json(stats);
+  } catch (error) {
+    console.error("Error fetching payment stats:", error);
+    res.status(500).json({ message: "Error fetching payment statistics" });
+  }
+});
+
+// Get seller transactions
+router.get("/payments/transactions", protect, async (req, res) => {
+  try {
+    const transactions = await Order.find({ seller: req.user.id })
+      .populate("buyer", "name email")
+      .sort("-createdAt")
+      .limit(100);
+
+    res.json(transactions);
+  } catch (error) {
+    console.error("Error fetching transactions:", error);
+    res.status(500).json({ message: "Error fetching transactions" });
+  }
+});
+
+// Generate payment report
+router.get("/payments/report", protect, async (req, res) => {
+  try {
+    const { start, end } = req.query;
+    const startDate = start
+      ? new Date(start)
+      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const endDate = end ? new Date(end) : new Date();
+
+    const orders = await Order.find({
+      seller: req.user.id,
+      createdAt: { $gte: startDate, $lte: endDate },
+    }).populate("buyer", "name email");
+
+    // Generate CSV content
+    const csvRows = [
+      // CSV Header
+      [
+        "Transaction ID",
+        "Date",
+        "Customer",
+        "Email",
+        "Amount",
+        "Platform Fee",
+        "Status",
+      ].join(","),
+      // CSV Data
+      ...orders.map((order) =>
+        [
+          order.paymentInfo.transactionId,
+          new Date(order.createdAt).toISOString().split("T")[0],
+          order.buyer.name,
+          order.buyer.email,
+          order.totalAmount.toFixed(2),
+          order.paymentInfo.platformFee.toFixed(2),
+          order.paymentInfo.status,
+        ].join(",")
+      ),
+    ].join("\n");
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=payment-report-${
+        new Date().toISOString().split("T")[0]
+      }.csv`
+    );
+    res.send(csvRows);
+  } catch (error) {
+    console.error("Error generating report:", error);
+    res.status(500).json({ message: "Error generating payment report" });
+  }
+});
+
+// Process refund
+router.post("/payments/:orderId/refund", protect, async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { reason } = req.body;
+
+    const order = await Order.findOne({
+      _id: orderId,
+      seller: req.user.id,
+      "paymentInfo.status": "completed",
+    });
+
+    if (!order) {
+      return res
+        .status(404)
+        .json({ message: "Order not found or cannot be refunded" });
+    }
+
+    await order.refund(`ref_${Date.now()}`);
+    order.notes = `Refunded: ${reason}`;
+    await order.save();
+
+    res.json({ message: "Refund processed successfully", order });
+  } catch (error) {
+    console.error("Error processing refund:", error);
+    res.status(500).json({ message: "Error processing refund" });
   }
 });
 

@@ -116,8 +116,8 @@ export const AuthProvider = ({ children }) => {
 
   // Helper function to determine default redirect based on user role
   const getDefaultRedirect = (user) => {
-    if (user.isSeller) return "/seller/dashboard";
     if (user.isAdmin) return "/admin";
+    if (user.isSeller) return "/seller/dashboard";
     return "/";
   };
 

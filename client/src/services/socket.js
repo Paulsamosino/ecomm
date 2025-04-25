@@ -5,228 +5,195 @@ class SocketService {
   constructor() {
     this.socket = null;
     this.connected = false;
-    this.connecting = false;
-    this.connectionAttempts = 0;
-    this.maxReconnectionAttempts = 5;
-    this.pendingListeners = new Map();
-    this.activeListeners = new Map();
+    this.listeners = new Map();
     this.currentChatId = null;
-    this.reconnectTimerId = null;
-    this.processingMessageIds = new Set(); // Add tracking for messages being processed
+    this.baseURL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+    this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
   }
 
-  async connect(token) {
-    if (this.connected || this.connecting) return;
-
-    try {
-      this.connecting = true;
-
-      console.log("Connecting to socket server...");
-      const socketServerUrl =
-        import.meta.env.VITE_SOCKET_URL ||
-        (window.location.hostname.includes("chickenpoultry.shop")
-          ? "https://api.chickenpoultry.shop" // Changed from wss:// to https://
-          : "http://localhost:3001");
-
-      this.socket = io(socketServerUrl, {
-        auth: { token },
-        reconnection: true,
-        reconnectionAttempts: this.maxReconnectionAttempts,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        timeout: 10000,
-        transports: ["websocket"], // Try WebSocket first
-        autoConnect: false, // Prevent auto-connection
-        path: "/socket.io/",
-        withCredentials: true,
-        forceNew: true,
-      });
-
-      this.socket.on("connect", () => {
-        console.log("Socket connected successfully");
-        this.connected = true;
-        this.connecting = false;
-        this.connectionAttempts = 0;
-
-        // Set up listeners that were registered before connection
-        this.setupPendingListeners();
-
-        // Update user status to online
-        this.emit("user_status", { status: "online" });
-
-        // Rejoin current chat if any
-        if (this.currentChatId) {
-          this.joinChat(this.currentChatId);
-        }
-
-        // Clear any pending reconnect timers
-        if (this.reconnectTimerId) {
-          clearTimeout(this.reconnectTimerId);
-          this.reconnectTimerId = null;
-        }
-      });
-
-      // Handle transport errors specifically
-      this.socket.on("connect_error", (error) => {
-        console.error("Socket connection error:", error.message);
-        this.connected = false;
-        this.connectionAttempts++;
-
-        if (
-          error.message === "Authentication error" ||
-          error.message === "User not found"
-        ) {
-          this.connecting = false;
-          toast.error("Authentication failed. Please try logging in again.");
-          window.dispatchEvent(new CustomEvent("socket_auth_error"));
-        } else if (this.connectionAttempts >= this.maxReconnectionAttempts) {
-          this.connecting = false;
-          toast.error("Unable to connect to chat. Please refresh the page.");
-        } else {
-          // On first error, try falling back to polling
-          if (this.connectionAttempts === 1) {
-            console.log("Retrying with polling transport...");
-            this.socket.io.opts.transports = ["polling", "websocket"];
-          }
-
-          // Don't show too many error toasts
-          if (this.connectionAttempts === 1) {
-            toast.error("Connection error. Retrying...");
-          }
-
-          // Schedule a reconnect attempt
-          this.reconnectTimerId = setTimeout(() => {
-            this.connect(token);
-          }, 2000 * this.connectionAttempts);
-        }
-      });
-
-      this.socket.on("disconnect", (reason) => {
-        console.log("Socket disconnected:", reason);
-        this.connected = false;
-        this.connecting = false;
-        this.clearListeners();
-
-        // Emit offline status before disconnecting
-        if (reason === "io client disconnect") {
-          this.socket.emit("user_status", { status: "offline" });
-        }
-
-        if (reason === "io server disconnect") {
-          // Schedule a reconnect attempt
-          this.reconnectTimerId = setTimeout(() => {
-            this.connect(token);
-          }, 2000);
-        }
-      });
-
-      this.socket.on("reconnect", (attempt) => {
-        console.log(`Socket reconnected after ${attempt} attempts`);
-        this.connected = true;
-        this.connecting = false;
-        this.connectionAttempts = 0;
-        this.setupPendingListeners();
-      });
-
-      // Handle message errors
-      this.socket.on("message_error", (error) => {
-        console.error("Message error:", error);
-        toast.error(error.message || "Failed to send message");
-      });
-
-      // Add online status event listener
-      this.socket.on("user_status", (data) => {
-        console.log("User status update:", data);
-        // Forward the event to any registered listeners
-        this.emitToListeners("user_status", data);
-      });
-
-      // Setup visibility change handler to update status
-      document.addEventListener(
-        "visibilitychange",
-        this.handleVisibilityChange.bind(this)
-      );
-      window.addEventListener("beforeunload", () => {
-        this.updateUserStatus("offline");
-      });
-    } catch (error) {
-      console.error("Error initializing socket:", error);
-      this.connected = false;
-      this.connecting = false;
-      toast.error("Failed to initialize chat connection");
+  connect(token, userType = {}) {
+    // Don't attempt to connect if already connected
+    if (this.socket?.connected) {
+      console.log("Socket already connected");
+      return Promise.resolve();
     }
-  }
 
-  setupPendingListeners() {
-    if (!this.socket?.connected) return;
+    // Track whether a connection attempt is in progress
+    if (this._connectPromise) {
+      console.log(
+        "Connection attempt already in progress, returning existing promise"
+      );
+      return this._connectPromise;
+    }
 
-    this.pendingListeners.forEach((callbacks, event) => {
-      if (!this.activeListeners.has(event)) {
-        this.activeListeners.set(event, new Set());
+    console.log("Connecting to socket server...");
+
+    // Clean up any existing connection before creating a new one
+    this.cleanup();
+
+    this._connectPromise = new Promise((resolve, reject) => {
+      try {
+        // Get user info from token and userType
+        const tokenData = JSON.parse(atob(token.split(".")[1]));
+        const isSeller = userType.isSeller === true;
+
+        console.log("Token data:", tokenData);
+        console.log("User type:", userType);
+        console.log("Connecting as:", isSeller ? "seller" : "buyer");
+
+        // Create socket with improved config
+        this.socket = io(this.baseURL, {
+          auth: { token },
+          transports: ["websocket", "polling"], // Allow both for better reliability
+          query: { isSeller: String(isSeller) },
+          reconnection: true,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
+          timeout: 10000,
+          forceNew: true,
+        });
+
+        // Set up connection handlers
+        this.socket.on("connect", () => {
+          console.log("Socket connected successfully");
+          this.connected = true;
+          this._connectPromise = null;
+
+          // Set up event handlers
+          this.setupEventListeners();
+
+          // Update status and join chat if needed
+          this.emit("user_status", { status: "online" });
+          if (this.currentChatId) {
+            this.joinChat(this.currentChatId);
+          }
+
+          resolve();
+        });
+
+        this.socket.on("connect_error", (error) => {
+          console.error("Socket connection error:", error);
+          this.connected = false;
+          reject(error);
+        });
+
+        this.socket.on("disconnect", (reason) => {
+          console.log("Socket disconnected:", reason);
+          this.connected = false;
+
+          if (
+            reason === "io server disconnect" ||
+            reason === "transport close"
+          ) {
+            console.log("Attempting to reconnect...");
+            setTimeout(() => {
+              this.socket.connect();
+            }, 1000);
+          }
+        });
+      } catch (error) {
+        console.error("Error initializing socket:", error);
+        this.cleanup();
+        this._connectPromise = null;
+        reject(error);
       }
-
-      callbacks.forEach((callback) => {
-        this.activeListeners.get(event).add(callback);
-        this.socket.on(event, callback);
-      });
     });
+
+    return this._connectPromise;
   }
 
-  clearListeners() {
+  setupEventListeners() {
     if (!this.socket) return;
 
-    this.activeListeners.forEach((callbacks, event) => {
-      callbacks.forEach((callback) => {
-        this.socket.off(event, callback);
-      });
+    // Handle message errors
+    this.socket.on("message_error", (error) => {
+      console.error("Message error:", error);
+      toast.error(error.message || "Failed to send message");
     });
 
-    this.activeListeners.clear();
-  }
-
-  removeAllListeners() {
-    this.clearListeners();
-    this.pendingListeners.clear();
-  }
-
-  // Helper to emit events to registered listeners
-  emitToListeners(event, data) {
-    const callbacks = this.activeListeners.get(event);
-    if (callbacks) {
-      callbacks.forEach((callback) => {
-        try {
-          callback(data);
-        } catch (error) {
-          console.error(`Error in ${event} listener:`, error);
+    // Verify authentication
+    this.socket.emit(
+      "verify_auth",
+      { token: this.socket.auth.token },
+      (response) => {
+        if (response?.error) {
+          console.error("Authentication verification failed:", response.error);
+          this.cleanup();
+          window.dispatchEvent(new CustomEvent("socket_auth_error"));
         }
-      });
+      }
+    );
+
+    // Setup visibility handlers for online status
+    document.addEventListener("visibilitychange", this.handleVisibilityChange);
+    window.addEventListener("beforeunload", () =>
+      this.updateUserStatus("offline")
+    );
+
+    // Re-register existing listeners
+    for (const [event, callbacks] of this.listeners.entries()) {
+      for (const callback of callbacks) {
+        this.socket.on(event, callback);
+      }
     }
   }
 
-  on(event, callback) {
-    if (!this.pendingListeners.has(event)) {
-      this.pendingListeners.set(event, new Set());
+  cleanup() {
+    this.connected = false;
+    if (this.socket) {
+      // Remove event listeners but keep track of our app-level registered listeners
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
+      this.socket = null;
     }
-    this.pendingListeners.get(event).add(callback);
+    document.removeEventListener(
+      "visibilitychange",
+      this.handleVisibilityChange
+    );
+  }
 
-    if (this.socket?.connected) {
-      if (!this.activeListeners.has(event)) {
-        this.activeListeners.set(event, new Set());
-      }
-      this.activeListeners.get(event).add(callback);
+  // Register event listener
+  on(event, callback) {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, new Set());
+    }
+    this.listeners.get(event).add(callback);
+
+    if (this.socket) {
       this.socket.on(event, callback);
     }
+
+    return () => this.off(event, callback); // Return function to remove listener
   }
 
+  // Remove event listener
   off(event, callback) {
-    this.pendingListeners.get(event)?.delete(callback);
-    this.activeListeners.get(event)?.delete(callback);
-    if (this.socket?.connected) {
+    const callbackSet = this.listeners.get(event);
+    if (callbackSet) {
+      callbackSet.delete(callback);
+    }
+
+    if (this.socket) {
       this.socket.off(event, callback);
     }
   }
 
-  // Chat events
+  // Remove all listeners for an event
+  removeAllListeners(event) {
+    if (event) {
+      this.listeners.delete(event);
+      if (this.socket) {
+        this.socket.removeAllListeners(event);
+      }
+    } else {
+      this.listeners.clear();
+      if (this.socket) {
+        this.socket.removeAllListeners();
+      }
+    }
+  }
+
+  // Convenience methods for common events
   onNewMessage(callback) {
     this.on("new_message", callback);
   }
@@ -239,12 +206,16 @@ class SocketService {
     this.on("typing", callback);
   }
 
-  // Emit events with connection check and error handling
+  // Emit event with error handling
   emit(event, data) {
     if (!this.socket?.connected) {
       console.warn(`Socket not connected when trying to emit ${event}`);
-      // For non-critical events, just return false instead of showing an error
-      if (event !== "user_status" && event !== "typing") {
+      // Don't show errors for non-critical events
+      if (
+        event !== "user_status" &&
+        event !== "typing" &&
+        event !== "leave_chat"
+      ) {
         toast.error("Connection lost. Please refresh the page.");
       }
       return false;
@@ -255,88 +226,109 @@ class SocketService {
       return true;
     } catch (error) {
       console.error(`Error emitting ${event}:`, error);
-      toast.error("Failed to send message. Please try again.");
       return false;
     }
   }
 
-  // Send a new message
+  // Send a message
   sendMessage(chatId, message) {
-    console.log("Sending message:", { chatId, message });
-
-    // Don't send duplicates
-    if (this.processingMessageIds.has(message._id)) {
-      console.warn("Duplicate message send attempt prevented:", message._id);
+    if (!this.socket?.connected) {
+      toast.error("Connection lost. Please try again.");
       return false;
     }
 
-    // Track that we're processing this message
-    this.processingMessageIds.add(message._id);
-
-    // Remove from processing set after a timeout (5 seconds)
-    setTimeout(() => {
-      this.processingMessageIds.delete(message._id);
-    }, 5000);
-
-    return this.emit("new_message", { chatId, message });
+    try {
+      this.socket.emit("new_message", { chatId, message });
+      console.log("Message sent via socket:", {
+        chatId,
+        messageContent: message.content,
+      });
+      return true;
+    } catch (error) {
+      console.error("Error sending message:", error);
+      toast.error("Failed to send message");
+      return false;
+    }
   }
 
   // Update message status
   updateMessageStatus(chatId, messageId, status) {
-    return this.emit("message_status", { chatId, messageId, status });
-  }
+    if (!this.socket?.connected) {
+      return false;
+    }
 
-  // Send typing status
-  sendTyping(chatId, isTyping) {
-    return this.emit("typing", { chatId, isTyping });
+    try {
+      this.socket.emit("message_status", { chatId, messageId, status });
+      return true;
+    } catch (error) {
+      console.error("Error updating message status:", error);
+      return false;
+    }
   }
 
   // Join a chat room
   joinChat(chatId) {
+    if (!chatId) return false;
+
     console.log("Joining chat:", chatId);
     this.currentChatId = chatId;
-    return this.emit("join_chat", { chatId });
+
+    if (this.isConnected()) {
+      return this.emit("join_chat", { chatId });
+    }
+
+    // If not connected, try to reconnect
+    if (this.socket && !this.socket.connected) {
+      console.log("Socket disconnected, attempting to reconnect...");
+      this.socket.connect();
+    }
+
+    return false;
   }
 
   // Leave a chat room
   leaveChat(chatId) {
-    console.log("Leaving chat:", chatId);
+    if (!chatId) return false;
+
     if (this.currentChatId === chatId) {
       this.currentChatId = null;
     }
-    return this.emit("leave_chat", { chatId });
-  }
 
-  // Disconnect socket
-  disconnect() {
-    if (this.socket) {
-      this.updateUserStatus("offline");
-      this.socket.disconnect();
-      this.connected = false;
-      document.removeEventListener(
-        "visibilitychange",
-        this.handleVisibilityChange
-      );
+    if (this.isConnected()) {
+      return this.emit("leave_chat", { chatId });
     }
+    return false;
   }
 
-  // Check connection status
+  // Disconnect
+  disconnect() {
+    if (this.socket?.connected) {
+      this.updateUserStatus("offline");
+    }
+    this.cleanup();
+  }
+
+  // Check if connected
   isConnected() {
     return this.connected && this.socket?.connected;
   }
 
-  isConnecting() {
-    return this.connecting;
+  // Send typing indicator
+  sendTyping(chatId, isTyping) {
+    if (this.isConnected()) {
+      return this.emit("typing", { chatId, isTyping });
+    }
+    return false;
   }
 
-  // Add method to update user status
+  // Update user status
   updateUserStatus(status) {
     if (this.isConnected()) {
       this.emit("user_status", { status });
     }
   }
 
-  // Add visibility change handler
+  // Handle visibility change
   handleVisibilityChange() {
     if (document.visibilityState === "visible") {
       this.updateUserStatus("online");

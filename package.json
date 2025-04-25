@@ -19,5 +19,9 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.0"
+  },
+  "dependencies": {
+    "@tanstack/react-table": "^8.21.3",
+    "xlsx": "^0.18.5"
   }
 }

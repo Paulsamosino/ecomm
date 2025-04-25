@@ -117,43 +117,55 @@ router.post("/register", async (req, res) => {
 // Login user
 router.post("/login", async (req, res) => {
   try {
-    console.log("Login attempt:", req.body);
+    console.log("Login attempt received:", {
+      email: req.body.email,
+      hasPassword: !!req.body.password,
+    });
 
     const { email, password } = req.body;
 
     // Validate required fields
     if (!email || !password) {
+      console.log("Missing required fields:", {
+        email: !email,
+        password: !password,
+      });
       return res.status(400).json({
         success: false,
         message: "Please provide both email and password",
-        missingFields: {
-          email: !email,
-          password: !password,
-        },
       });
     }
 
-    // Check if user exists
+    // Check if user exists and include password field
     const user = await User.findOne({ email }).select("+password");
+    console.log("User found:", user ? "Yes" : "No");
+
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password",
+        message: "Invalid credentials",
       });
     }
 
     // Check password
     const isMatch = await user.matchPassword(password);
+    console.log("Password match:", isMatch);
+
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password",
+        message: "Invalid credentials",
       });
     }
 
     // Create token
-    const token = user.getSignedJwtToken();
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRE || "30d",
+    });
 
+    console.log("Token generated successfully");
+
+    // Send response with admin status based on user role
     res.json({
       success: true,
       token,
@@ -161,12 +173,15 @@ router.post("/login", async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        role: user.role,
         isSeller: user.isSeller,
+        isAdmin: user.role === "admin", // Explicitly check role
         sellerProfile: user.sellerProfile,
       },
     });
   } catch (err) {
     console.error("Login error:", err);
+    console.error("Error stack:", err.stack);
     res.status(500).json({
       success: false,
       message: "Server error during login",
@@ -183,7 +198,9 @@ router.get("/me", auth, async (req, res) => {
       id: user._id,
       name: user.name,
       email: user.email,
+      role: user.role,
       isSeller: user.isSeller,
+      isAdmin: user.role === "admin",
       sellerProfile: user.sellerProfile,
     });
   } catch (err) {

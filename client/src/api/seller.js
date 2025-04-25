@@ -1,60 +1,68 @@
-import axios from "./axios";
+import { axiosInstance } from "@/contexts/axios";
 
-// Dashboard Statistics
+// Get seller dashboard statistics
 export const getSellerStats = async () => {
-  const response = await axios.get("/api/seller/stats");
+  const response = await axiosInstance.get("/seller/stats");
+  return response.data;
+};
+
+// Get seller's recent orders
+export const getSellerOrders = async () => {
+  const response = await axiosInstance.get("/seller/orders");
+  return response.data;
+};
+
+// Get seller's reviews
+export const getSellerReviews = async () => {
+  const response = await axiosInstance.get("/seller/reviews");
+  return response.data;
+};
+
+// Get seller profile
+export const getSellerProfile = async () => {
+  const response = await axiosInstance.get("/auth/me");
   return response.data;
 };
 
 // Products
 export const getSellerProducts = async () => {
-  const response = await axios.get("/api/seller/products");
+  const response = await axiosInstance.get("/seller/products");
   return response.data;
 };
 
 export const createProduct = async (productData) => {
-  const response = await axios.post("/api/seller/products", productData);
+  const response = await axiosInstance.post("/seller/products", productData);
   return response.data;
 };
 
 export const updateProduct = async (productId, productData) => {
-  const response = await axios.put(
-    `/api/seller/products/${productId}`,
+  const response = await axiosInstance.put(
+    `/seller/products/${productId}`,
     productData
   );
   return response.data;
 };
 
 export const deleteProduct = async (productId) => {
-  const response = await axios.delete(`/api/seller/products/${productId}`);
-  return response.data;
-};
-
-// Orders
-export const getSellerOrders = async () => {
-  const response = await axios.get("/api/seller/orders");
-  return response.data;
-};
-
-export const updateOrderStatus = async (orderId, status) => {
-  const response = await axios.put(`/api/seller/orders/${orderId}`, { status });
+  const response = await axiosInstance.delete(`/seller/products/${productId}`);
   return response.data;
 };
 
 // Customers
 export const getSellerCustomers = async () => {
-  const response = await axios.get("/api/seller/customers");
+  const response = await axiosInstance.get("/seller/customers");
   return response.data;
 };
 
 // Analytics
 export const getSellerAnalytics = async () => {
-  const response = await axios.get("/api/seller/analytics");
+  const response = await axiosInstance.get("/seller/analytics");
   return response.data;
 };
 
-// Reviews
-export const getSellerReviews = async () => {
-  const response = await axios.get("/api/seller/reviews");
+export const updateOrderStatus = async (orderId, status) => {
+  const response = await axiosInstance.put(`/seller/orders/${orderId}`, {
+    status,
+  });
   return response.data;
 };

@@ -21,10 +21,15 @@ const ProtectedRoute = ({ allowedRoles = [] }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Check if user has required role
-  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    toast.error("You don't have permission to access this page");
-    return <Navigate to="/" replace />;
+  // Check if route requires specific roles
+  if (allowedRoles.length > 0) {
+    const isAdmin = user.isAdmin || user.role === "admin";
+    const hasRequiredRole = allowedRoles.includes("admin") ? isAdmin : true;
+
+    if (!hasRequiredRole) {
+      toast.error("You don't have permission to access this page");
+      return <Navigate to="/" replace />;
+    }
   }
 
   return <Outlet />;

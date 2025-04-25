@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Package, Search, Filter, ChevronDown } from "lucide-react";
+import toast from "react-hot-toast";
+import { API_URL } from "@/config/constants";
+import axiosInstance from "@/services/axiosInstance";
 
 const OrderStatusBadge = ({ status }) => {
   const statusStyles = {
@@ -25,55 +28,139 @@ const SellerOrders = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("date");
   const [sortOrder, setSortOrder] = useState("desc");
+  const [selectedOrders, setSelectedOrders] = useState([]);
+  const [metrics, setMetrics] = useState({
+    totalOrders: 0,
+    completedOrders: 0,
+    cancelledOrders: 0,
+    totalRevenue: 0,
+    averageOrderValue: 0,
+    conversionRate: 0,
+  });
+  const [timeframe, setTimeframe] = useState(30);
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+    fetchMetrics();
+  }, [timeframe]);
 
   const fetchOrders = async () => {
     try {
-      const response = await fetch("/api/seller/orders", {
+      const response = await fetch(`${API_URL}/api/seller/orders`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
       setOrders(data);
-      setLoading(false);
     } catch (error) {
       console.error("Error fetching orders:", error);
+      toast.error("Failed to fetch orders");
+    } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMetrics = async () => {
+    try {
+      const response = await fetch(
+        `${API_URL}/api/seller/orders/metrics?timeframe=${timeframe}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      // Set metrics with default values for any missing fields
+      setMetrics({
+        totalOrders: data.totalOrders || 0,
+        completedOrders: data.completedOrders || 0,
+        cancelledOrders: data.cancelledOrders || 0,
+        totalRevenue: data.totalRevenue || 0,
+        averageOrderValue: data.averageOrderValue || 0,
+        conversionRate: data.conversionRate || 0,
+      });
+    } catch (error) {
+      console.error("Error fetching metrics:", error);
+      toast.error("Failed to fetch metrics");
+      // Reset metrics to defaults on error
+      setMetrics({
+        totalOrders: 0,
+        completedOrders: 0,
+        cancelledOrders: 0,
+        totalRevenue: 0,
+        averageOrderValue: 0,
+        conversionRate: 0,
+      });
     }
   };
 
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
-      const response = await fetch(`/api/seller/orders/${orderId}/status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
+      let trackingNumber;
+      if (newStatus === "shipped") {
+        trackingNumber = await showTrackingNumberDialog();
+        if (!trackingNumber) return;
+      }
 
-      if (response.ok) {
-        setOrders(
-          orders.map((order) =>
-            order._id === orderId ? { ...order, status: newStatus } : order
-          )
-        );
+      const response = await axiosInstance.put(
+        `/seller/orders/${orderId}/status`,
+        {
+          status: newStatus,
+          trackingNumber,
+        }
+      );
+
+      const updatedOrder = response.data;
+
+      setOrders((prevOrders) =>
+        prevOrders.map((order) =>
+          order._id === orderId ? { ...order, ...updatedOrder } : order
+        )
+      );
+
+      toast.success(`Order status updated to ${newStatus}`);
+
+      // Status-specific actions
+      if (newStatus === "completed") {
+        toast("Don't forget to follow up on customer satisfaction!", {
+          description: "A review request has been sent to the customer.",
+          duration: 5000,
+        });
       }
     } catch (error) {
       console.error("Error updating order status:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to update order status"
+      );
     }
+  };
+
+  const showTrackingNumberDialog = () => {
+    return new Promise((resolve) => {
+      const trackingNumber = prompt("Enter tracking number:");
+      resolve(trackingNumber);
+    });
   };
 
   const filteredOrders = orders
     .filter((order) => {
       const matchesSearch =
         order._id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.buyer.name.toLowerCase().includes(searchTerm.toLowerCase());
+        (order.buyer?.name || "")
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase());
       const matchesStatus =
         statusFilter === "all" || order.status === statusFilter;
       return matchesSearch && matchesStatus;
@@ -92,6 +179,15 @@ const SellerOrders = () => {
       return 0;
     });
 
+  const formattedMetrics = {
+    totalRevenue: metrics?.totalRevenue?.toFixed(2) || "0.00",
+    averageOrderValue: metrics?.averageOrderValue?.toFixed(2) || "0.00",
+    conversionRate: metrics?.conversionRate?.toFixed(1) || "0.0",
+    totalOrders: metrics?.totalOrders || 0,
+    completedOrders: metrics?.completedOrders || 0,
+    cancelledOrders: metrics?.cancelledOrders || 0,
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -107,7 +203,70 @@ const SellerOrders = () => {
         <p className="text-gray-600">Manage and track your orders</p>
       </div>
 
-      <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+      {/* Metrics Dashboard */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold mb-2">Order Summary</h3>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Total Orders:</span>
+              <span className="font-medium">{metrics?.totalOrders || 0}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Completed:</span>
+              <span className="text-green-600 font-medium">
+                {metrics?.completedOrders || 0}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Cancelled:</span>
+              <span className="text-red-600 font-medium">
+                {metrics?.cancelledOrders || 0}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold mb-2">Revenue</h3>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Total Revenue:</span>
+              <span className="font-medium">
+                ₱{(metrics?.totalRevenue || 0).toFixed(2)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Average Order:</span>
+              <span className="font-medium">
+                ₱{(metrics?.averageOrderValue || 0).toFixed(2)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Conversion Rate:</span>
+              <span className="font-medium">
+                {(metrics?.conversionRate || 0).toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold mb-2">Time Period</h3>
+          <select
+            className="w-full border rounded-lg p-2"
+            value={timeframe}
+            onChange={(e) => setTimeframe(Number(e.target.value))}
+          >
+            <option value={7}>Last 7 days</option>
+            <option value={30}>Last 30 days</option>
+            <option value={90}>Last 90 days</option>
+            <option value={365}>Last year</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-md p-6">
         <div className="flex flex-col md:flex-row gap-4 mb-6">
           <div className="flex-1">
             <div className="relative">
@@ -166,6 +325,7 @@ const SellerOrders = () => {
               <tr className="border-b">
                 <th className="text-left py-4 px-4">Order ID</th>
                 <th className="text-left py-4 px-4">Customer</th>
+                <th className="text-left py-4 px-4">Products</th>
                 <th className="text-left py-4 px-4">Date</th>
                 <th className="text-left py-4 px-4">Amount</th>
                 <th className="text-left py-4 px-4">Status</th>
@@ -186,10 +346,22 @@ const SellerOrders = () => {
                   </td>
                   <td className="py-4 px-4">
                     <div>
-                      <p className="font-medium">{order.buyer.name}</p>
+                      <p className="font-medium">{order.buyer?.name}</p>
                       <p className="text-sm text-gray-600">
-                        {order.buyer.email}
+                        {order.buyer?.email}
                       </p>
+                    </div>
+                  </td>
+                  <td className="py-4 px-4">
+                    <div>
+                      {order.items.map((item, index) => (
+                        <div key={index} className="mb-1 last:mb-0">
+                          <p className="font-medium">{item.product?.name}</p>
+                          <p className="text-sm text-gray-600">
+                            Quantity: {item.quantity}
+                          </p>
+                        </div>
+                      ))}
                     </div>
                   </td>
                   <td className="py-4 px-4">
@@ -200,9 +372,7 @@ const SellerOrders = () => {
                       </p>
                     </div>
                   </td>
-                  <td className="py-4 px-4">
-                    ${order.totalAmount.toLocaleString()}
-                  </td>
+                  <td className="py-4 px-4">₱{order.totalAmount.toFixed(2)}</td>
                   <td className="py-4 px-4">
                     <OrderStatusBadge status={order.status} />
                   </td>

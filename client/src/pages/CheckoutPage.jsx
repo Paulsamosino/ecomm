@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "@/contexts/CartContext";
 import { PayPalButton } from "@/components/PayPalButton";
@@ -14,6 +14,8 @@ const CheckoutPage = () => {
   const navigate = useNavigate();
   const { cartItems, cartTotal, clearCart } = useCart();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isValidatingStock, setIsValidatingStock] = useState(false);
+  const [stockError, setStockError] = useState(null);
   const [shippingDetails, setShippingDetails] = useState({
     street: "",
     city: "",
@@ -22,6 +24,51 @@ const CheckoutPage = () => {
     country: "",
     phone: "",
   });
+
+  // Validate stock availability before proceeding
+  useEffect(() => {
+    const validateStock = async () => {
+      setIsValidatingStock(true);
+      setStockError(null);
+
+      try {
+        const token = localStorage.getItem("token");
+        const stockChecks = await Promise.all(
+          cartItems.map(async (item) => {
+            const response = await fetch(`${API_URL}/api/products/${item._id}`);
+            const product = await response.json();
+            return {
+              id: item._id,
+              name: product.name,
+              available: product.quantity,
+              requested: item.quantity,
+            };
+          })
+        );
+
+        const insufficientStock = stockChecks.filter(
+          (item) => item.requested > item.available
+        );
+
+        if (insufficientStock.length > 0) {
+          setStockError(
+            `Insufficient stock for: ${insufficientStock
+              .map((item) => item.name)
+              .join(", ")}`
+          );
+        }
+      } catch (error) {
+        console.error("Error validating stock:", error);
+        setStockError("Could not validate product availability");
+      } finally {
+        setIsValidatingStock(false);
+      }
+    };
+
+    if (cartItems.length > 0) {
+      validateStock();
+    }
+  }, [cartItems]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -33,6 +80,11 @@ const CheckoutPage = () => {
 
   const isFormValid = () => {
     return Object.values(shippingDetails).every((value) => value.trim() !== "");
+  };
+
+  const calculateTotalWithFees = () => {
+    const platformFee = cartTotal * 0.02; // 2% platform fee
+    return cartTotal + platformFee;
   };
 
   const handlePaymentSuccess = async (order) => {
@@ -68,12 +120,11 @@ const CheckoutPage = () => {
             price: item.price,
           })),
           paymentInfo: {
-            method: "credit_card",
+            method: "paypal",
             status: "completed",
             transactionId: order.purchase_units[0].payments.captures[0].id,
           },
-          totalAmount: cartTotal,
-          status: "pending",
+          totalAmount: calculateTotalWithFees(),
           shippingAddress: shippingDetails,
         }),
       });
@@ -96,22 +147,37 @@ const CheckoutPage = () => {
   };
 
   const handlePaymentError = (error) => {
-    console.error("Payment failed:", error);
-    toast.error("Payment failed. Please try again.");
+    // Only handle non-window-closed errors here
+    if (!error?.message?.includes("Window closed")) {
+      console.error("Payment failed:", error);
+      toast.error("Payment failed. Please try again.");
+    }
     setIsProcessing(false);
   };
 
-  if (cartItems.length === 0) {
-    navigate("/cart");
-    return null;
+  if (isValidatingStock) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p>Validating product availability...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-3xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">Checkout</h1>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="container mx-auto px-4 space-y-8 max-w-4xl">
+        <h1 className="text-3xl font-bold">Checkout</h1>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 mb-6">
+        {stockError && (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-600">{stockError}</p>
+          </div>
+        )}
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
           <h2 className="text-xl font-semibold mb-4">Shipping Information</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -121,7 +187,7 @@ const CheckoutPage = () => {
                 name="street"
                 value={shippingDetails.street}
                 onChange={handleInputChange}
-                placeholder="123 Main St"
+                placeholder="Street address"
                 required
               />
             </div>
@@ -191,13 +257,13 @@ const CheckoutPage = () => {
               <span>₱{cartTotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-gray-600">
-              <span>Marketplace Fee (2%)</span>
+              <span>Platform Fee (2%)</span>
               <span>₱{(cartTotal * 0.02).toFixed(2)}</span>
             </div>
             <div className="border-t border-gray-100 pt-3 mt-3"></div>
             <div className="flex justify-between font-semibold text-lg">
               <span>Total</span>
-              <span>₱{(cartTotal + cartTotal * 0.02).toFixed(2)}</span>
+              <span>₱{calculateTotalWithFees().toFixed(2)}</span>
             </div>
           </div>
 
@@ -214,10 +280,10 @@ const CheckoutPage = () => {
                 </Button>
               ) : (
                 <PayPalButton
-                  amount={cartTotal + cartTotal * 0.02}
+                  amount={calculateTotalWithFees()}
                   onSuccess={handlePaymentSuccess}
                   onError={handlePaymentError}
-                  disabled={isProcessing || !isFormValid()}
+                  disabled={isProcessing || !isFormValid() || stockError}
                 />
               )}
               <Button

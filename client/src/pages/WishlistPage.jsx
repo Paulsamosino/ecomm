@@ -56,18 +56,15 @@ const WishlistPage = () => {
             >
               {/* Product Image */}
               <Link to={`/products/${item._id}`}>
-                <div className="aspect-w-1 aspect-h-1 bg-gray-50 relative">
-                  {item.images && item.images.length > 0 ? (
-                    <img
-                      src={item.images[0]}
-                      alt={item.name}
-                      className="w-full h-48 object-cover object-center group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="w-full h-48 flex items-center justify-center bg-gray-100">
-                      <ShoppingCart className="h-12 w-12 text-gray-300" />
-                    </div>
-                  )}
+                <div className="aspect-w-1 aspect-h-1 bg-amber-50 relative">
+                  <img
+                    src={item.images?.[0] || "/1f425.png"}
+                    alt={item.name}
+                    className="w-full h-48 object-contain object-center group-hover:scale-105 transition-transform duration-300"
+                    onError={(e) => {
+                      e.target.src = "/1f425.png";
+                    }}
+                  />
                 </div>
               </Link>
 

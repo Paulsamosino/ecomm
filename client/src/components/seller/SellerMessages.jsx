@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { io } from "socket.io-client";
 import toast from "react-hot-toast";
+import { socketService } from "@/services/socketService";
 
 const SellerMessages = () => {
   const { user } = useAuth();
@@ -34,41 +35,81 @@ const SellerMessages = () => {
 
   // Set up socket connection
   useEffect(() => {
-    socketRef.current = io(
-      import.meta.env.VITE_API_URL || "http://localhost:3001"
-    );
+    const initializeSocket = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          toast.error("Authentication required");
+          navigate("/login");
+          return;
+        }
 
-    socketRef.current.emit("authenticate", user._id);
+        // Initialize socket connection
+        await socketService.connect(token);
 
-    socketRef.current.on("new_message", (data) => {
-      if (data.chatId === chatId) {
-        setMessages((prevMessages) => [...prevMessages, data.message]);
-      }
-
-      // Update chats with new message
-      setChats((prevChats) => {
-        return prevChats.map((chat) => {
-          if (chat._id === data.chatId) {
-            return {
-              ...chat,
-              lastMessage: data.message,
-              unreadCount:
-                chat._id !== chatId ? (chat.unreadCount || 0) + 1 : 0,
-            };
+        // Set up event handlers after successful connection
+        socketService.onNewMessage((data) => {
+          if (data.chatId === chatId) {
+            setMessages((prevMessages) => {
+              // Prevent duplicate messages
+              const messageExists = prevMessages.some(
+                (msg) => msg._id === data.message._id
+              );
+              if (messageExists) return prevMessages;
+              return [...prevMessages, data.message];
+            });
           }
-          return chat;
+
+          // Update chats with new message
+          setChats((prevChats) => {
+            return prevChats.map((chat) => {
+              if (chat._id === data.chatId) {
+                return {
+                  ...chat,
+                  lastMessage: data.message,
+                  unreadCount:
+                    chat._id !== chatId ? (chat.unreadCount || 0) + 1 : 0,
+                };
+              }
+              return chat;
+            });
+          });
         });
-      });
-    });
 
-    socketRef.current.on("new_chat", (chat) => {
-      setChats((prevChats) => [chat, ...prevChats]);
-    });
+        socketService.onMessageStatus((data) => {
+          if (data.chatId === chatId) {
+            setMessages((prevMessages) =>
+              prevMessages.map((msg) =>
+                msg._id === data.messageId
+                  ? { ...msg, status: data.status }
+                  : msg
+              )
+            );
+          }
+        });
 
-    return () => {
-      socketRef.current.disconnect();
+        // Join chat room if chatId exists
+        if (chatId) {
+          socketService.joinChat(chatId);
+        }
+      } catch (error) {
+        console.error("Socket initialization error:", error);
+        toast.error(
+          "Failed to connect to chat server. Please refresh the page."
+        );
+      }
     };
-  }, [chatId, user._id]);
+
+    initializeSocket();
+
+    // Cleanup function
+    return () => {
+      if (chatId) {
+        socketService.leaveChat(chatId);
+      }
+      socketService.removeAllListeners();
+    };
+  }, [chatId, user._id, navigate]);
 
   // Load chats on mount
   useEffect(() => {
@@ -132,20 +173,41 @@ const SellerMessages = () => {
     e.preventDefault();
     if (!newMessage.trim() || !chatId) return;
 
+    if (!socketService.isConnected()) {
+      toast.error("Chat connection is offline. Please try again in a moment.");
+      return;
+    }
+
     try {
-      const response = await axiosInstance.post(`/chat/${chatId}/messages`, {
-        content: newMessage,
-      });
+      // Create a temporary message ID
+      const tempMessageId = new Date().getTime().toString();
 
-      // Clear input and add message optimistically
+      // Optimistically add message to UI
+      const tempMessage = {
+        _id: tempMessageId,
+        content: newMessage.trim(),
+        senderId: user._id,
+        status: "SENDING",
+        createdAt: new Date().toISOString(),
+        sender: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          isSeller: true,
+        },
+      };
+
+      setMessages((prev) => [...prev, tempMessage]);
       setNewMessage("");
-      setMessages((prev) => [...prev, response.data]);
 
-      // Emit socket event for real-time update
-      socketRef.current.emit("new_message", {
-        chatId,
-        message: response.data,
-      });
+      // Send message through socket
+      const success = socketService.sendMessage(chatId, tempMessage);
+
+      if (!success) {
+        // Remove temporary message if send failed
+        setMessages((prev) => prev.filter((msg) => msg._id !== tempMessageId));
+        toast.error("Failed to send message. Please try again.");
+      }
     } catch (error) {
       console.error("Error sending message:", error);
       toast.error("Failed to send message");

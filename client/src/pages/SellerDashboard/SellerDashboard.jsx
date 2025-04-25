@@ -10,6 +10,13 @@ import {
   BarChart3,
   ExternalLink,
 } from "lucide-react";
+import {
+  getSellerStats,
+  getSellerOrders,
+  getSellerReviews,
+  getSellerProducts,
+} from "@/api/seller";
+import { toast } from "react-hot-toast";
 
 const StatCard = ({ title, value, icon: Icon, description }) => (
   <div className="bg-white rounded-lg p-6 shadow-md">
@@ -32,11 +39,12 @@ const OrderRow = ({ order }) => (
       <div>
         <p className="font-medium">Order #{order._id.slice(-6)}</p>
         <p className="text-sm text-gray-600">
-          {order.buyer.name} • {new Date(order.createdAt).toLocaleDateString()}
+          {order.buyer?.name || "Anonymous"} •{" "}
+          {new Date(order.createdAt).toLocaleDateString()}
         </p>
       </div>
       <div className="text-right">
-        <p className="font-medium">${order.totalAmount.toLocaleString()}</p>
+        <p className="font-medium">₱{order.totalAmount?.toLocaleString()}</p>
         <span
           className={`inline-block px-2 py-1 text-xs rounded-full ${
             order.status === "completed"
@@ -71,6 +79,8 @@ const ReviewCard = ({ review }) => (
 
 const SellerDashboard = () => {
   const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [stats, setStats] = useState({
     totalProducts: 0,
     totalSales: 0,
@@ -83,43 +93,135 @@ const SellerDashboard = () => {
   const [recentReviews, setRecentReviews] = useState([]);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchDashboardData = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const headers = { Authorization: `Bearer ${token}` };
+        setIsLoading(true);
+        setError(null);
 
-        // Fetch statistics
-        const statsRes = await fetch("/api/seller/stats", { headers });
-        const statsData = await statsRes.json();
-        setStats(statsData);
+        // Fetch all data in parallel
+        const [statsData, ordersData, reviewsData, productsData] =
+          await Promise.all([
+            getSellerStats(),
+            getSellerOrders(),
+            getSellerReviews(),
+            getSellerProducts(),
+          ]);
 
-        // Fetch recent orders
-        const ordersRes = await fetch("/api/seller/orders/recent", { headers });
-        const ordersData = await ordersRes.json();
-        setRecentOrders(ordersData);
+        // Calculate total sales from completed orders
+        const completedOrders = ordersData.filter(
+          (order) => order.status === "completed"
+        );
+        const totalSales = completedOrders.reduce(
+          (sum, order) => sum + (order.totalAmount || 0),
+          0
+        );
 
-        // Fetch recent reviews
-        const reviewsRes = await fetch("/api/seller/reviews/recent", {
-          headers,
+        // Calculate monthly revenue (orders from current month)
+        const currentMonth = new Date().getMonth();
+        const currentYear = new Date().getFullYear();
+        const monthlyOrders = completedOrders.filter((order) => {
+          const orderDate = new Date(order.createdAt);
+          return (
+            orderDate.getMonth() === currentMonth &&
+            orderDate.getFullYear() === currentYear
+          );
         });
-        const reviewsData = await reviewsRes.json();
-        setRecentReviews(reviewsData);
-      } catch (error) {
-        console.error("Error fetching seller data:", error);
+        const monthlyRevenue = monthlyOrders.reduce(
+          (sum, order) => sum + (order.totalAmount || 0),
+          0
+        );
+
+        // Get unique customers
+        const uniqueCustomers = new Set(
+          ordersData.map((order) => order.buyer?._id)
+        ).size;
+
+        // Update stats
+        setStats({
+          totalProducts: productsData.length || 0,
+          totalSales: totalSales,
+          pendingOrders: ordersData.filter(
+            (order) => order.status === "pending"
+          ).length,
+          averageRating:
+            reviewsData.length > 0
+              ? reviewsData.reduce((sum, review) => sum + review.rating, 0) /
+                reviewsData.length
+              : 0,
+          totalCustomers: uniqueCustomers,
+          monthlyRevenue: monthlyRevenue,
+        });
+
+        // Set recent orders and reviews
+        setRecentOrders(ordersData.slice(0, 5));
+        setRecentReviews(reviewsData.slice(0, 5));
+      } catch (err) {
+        console.error("Error fetching dashboard data:", err);
+        setError(
+          err.response?.data?.message || "Failed to load dashboard data"
+        );
+        toast.error("Failed to load dashboard data. Please try again later.");
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    fetchData();
-  }, []);
+    if (user) {
+      fetchDashboardData();
+    }
+  }, [user]);
+
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">
+            Access Denied
+          </h2>
+          <p className="text-gray-600 mb-4">
+            Please log in to access the seller dashboard.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">
+            Error Loading Dashboard
+          </h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">Loading Dashboard...</h2>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold">Seller Dashboard</h1>
-          <p className="text-gray-600 mt-1">
-            Welcome back, {user?.sellerProfile?.businessName || user?.name}
-          </p>
+          <p className="text-gray-600 mt-1">Welcome back, {user?.name}</p>
         </div>
         <Link
           to="/seller/post-product"
@@ -138,7 +240,7 @@ const SellerDashboard = () => {
         />
         <StatCard
           title="Total Sales"
-          value={`$${stats.totalSales.toLocaleString()}`}
+          value={`₱${stats.totalSales.toLocaleString()}`}
           icon={DollarSign}
           description="Lifetime sales"
         />
@@ -152,9 +254,7 @@ const SellerDashboard = () => {
           title="Average Rating"
           value={stats.averageRating.toFixed(1)}
           icon={Star}
-          description={`From ${
-            user?.sellerProfile?.reviews?.length || 0
-          } reviews`}
+          description={`From ${recentReviews.length} reviews`}
         />
         <StatCard
           title="Total Customers"
@@ -164,7 +264,7 @@ const SellerDashboard = () => {
         />
         <StatCard
           title="Monthly Revenue"
-          value={`$${stats.monthlyRevenue.toLocaleString()}`}
+          value={`₱${stats.monthlyRevenue.toLocaleString()}`}
           icon={BarChart3}
           description="This month"
         />

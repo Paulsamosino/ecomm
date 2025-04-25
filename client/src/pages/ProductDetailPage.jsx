@@ -26,9 +26,11 @@ import {
   Plus,
   Minus,
   Store,
+  Flag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
+import ReportModal from "@/components/common/ReportModal";
 
 const ProductDetailPage = () => {
   const { id } = useParams();
@@ -42,6 +44,7 @@ const ProductDetailPage = () => {
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState("description");
   const [similarProducts, setSimilarProducts] = useState([]);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -62,18 +65,42 @@ const ProductDetailPage = () => {
 
       // Fetch similar products
       try {
-        // You could add a similar products endpoint or use category for filtering
+        // Get products in the same category with similar characteristics
         const category = data.category || "all";
+        const price = data.price || 0;
+        const breed = data.breed;
+        const age = data.age;
+
+        // Calculate price range (±30% of current product's price)
+        const minPrice = price * 0.7;
+        const maxPrice = price * 1.3;
+
         const response = await axiosInstance.get(`/products`, {
           params: {
             category: category,
-            limit: 4,
+            minPrice,
+            maxPrice,
+            limit: 8, // Fetch more products to filter from
             exclude: id,
           },
         });
 
         if (response.data && response.data.products) {
-          setSimilarProducts(response.data.products);
+          // Filter and sort products by relevance
+          const products = response.data.products;
+          const similarProducts = products
+            .map((product) => ({
+              ...product,
+              relevanceScore: calculateRelevanceScore(product, {
+                breed,
+                age,
+                price,
+              }),
+            }))
+            .sort((a, b) => b.relevanceScore - a.relevanceScore)
+            .slice(0, 4); // Take top 4 most relevant products
+
+          setSimilarProducts(similarProducts);
         }
       } catch (err) {
         console.error("Error fetching similar products:", err);
@@ -153,14 +180,26 @@ const ProductDetailPage = () => {
     }
 
     try {
+      // Show loading toast
+      const loadingToast = toast.loading("Starting conversation...");
+
       // Create a new chat or get existing chat
       const response = await axiosInstance.post("/chat", {
         sellerId: product.seller._id,
         productId: product._id,
       });
 
-      // Navigate to the chat with the created/existing chat ID
-      navigate(`/chat/${response.data._id}`);
+      toast.dismiss(loadingToast);
+      toast.success("Chat started with seller");
+
+      // Create a custom event to notify the ChatWidget to open with this chat
+      const chatEvent = new CustomEvent("openChatWidget", {
+        detail: { chatId: response.data._id, product },
+      });
+      window.dispatchEvent(chatEvent);
+
+      // Optional: Can also navigate to full chat page
+      // navigate(`/chat/${response.data._id}`);
     } catch (err) {
       console.error("Error creating chat:", err);
       toast.error("Failed to start chat. Please try again.");
@@ -294,15 +333,18 @@ const ProductDetailPage = () => {
             <div className="relative rounded-lg overflow-hidden border border-gray-200 bg-white mb-4">
               <div className="aspect-w-1 aspect-h-1">
                 <img
-                  src={product.images[currentImageIndex]}
+                  src={product.images?.[currentImageIndex] || "/1f425.png"}
                   alt={product.name}
-                  className="object-contain w-full h-full"
+                  className="w-full h-full object-contain"
                   loading="eager"
+                  onError={(e) => {
+                    e.target.src = "/1f425.png";
+                  }}
                 />
               </div>
 
               {/* Image Navigation Arrows */}
-              {product.images.length > 1 && (
+              {product.images && product.images.length > 1 && (
                 <>
                   <button
                     onClick={handlePreviousImage}
@@ -330,7 +372,7 @@ const ProductDetailPage = () => {
             </div>
 
             {/* Thumbnail Images */}
-            {product.images.length > 1 && (
+            {product.images && product.images.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-2">
                 {product.images.map((image, index) => (
                   <button
@@ -338,16 +380,19 @@ const ProductDetailPage = () => {
                     onClick={() => setCurrentImageIndex(index)}
                     className={`flex-shrink-0 w-20 h-20 rounded-md border-2 overflow-hidden ${
                       currentImageIndex === index
-                        ? "border-primary"
+                        ? "border-amber-600"
                         : "border-gray-200 hover:border-gray-300"
                     }`}
                     aria-label={`View image ${index + 1}`}
                   >
                     <img
-                      src={image}
+                      src={image || "/1f425.png"}
                       alt={`${product.name} - Image ${index + 1}`}
-                      className="object-contain w-full h-full"
+                      className="w-full h-full object-contain"
                       loading="lazy"
+                      onError={(e) => {
+                        e.target.src = "/1f425.png";
+                      }}
                     />
                   </button>
                 ))}
@@ -549,10 +594,12 @@ const ProductDetailPage = () => {
                     </dd>
                   </div>
                 )}
-                {product.age && (
+                {product.age > 0 && (
                   <div>
                     <dt className="text-gray-500">Age:</dt>
-                    <dd className="font-medium text-gray-900">{product.age}</dd>
+                    <dd className="font-medium text-gray-900">
+                      {product.age} {product.age === 1 ? "month" : "months"}
+                    </dd>
                   </div>
                 )}
                 {product.weight && (
@@ -635,13 +682,22 @@ const ProductDetailPage = () => {
                     </div>
                   )}
                   {product.seller?._id && product.seller?._id !== user?._id && (
-                    <button
-                      onClick={handleMessageSeller}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-md hover:bg-primary/20 transition-colors text-sm font-medium"
-                    >
-                      <MessageSquare className="h-4 w-4" />
-                      Contact Seller
-                    </button>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={handleMessageSeller}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-md hover:bg-primary/20 transition-colors text-sm font-medium"
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                        Contact Seller
+                      </button>
+                      <button
+                        onClick={() => setIsReportModalOpen(true)}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors text-sm font-medium"
+                      >
+                        <Flag className="h-4 w-4" />
+                        Report Seller
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -954,23 +1010,44 @@ const ProductDetailPage = () => {
                 <Link
                   key={product._id}
                   to={`/products/${product._id}`}
-                  className="group"
+                  className="group bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all border border-gray-200"
                 >
-                  <div className="bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200 transition-shadow group-hover:shadow-md">
-                    <div className="aspect-w-1 aspect-h-1 bg-gray-100">
-                      <img
-                        src={product.images[0]}
-                        alt={product.name}
-                        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-                      />
-                    </div>
-                    <div className="p-4">
-                      <h3 className="font-medium text-gray-900 group-hover:text-primary transition-colors">
-                        {product.name}
-                      </h3>
-                      <p className="font-bold text-primary mt-1">
-                        ${product.price.toFixed(2)}
+                  <div className="aspect-square bg-amber-50 relative">
+                    <img
+                      src={product.images?.[0] || "/1f425.png"}
+                      alt={product.name}
+                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        e.target.src = "/1f425.png";
+                      }}
+                    />
+                    {product.discount > 0 && (
+                      <div className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
+                        {product.discount}% OFF
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-medium text-gray-900 group-hover:text-amber-600 transition-colors mb-1 truncate">
+                      {product.name}
+                    </h3>
+                    {product.breed && (
+                      <p className="text-sm text-gray-500 mb-2">
+                        Breed: {product.breed}
                       </p>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <div className="font-bold text-amber-600">
+                        ${product.price?.toFixed(2)}
+                      </div>
+                      {product.rating > 0 && (
+                        <div className="flex items-center">
+                          <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                          <span className="text-sm text-gray-600 ml-1">
+                            {product.rating?.toFixed(1)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </Link>
@@ -979,8 +1056,41 @@ const ProductDetailPage = () => {
           </div>
         )}
       </div>
+
+      {/* Add the Report Modal */}
+      <ReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        reportedUserId={product?.seller?._id}
+        reporterRole="buyer"
+      />
     </div>
   );
+};
+
+// Add the relevance score calculation function
+const calculateRelevanceScore = (product, reference) => {
+  let score = 0;
+
+  // Same breed bonus
+  if (product.breed === reference.breed) {
+    score += 3;
+  }
+
+  // Similar age bonus (within 2 months)
+  if (Math.abs(product.age - reference.age) <= 2) {
+    score += 2;
+  }
+
+  // Price similarity bonus (closer price = higher score)
+  const priceDiffPercentage =
+    Math.abs(product.price - reference.price) / reference.price;
+  score += (1 - priceDiffPercentage) * 2; // Max 2 points for price similarity
+
+  // Add some randomness to ensure variety (0-1 point)
+  score += Math.random();
+
+  return score;
 };
 
 export default ProductDetailPage;

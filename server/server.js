@@ -170,6 +170,7 @@ const productRoutes = require("./src/routes/products");
 const chatRoutes = require("./src/routes/chat");
 const sellerRoutes = require("./src/routes/seller");
 const blogRoutes = require("./src/routes/blog");
+const adminRoutes = require("./src/routes/admin");
 
 // Serve static files from the React app
 if (process.env.NODE_ENV === "production") {
@@ -183,6 +184,7 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/seller", sellerRoutes);
 app.use("/api/blog", blogRoutes);
 app.use("/api/orders", require("./src/routes/orders"));
+app.use("/api/admin", adminRoutes);
 
 // Basic route for testing
 app.get("/", (req, res) => {

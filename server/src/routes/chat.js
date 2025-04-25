@@ -26,6 +26,7 @@ router.use((req, res, next) => {
 // Routes that don't require chat access validation
 router.get("/", chatController.getChats);
 router.post("/", chatController.createChat);
+router.post("/direct", chatController.createDirectChat);
 
 // Routes that require chat access validation
 router.get("/:chatId", validateChatAccess, chatController.getChat);

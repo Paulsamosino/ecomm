@@ -74,18 +74,15 @@ const CartPage = () => {
                   className="p-6 flex flex-col sm:flex-row gap-4"
                 >
                   {/* Product Image */}
-                  <div className="w-full sm:w-24 h-24 flex-shrink-0 bg-gray-50 rounded-md overflow-hidden">
-                    {item.images && item.images.length > 0 ? (
-                      <img
-                        src={item.images[0]}
-                        alt={item.name}
-                        className="w-full h-full object-contain"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                        <ShoppingBag className="h-8 w-8 text-gray-300" />
-                      </div>
-                    )}
+                  <div className="w-full sm:w-24 h-24 flex-shrink-0 bg-amber-50 rounded-md overflow-hidden">
+                    <img
+                      src={item.images?.[0] || "/1f425.png"}
+                      alt={item.name}
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        e.target.src = "/1f425.png";
+                      }}
+                    />
                   </div>
 
                   {/* Product Details */}

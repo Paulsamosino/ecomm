@@ -10,6 +10,9 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { format } from "date-fns";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 const TransactionRow = ({ transaction }) => {
   const statusStyles = {
@@ -23,32 +26,39 @@ const TransactionRow = ({ transaction }) => {
     <tr className="border-b last:border-0">
       <td className="py-4 px-4">
         <div className="flex items-center">
-          {transaction.type === "credit_card" ? (
+          {transaction.paymentInfo.method === "paypal" ? (
             <CreditCard className="h-5 w-5 text-gray-400 mr-2" />
           ) : (
             <Wallet className="h-5 w-5 text-gray-400 mr-2" />
           )}
-          #{transaction._id.slice(-6)}
+          #{transaction.paymentInfo.transactionId.slice(-6)}
         </div>
       </td>
       <td className="py-4 px-4">
         <div>
-          <p className="font-medium">{transaction.customer.name}</p>
-          <p className="text-sm text-gray-600">{transaction.customer.email}</p>
+          <p className="font-medium">{transaction.buyer.name}</p>
+          <p className="text-sm text-gray-600">{transaction.buyer.email}</p>
         </div>
       </td>
       <td className="py-4 px-4">
-        {new Date(transaction.date).toLocaleDateString()}
+        {format(new Date(transaction.createdAt), "MMM d, yyyy")}
       </td>
-      <td className="py-4 px-4">${transaction.amount.toFixed(2)}</td>
+      <td className="py-4 px-4">
+        <div>
+          <p className="font-medium">₱{transaction.totalAmount.toFixed(2)}</p>
+          <p className="text-xs text-gray-500">
+            Fee: ₱{transaction.paymentInfo.platformFee.toFixed(2)}
+          </p>
+        </div>
+      </td>
       <td className="py-4 px-4">
         <span
           className={`inline-block px-2 py-1 rounded-full text-xs ${
-            statusStyles[transaction.status]
+            statusStyles[transaction.paymentInfo.status]
           }`}
         >
-          {transaction.status.charAt(0).toUpperCase() +
-            transaction.status.slice(1)}
+          {transaction.paymentInfo.status.charAt(0).toUpperCase() +
+            transaction.paymentInfo.status.slice(1)}
         </span>
       </td>
       <td className="py-4 px-4 text-right">
@@ -71,32 +81,41 @@ const SellerPayments = () => {
     pendingPayments: 0,
     successfulPayments: 0,
     refundedAmount: 0,
+    platformFees: 0,
+  });
+  const [dateRange, setDateRange] = useState({
+    start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    end: new Date(),
   });
 
   useEffect(() => {
     fetchPaymentData();
-  }, []);
+  }, [dateRange]);
 
   const fetchPaymentData = async () => {
     try {
+      setLoading(true);
       const token = localStorage.getItem("token");
       const headers = { Authorization: `Bearer ${token}` };
 
       // Fetch payment statistics
-      const statsRes = await fetch("/api/seller/payments/stats", { headers });
+      const statsRes = await fetch(
+        `${API_URL}/api/seller/payments/stats?start=${dateRange.start.toISOString()}&end=${dateRange.end.toISOString()}`,
+        { headers }
+      );
       const statsData = await statsRes.json();
       setPaymentStats(statsData);
 
       // Fetch transactions
-      const transactionsRes = await fetch("/api/seller/payments/transactions", {
-        headers,
-      });
+      const transactionsRes = await fetch(
+        `${API_URL}/api/seller/payments/transactions`,
+        { headers }
+      );
       const transactionsData = await transactionsRes.json();
       setTransactions(transactionsData);
-
-      setLoading(false);
     } catch (error) {
       console.error("Error fetching payment data:", error);
+    } finally {
       setLoading(false);
     }
   };
@@ -104,14 +123,17 @@ const SellerPayments = () => {
   const downloadReport = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("/api/seller/payments/report", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetch(
+        `${API_URL}/api/seller/payments/report?start=${dateRange.start.toISOString()}&end=${dateRange.end.toISOString()}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "payment-report.csv";
+      a.download = `payment-report-${format(new Date(), "yyyy-MM-dd")}.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -120,6 +142,33 @@ const SellerPayments = () => {
       console.error("Error downloading report:", error);
     }
   };
+
+  const filteredTransactions = transactions
+    .filter((transaction) => {
+      const matchesSearch =
+        transaction.buyer.name
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        transaction.paymentInfo.transactionId.includes(searchTerm);
+      const matchesStatus =
+        filterStatus === "all" ||
+        transaction.paymentInfo.status === filterStatus;
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case "recent":
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        case "oldest":
+          return new Date(a.createdAt) - new Date(b.createdAt);
+        case "amount-high":
+          return b.totalAmount - a.totalAmount;
+        case "amount-low":
+          return a.totalAmount - b.totalAmount;
+        default:
+          return 0;
+      }
+    });
 
   if (loading) {
     return (
@@ -143,7 +192,10 @@ const SellerPayments = () => {
             <div>
               <p className="text-gray-600 text-sm">Total Revenue</p>
               <h3 className="text-2xl font-semibold mt-1">
-                ${paymentStats.totalRevenue.toLocaleString()}
+                ₱
+                {(
+                  paymentStats.totalRevenue - paymentStats.platformFees
+                ).toLocaleString()}
               </h3>
             </div>
             <div className="bg-green-100 p-3 rounded-full">
@@ -157,7 +209,7 @@ const SellerPayments = () => {
             <div>
               <p className="text-gray-600 text-sm">Pending Payments</p>
               <h3 className="text-2xl font-semibold mt-1">
-                ${paymentStats.pendingPayments.toLocaleString()}
+                ₱{paymentStats.pendingPayments.toLocaleString()}
               </h3>
             </div>
             <div className="bg-yellow-100 p-3 rounded-full">
@@ -169,9 +221,9 @@ const SellerPayments = () => {
         <div className="bg-white rounded-lg p-6 shadow-md">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm">Successful Payments</p>
+              <p className="text-gray-600 text-sm">Platform Fees</p>
               <h3 className="text-2xl font-semibold mt-1">
-                {paymentStats.successfulPayments}
+                ₱{paymentStats.platformFees.toLocaleString()}
               </h3>
             </div>
             <div className="bg-blue-100 p-3 rounded-full">
@@ -185,7 +237,7 @@ const SellerPayments = () => {
             <div>
               <p className="text-gray-600 text-sm">Refunded Amount</p>
               <h3 className="text-2xl font-semibold mt-1">
-                ${paymentStats.refundedAmount.toLocaleString()}
+                ₱{paymentStats.refundedAmount.toLocaleString()}
               </h3>
             </div>
             <div className="bg-red-100 p-3 rounded-full">
@@ -268,7 +320,7 @@ const SellerPayments = () => {
               </tr>
             </thead>
             <tbody>
-              {transactions.map((transaction) => (
+              {filteredTransactions.map((transaction) => (
                 <TransactionRow
                   key={transaction._id}
                   transaction={transaction}
@@ -278,7 +330,7 @@ const SellerPayments = () => {
           </table>
         </div>
 
-        {transactions.length === 0 && (
+        {filteredTransactions.length === 0 && (
           <div className="text-center py-8">
             <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-1">

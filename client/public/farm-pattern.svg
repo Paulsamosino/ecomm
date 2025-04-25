@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Chicken silhouettes -->
+  <path d="M20,60 Q25,58 30,60 T40,60 Q45,55 43,50 T45,40 Q50,35 55,40 T65,50 Q63,55 65,60 T75,60 Q80,58 85,60" 
+        fill="none" stroke="currentColor" stroke-width="1" opacity="0.1"/>
+  
+  <!-- Simplified barn shape -->
+  <path d="M15,80 L25,60 L35,80 M20,80 L30,80" 
+        fill="none" stroke="currentColor" stroke-width="1" opacity="0.1"/>
+  
+  <!-- Fence pattern -->
+  <path d="M80,75 L85,65 L90,75 M82,75 L88,75" 
+        fill="none" stroke="currentColor" stroke-width="1" opacity="0.1"/>
+  
+  <!-- Wheat stalks -->
+  <path d="M60,20 Q65,15 70,20 M65,15 L65,25 M45,25 Q50,20 55,25 M50,20 L50,30" 
+        fill="none" stroke="currentColor" stroke-width="1" opacity="0.1"/>
+</svg>

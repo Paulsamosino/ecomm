@@ -21,6 +21,7 @@ import {
   ChevronUp,
   Info,
   HelpCircle,
+  ClipboardList,
 } from "lucide-react";
 
 const Navbar = () => {
@@ -104,9 +105,6 @@ const Navbar = () => {
               </NavItem>
               {isAuthenticated ? (
                 <>
-                  <NavItem to="/chat" active={location.pathname === "/chat"}>
-                    Messages
-                  </NavItem>
                   <NavItem
                     to="/help-center"
                     active={location.pathname === "/help-center"}
@@ -145,110 +143,44 @@ const Navbar = () => {
 
             {/* User related links */}
             {isAuthenticated ? (
-              <div className="flex items-center space-x-4">
-                {/* Wishlist */}
-                <Link
-                  to="/wishlist"
-                  className="text-gray-700 hover:text-primary relative"
-                >
-                  <Heart className="h-5 w-5" />
-                  {wishlistCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                      {wishlistCount}
-                    </span>
-                  )}
-                </Link>
-
-                {/* Shopping Cart */}
-                <Link
-                  to="/cart"
-                  className="text-gray-700 hover:text-primary relative"
-                >
-                  <ShoppingCart className="h-5 w-5" />
-                  {cartItemCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                      {cartItemCount}
-                    </span>
-                  )}
-                </Link>
-
-                {/* User Menu */}
-                <div className="relative">
+              <div className="flex items-center gap-4">
+                {user.role === "seller" ? (
                   <button
-                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                    className="flex items-center text-gray-700 hover:text-primary"
+                    onClick={() => navigate("/seller/dashboard")}
+                    className="px-4 py-2 text-gray-700 hover:text-primary transition-colors"
                   >
-                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                      {userName ? (
-                        userName.charAt(0).toUpperCase()
-                      ) : (
-                        <User className="h-4 w-4" />
-                      )}
-                    </div>
-                    <ChevronDown className="ml-1 h-4 w-4" />
+                    Seller Dashboard
                   </button>
-
-                  {isUserMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
-                      <div className="px-4 py-2 text-xs text-gray-500">
-                        Signed in as
-                      </div>
-                      <div className="px-4 py-1 text-sm font-medium">
-                        {userEmail}
-                      </div>
-                      <div className="border-t border-gray-100 my-1"></div>
-
-                      {userRole === "seller" && (
-                        <Link
-                          to="/seller"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                          Seller Dashboard
-                        </Link>
-                      )}
-
-                      {userRole === "buyer" && (
-                        <Link
-                          to="/buyer-dashboard"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                          My Account
-                        </Link>
-                      )}
-
-                      {userRole === "admin" && (
-                        <Link
-                          to="/admin-dashboard"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                          Admin Dashboard
-                        </Link>
-                      )}
-
-                      <Link
-                        to="/orders"
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      >
-                        Orders
-                      </Link>
-
-                      <Link
-                        to="/chat"
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      >
-                        Messages
-                      </Link>
-
-                      <div className="border-t border-gray-100 my-1"></div>
-                      <button
-                        onClick={logout}
-                        className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
-                      >
-                        Sign out
-                      </button>
-                    </div>
-                  )}
-                </div>
+                ) : null}
+                <Link to="/buyer-dashboard/purchases">
+                  <button
+                    className="p-2 text-gray-700 hover:text-primary relative"
+                    title="My Orders"
+                  >
+                    <ClipboardList className="h-5 w-5" />
+                  </button>
+                </Link>
+                <Link to="/wishlist">
+                  <button className="p-2 text-gray-700 hover:text-primary relative">
+                    <Heart className="h-5 w-5" />
+                    {wishlistCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                        {wishlistCount}
+                      </span>
+                    )}
+                  </button>
+                </Link>
+                <Link to="/cart">
+                  <button className="p-2 text-gray-700 hover:text-primary relative">
+                    <ShoppingCart className="h-5 w-5" />
+                    {cartItemCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                        {cartItemCount}
+                      </span>
+                    )}
+                  </button>
+                </Link>
+                <UserMenu />
               </div>
             ) : (
               <div className="flex items-center">
@@ -357,5 +289,85 @@ const MobileNavItem = ({ children, to, active }) => (
     {children}
   </Link>
 );
+
+const UserMenu = () => {
+  const { user, logout, isAuthenticated } = useAuth();
+  const { cartItemCount, wishlistItems } = useCart();
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+
+  // Use safe access for user properties
+  const userRole = user?.role || "";
+  const userName = user?.name || "";
+  const userEmail = user?.email || "";
+  const wishlistCount = isAuthenticated ? wishlistItems?.length || 0 : 0;
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+        className="flex items-center text-gray-700 hover:text-primary"
+      >
+        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+          {userName ? (
+            userName.charAt(0).toUpperCase()
+          ) : (
+            <User className="h-4 w-4" />
+          )}
+        </div>
+        <ChevronDown className="ml-1 h-4 w-4" />
+      </button>
+
+      {isUserMenuOpen && (
+        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
+          <div className="px-4 py-2 text-xs text-gray-500">Signed in as</div>
+          <div className="px-4 py-1 text-sm font-medium">{userEmail}</div>
+          <div className="border-t border-gray-100 my-1"></div>
+
+          {userRole === "seller" && (
+            <Link
+              to="/seller"
+              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            >
+              Seller Dashboard
+            </Link>
+          )}
+
+          {userRole === "buyer" && (
+            <Link
+              to="/buyer-dashboard"
+              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            >
+              My Account
+            </Link>
+          )}
+
+          {userRole === "admin" && (
+            <Link
+              to="/admin-dashboard"
+              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            >
+              Admin Dashboard
+            </Link>
+          )}
+
+          <Link
+            to="/chat"
+            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+          >
+            Messages
+          </Link>
+
+          <div className="border-t border-gray-100 my-1"></div>
+          <button
+            onClick={logout}
+            className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+          >
+            Sign out
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default Navbar;

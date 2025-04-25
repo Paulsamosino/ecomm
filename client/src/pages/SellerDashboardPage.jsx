@@ -29,6 +29,9 @@ const SellerDashboardPage = () => {
         <Link to="/seller-dashboard/analytics">
           <Button variant="outline">Analytics</Button>
         </Link>
+        <Link to="/seller-dashboard/breeding-management">
+          <Button variant="outline">Breeding Management</Button>
+        </Link>
       </div>
 
       <div className="bg-background rounded-lg shadow p-6">
