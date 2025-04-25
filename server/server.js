@@ -124,6 +124,22 @@ app.use((req, res, next) => {
   }
 });
 
+// Configure Cloudinary
+const cloudinary = require("cloudinary").v2;
+const cloudinaryConfig = {
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+};
+
+console.log("Initializing Cloudinary with config:", {
+  cloud_name: cloudinaryConfig.cloud_name,
+  api_key: cloudinaryConfig.api_key,
+  api_secret: "***",
+});
+
+cloudinary.config(cloudinaryConfig);
+
 // Only attempt to create upload directories in development
 if (process.env.NODE_ENV !== "production") {
   const fs = require("fs");

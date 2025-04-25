@@ -5,11 +5,12 @@ const path = require("path");
 const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
 const { authenticateToken } = require("../middleware/auth");
+const cloudinary = require("cloudinary").v2;
 
-// Configure multer for image uploads
+// Configure multer for temporary storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = "uploads/images";
+    const uploadDir = "uploads/temp";
     // Create directory if it doesn't exist
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
@@ -48,15 +49,26 @@ router.post(
         return res.status(400).json({ message: "No image file provided" });
       }
 
-      // Generate URL for the uploaded image
-      const imageUrl = `/uploads/images/${req.file.filename}`;
+      // Upload to Cloudinary
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        folder: "poultrymart",
+        use_filename: true,
+      });
+
+      // Delete the temporary file
+      fs.unlinkSync(req.file.path);
 
       res.json({
-        url: imageUrl,
-        filename: req.file.filename,
+        url: result.secure_url,
+        public_id: result.public_id,
+        filename: path.basename(result.secure_url),
       });
     } catch (error) {
       console.error("Error uploading image:", error);
+      // Clean up temporary file if it exists
+      if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
       res.status(500).json({ message: "Failed to upload image" });
     }
   }
