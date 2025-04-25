@@ -1,44 +1,19 @@
 const socketIo = require("socket.io");
-const jwt = require("jsonwebtoken");
-const Chat = require("./src/models/Chat");
-const User = require("./src/models/User");
-const mongoose = require("mongoose");
-
-// Map to track which users are online and their socket connections
-const userSockets = new Map();
-
-// Helper function to extract user ID
-const extractUserId = (user) => {
-  if (!user) return null;
-  if (typeof user === "string") return user;
-  return (user._id || user.id)?.toString();
-};
-
-// Helper function to compare IDs safely
-const compareIds = (id1, id2) => {
-  if (!id1 || !id2) return false;
-  return String(id1) === String(id2);
-};
 
 // List of specific allowed domains
 const allowedDomains = [
   "http://localhost:5173",
+  "http://localhost:3000",
+  "https://poultrymart-client.onrender.com",
+  "https://poultrymart-api.onrender.com",
   "https://chickenpoultry.shop",
   "https://www.chickenpoultry.shop",
-  "https://api.chickenpoultry.shop",
-  "https://ecomm-git-main-ecomms-projects-807aa19d.vercel.app",
 ];
 
-// Function to setup socket server
 const setupSocketServer = (server) => {
   const io = socketIo(server, {
     cors: {
       origin: function (origin, callback) {
-        // Allow all origins in development
-        if (process.env.NODE_ENV !== "production") {
-          return callback(null, true);
-        }
-
         // In production, check against allowed domains
         if (!origin) return callback(null, true);
 
@@ -66,13 +41,6 @@ const setupSocketServer = (server) => {
     pingTimeout: 60000,
     pingInterval: 25000,
     path: "/socket.io/",
-    secure: process.env.NODE_ENV === "production",
-    cookie: {
-      name: "io",
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "none",
-    },
   });
 
   // Socket authentication middleware

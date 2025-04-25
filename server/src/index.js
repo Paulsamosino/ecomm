@@ -18,18 +18,22 @@ const allowedDomains = [
   "https://chickenpoultry.shop",
   "https://www.chickenpoultry.shop",
   "https://api.chickenpoultry.shop",
+  "https://poultrymart-client.onrender.com",
+  "https://poultrymart-api.onrender.com",
   "https://ecomm-git-main-ecomms-projects-807aa19d.vercel.app",
   "https://chickenpoultry.netlify.app",
 ];
 
-// Request logging middleware
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-  console.log("Request origin:", req.headers.origin);
-  console.log("Request headers:", req.headers);
-  console.log("Request body:", req.body);
-  next();
-});
+// Request logging middleware - only in development
+if (process.env.NODE_ENV !== "production") {
+  app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    console.log("Request origin:", req.headers.origin);
+    console.log("Request headers:", req.headers);
+    console.log("Request body:", req.body);
+    next();
+  });
+}
 
 // CORS configuration with enhanced preflight handling
 app.use(
@@ -50,6 +54,11 @@ app.use(
 
       // Allow chickenpoultry.shop subdomains
       if (origin && origin.endsWith(".chickenpoultry.shop")) {
+        return callback(null, origin);
+      }
+
+      // Allow render.com domains in production
+      if (origin && origin.endsWith(".render.com")) {
         return callback(null, origin);
       }
 

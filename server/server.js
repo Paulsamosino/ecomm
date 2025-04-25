@@ -172,95 +172,6 @@ const sellerRoutes = require("./src/routes/seller");
 const blogRoutes = require("./src/routes/blog");
 const adminRoutes = require("./src/routes/admin");
 
-// Serve static files from the React app
-if (process.env.NODE_ENV === "production") {
-  app.use(express.static(path.join(__dirname, "../client/dist")));
-}
-
-// Register routes with proper error handling
-app.use("/api/auth", authRoutes);
-app.use("/api/products", productRoutes);
-app.use("/api/chat", chatRoutes);
-app.use("/api/seller", sellerRoutes);
-app.use("/api/blog", blogRoutes);
-app.use("/api/orders", require("./src/routes/orders"));
-app.use("/api/admin", adminRoutes);
-
-// Basic route for testing
-app.get("/", (req, res) => {
-  res.json({ message: "Welcome to PoultryMart API" });
-});
-
-// Health check endpoint for Render.com and monitoring
-app.get("/health", async (req, res) => {
-  const healthStatus = {
-    status: "ok",
-    timestamp: new Date(),
-    services: {
-      server: "up",
-      mongodb: "unknown",
-      cloudinary: "unknown",
-    },
-    uptime: process.uptime(),
-  };
-
-  // Check MongoDB connection
-  try {
-    const mongoStatus = mongoose.connection.readyState;
-    switch (mongoStatus) {
-      case 0:
-        healthStatus.services.mongodb = "disconnected";
-        break;
-      case 1:
-        healthStatus.services.mongodb = "connected";
-        break;
-      case 2:
-        healthStatus.services.mongodb = "connecting";
-        break;
-      case 3:
-        healthStatus.services.mongodb = "disconnecting";
-        break;
-      default:
-        healthStatus.services.mongodb = "unknown";
-    }
-  } catch (error) {
-    healthStatus.services.mongodb = "error";
-    healthStatus.mongoError = error.message;
-  }
-
-  // Check Cloudinary connection
-  try {
-    const { isCloudinaryConfigured } = require("./src/config/cloudinary");
-    if (isCloudinaryConfigured) {
-      healthStatus.services.cloudinary = "configured";
-    } else {
-      healthStatus.services.cloudinary = "not_configured";
-    }
-  } catch (error) {
-    healthStatus.services.cloudinary = "error";
-    healthStatus.cloudinaryError = error.message;
-  }
-
-  // Set overall status
-  if (
-    healthStatus.services.mongodb !== "connected" ||
-    healthStatus.services.cloudinary !== "configured"
-  ) {
-    healthStatus.status = "degraded";
-  }
-
-  // Return status code based on health
-  const statusCode = healthStatus.status === "ok" ? 200 : 503;
-  res.status(statusCode).json(healthStatus);
-});
-
-// Handle React routing, return all requests to React app
-if (process.env.NODE_ENV === "production") {
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "../client/dist/index.html"));
-  });
-}
-
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error("Error stack:", err.stack);
@@ -276,6 +187,25 @@ app.use((err, req, res, next) => {
     error: process.env.NODE_ENV === "development" ? err.stack : undefined,
   });
 });
+
+// In production, serve static files and handle client-side routing
+if (process.env.NODE_ENV === "production") {
+  // Serve static files from the React app
+  app.use(express.static(path.join(__dirname, "../client/dist")));
+
+  // Handle React routing, return all requests to React app
+  app.get("*", (req, res) => {
+    // Skip API routes
+    if (
+      req.url.startsWith("/api/") ||
+      req.url.startsWith("/socket.io/") ||
+      req.url.startsWith("/uploads/")
+    ) {
+      return next();
+    }
+    res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+  });
+}
 
 // 404 handler
 app.use((req, res) => {
