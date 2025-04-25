@@ -1,4 +1,16 @@
 const socketIo = require("socket.io");
+const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
+const User = require("./src/models/User");
+const Chat = require("./src/models/Chat");
+
+// Store active user sockets
+const userSockets = new Map();
+
+// Helper function to extract user ID
+const extractUserId = (user) => {
+  return user?.id || user?._id?.toString();
+};
 
 // List of specific allowed domains
 const allowedDomains = [
