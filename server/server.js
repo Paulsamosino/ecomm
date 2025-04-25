@@ -21,6 +21,7 @@ const allowedDomains = [
   "https://poultrymart-api.onrender.com",
   "https://chickenpoultry.shop",
   "https://www.chickenpoultry.shop",
+  "https://poultrymart.onrender.com",
 ];
 
 // CORS configuration
@@ -172,40 +173,25 @@ const sellerRoutes = require("./src/routes/seller");
 const blogRoutes = require("./src/routes/blog");
 const adminRoutes = require("./src/routes/admin");
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error("Error stack:", err.stack);
-  console.error("Error details:", {
-    message: err.message,
-    name: err.name,
-    code: err.code,
-  });
+// Register routes with proper error handling
+app.use("/api/auth", authRoutes);
+app.use("/api/products", productRoutes);
+app.use("/api/chat", chatRoutes);
+app.use("/api/seller", sellerRoutes);
+app.use("/api/blog", blogRoutes);
+app.use("/api/orders", require("./src/routes/orders"));
+app.use("/api/admin", adminRoutes);
+app.use("/api/reports", require("./src/routes/reports"));
+app.use("/api/upload", require("./src/routes/upload"));
 
-  res.status(err.status || 500).json({
-    success: false,
-    message: err.message || "Something went wrong!",
-    error: process.env.NODE_ENV === "development" ? err.stack : undefined,
+// Basic route for API health check
+app.get("/", (req, res) => {
+  res.json({
+    message: "PoultryMart API is running",
+    environment: process.env.NODE_ENV,
+    time: new Date().toISOString(),
   });
 });
-
-// In production, serve static files and handle client-side routing
-if (process.env.NODE_ENV === "production") {
-  // Serve static files from the React app
-  app.use(express.static(path.join(__dirname, "../client/dist")));
-
-  // Handle React routing, return all requests to React app
-  app.get("*", (req, res) => {
-    // Skip API routes
-    if (
-      req.url.startsWith("/api/") ||
-      req.url.startsWith("/socket.io/") ||
-      req.url.startsWith("/uploads/")
-    ) {
-      return next();
-    }
-    res.sendFile(path.join(__dirname, "../client/dist/index.html"));
-  });
-}
 
 // 404 handler
 app.use((req, res) => {

@@ -21,3 +21,11 @@ export const FEATURES = {
   ENABLE_REPORTS: true,
   ENABLE_BREEDING_MANAGER: true,
 };
+
+// Production environment detection
+export const IS_PRODUCTION = import.meta.env.MODE === "production";
+
+// Base URL for uploads - handle both development and production
+export const UPLOADS_URL = IS_PRODUCTION
+  ? "https://poultrymart-api.onrender.com/uploads"
+  : `${API_URL}/uploads`;
