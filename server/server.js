@@ -111,20 +111,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Check for required dependencies and setup uploads directory
-const fs = require("fs");
-const uploadDir = path.join(__dirname, "uploads");
-const productUploadsDir = path.join(uploadDir, "products");
-
-// Ensure upload directories exist
-[uploadDir, productUploadsDir].forEach((dir) => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-    console.log(`Created directory: ${dir}`);
-  }
-});
-
-// Verify critical dependencies
+// Check for required dependencies
 ["multer", "cloudinary", "mongoose"].forEach((dep) => {
   try {
     require.resolve(dep);
@@ -137,30 +124,62 @@ const productUploadsDir = path.join(uploadDir, "products");
   }
 });
 
-// Serve uploaded files
-app.use("/uploads", express.static(uploadDir));
+// Only attempt to create upload directories in development
+if (process.env.NODE_ENV !== "production") {
+  const fs = require("fs");
+  const uploadDir = path.join(__dirname, "uploads");
+  const productUploadsDir = path.join(uploadDir, "products");
 
-// Connect to MongoDB
-mongoose
-  .connect(process.env.MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-    serverSelectionTimeoutMS: 10000,
-    socketTimeoutMS: 45000,
-    family: 4, // Force IPv4
-  })
-  .then(() => {
+  [uploadDir, productUploadsDir].forEach((dir) => {
+    try {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        console.log(`Created directory: ${dir}`);
+      }
+    } catch (err) {
+      console.warn(`Warning: Could not create directory ${dir}:`, err.message);
+      // Don't exit - this is not critical in production
+    }
+  });
+}
+
+// Serve uploaded files - only if the directory exists
+const uploadDir = path.join(__dirname, "uploads");
+if (process.env.NODE_ENV !== "production") {
+  app.use("/uploads", express.static(uploadDir));
+}
+
+// Connect to MongoDB with better error handling
+const connectDB = async () => {
+  try {
+    if (!process.env.MONGODB_URI) {
+      throw new Error("MONGODB_URI environment variable is not set");
+    }
+
+    await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+      family: 4,
+    });
+
     console.log("Connected to MongoDB");
     console.log("Database:", mongoose.connection.db.databaseName);
     console.log("Host:", mongoose.connection.host);
-  })
-  .catch((err) => {
-    console.error("MongoDB connection error details:");
+  } catch (err) {
+    console.error("MongoDB connection error:");
     console.error("Error name:", err.name);
     console.error("Error message:", err.message);
-    console.error("Error code:", err.code);
-    console.error("Full error:", err);
-  });
+    if (err.code) console.error("Error code:", err.code);
+    // Exit only in production, allow retries in development
+    if (process.env.NODE_ENV === "production") {
+      process.exit(1);
+    }
+  }
+};
+
+connectDB();
 
 // Initialize Socket.IO
 setupSocketServer(server);
@@ -202,9 +221,14 @@ app.use((req, res) => {
   });
 });
 
-// Use PORT from environment variable, defaulting to 3001 only in development
-const PORT = process.env.NODE_ENV === "production" ? process.env.PORT : 3001;
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server is running on port ${PORT}`);
+// Use PORT from environment variable with strict checking
+const PORT = process.env.PORT;
+if (!PORT && process.env.NODE_ENV === "production") {
+  console.error("PORT environment variable is not set");
+  process.exit(1);
+}
+
+server.listen(PORT || 3001, "0.0.0.0", () => {
+  console.log(`Server is running on port ${PORT || 3001}`);
   console.log(`Environment: ${process.env.NODE_ENV}`);
 });
