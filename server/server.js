@@ -119,12 +119,21 @@ app.options("/api/auth/*", (req, res) => {
   }
 });
 
-// Log all requests for debugging
+// Log all requests for debugging - with safe logging (no credentials)
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-  console.log("Request origin:", req.headers.origin);
-  console.log("Request headers:", req.headers);
-  console.log("Request body:", req.body);
+  // Log origin safely
+  console.log("Request origin:", req.headers.origin || "none");
+
+  // Don't log headers or body content for security and performance
+  // Especially important for auth routes that contain credentials
+  if (req.url.includes("/auth/")) {
+    console.log("Auth route detected - body logging skipped for security");
+  } else if (req.method !== "GET") {
+    // For non-GET requests, log that a body exists but not its contents
+    console.log("Request has body:", !!req.body);
+  }
+
   next();
 });
 

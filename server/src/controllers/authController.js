@@ -237,6 +237,12 @@ exports.register = async (req, res) => {
 
 exports.login = async (req, res) => {
   try {
+    // Log login attempt (without credentials)
+    console.log(
+      "Login attempt for email:",
+      req.body.email ? req.body.email.substring(0, 3) + "..." : "not provided"
+    );
+
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -250,32 +256,58 @@ exports.login = async (req, res) => {
     }
 
     const sanitizedEmail = sanitize(email.toLowerCase().trim());
-    const user = await User.findOne({ email: sanitizedEmail }).select(
-      "+password +loginAttempts"
+    console.log(
+      "Finding user with email:",
+      sanitizedEmail.substring(0, 3) + "..."
     );
-    if (!user || !(await user.matchPassword(password))) {
-      return res.status(401).json({
-        message: MESSAGES.INVALID_CREDENTIALS,
+
+    try {
+      const user = await User.findOne({ email: sanitizedEmail }).select(
+        "+password +loginAttempts"
+      );
+
+      if (!user) {
+        console.log("No user found with the provided email");
+        return res.status(401).json({
+          message: MESSAGES.INVALID_CREDENTIALS,
+        });
+      }
+
+      console.log("User found, checking password");
+      const passwordMatch = await user.matchPassword(password);
+
+      if (!passwordMatch) {
+        console.log("Password does not match");
+        return res.status(401).json({
+          message: MESSAGES.INVALID_CREDENTIALS,
+        });
+      }
+
+      // Reset login attempts on successful login
+      user.loginAttempts = 0;
+      user.lastLogin = new Date();
+      await user.save();
+
+      const { token, jwtId } = createJwtToken(user._id);
+
+      // Add session
+      await User.findByIdAndUpdate(user._id, {
+        $push: { activeSessions: jwtId },
       });
+
+      console.log("Login successful for user ID:", user._id);
+
+      res.json({
+        success: true,
+        ...formatUserResponse(user, token),
+      });
+    } catch (err) {
+      console.error("Database error during login:", err.message);
+      throw err; // Rethrow to be caught by outer try/catch
     }
-
-    // Reset login attempts on successful login
-    user.loginAttempts = 0;
-    user.lastLogin = new Date();
-    await user.save();
-
-    const { token, jwtId } = createJwtToken(user._id);
-
-    // Add session
-    await User.findByIdAndUpdate(user._id, {
-      $push: { activeSessions: jwtId },
-    });
-
-    res.json({
-      success: true,
-      ...formatUserResponse(user, token),
-    });
   } catch (err) {
+    console.error("Login error:", err.message);
+    console.error("Error stack:", err.stack);
     res.status(500).json({ message: MESSAGES.SERVER_ERROR });
   }
 };
