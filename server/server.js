@@ -9,6 +9,9 @@ require("dotenv").config();
 const app = express();
 const server = http.createServer(app);
 
+// Trust proxy - required for correct IP detection behind Render.com and Cloudflare
+app.set("trust proxy", true);
+
 // Basic middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
