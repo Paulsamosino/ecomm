@@ -1,6 +1,5 @@
 import { io } from "socket.io-client";
 import toast from "react-hot-toast";
-import { SOCKET_URL } from "@/config/constants";
 
 class SocketService {
   constructor() {
@@ -8,10 +7,8 @@ class SocketService {
     this.connected = false;
     this.listeners = new Map();
     this.currentChatId = null;
-    this.baseURL = SOCKET_URL;
+    this.baseURL = import.meta.env.VITE_API_URL || "http://localhost:3001";
     this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
-    this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 5;
   }
 
   connect(token, userType = {}) {
@@ -29,10 +26,7 @@ class SocketService {
       return this._connectPromise;
     }
 
-    // Only log connection attempts in development
-    if (import.meta.env.MODE !== "production") {
-      console.log("Connecting to socket server:", this.baseURL);
-    }
+    console.log("Connecting to socket server...");
 
     // Clean up any existing connection before creating a new one
     this.cleanup();
@@ -43,33 +37,27 @@ class SocketService {
         const tokenData = JSON.parse(atob(token.split(".")[1]));
         const isSeller = userType.isSeller === true;
 
-        // Only log in development mode
-        if (import.meta.env.MODE !== "production") {
-          console.log("Token data:", tokenData);
-          console.log("User type:", userType);
-          console.log("Connecting as:", isSeller ? "seller" : "buyer");
-        }
+        console.log("Token data:", tokenData);
+        console.log("User type:", userType);
+        console.log("Connecting as:", isSeller ? "seller" : "buyer");
 
-        // Create socket with production optimized config
+        // Create socket with improved config
         this.socket = io(this.baseURL, {
           auth: { token },
           transports: ["websocket", "polling"], // Allow both for better reliability
           query: { isSeller: String(isSeller) },
           reconnection: true,
-          reconnectionAttempts: this.maxReconnectAttempts,
+          reconnectionAttempts: 5,
           reconnectionDelay: 1000,
-          timeout: 20000, // Increased timeout for production environments
+          timeout: 10000,
           forceNew: true,
         });
 
         // Set up connection handlers
         this.socket.on("connect", () => {
-          if (import.meta.env.MODE !== "production") {
-            console.log("Socket connected successfully");
-          }
+          console.log("Socket connected successfully");
           this.connected = true;
           this._connectPromise = null;
-          this.reconnectAttempts = 0;
 
           // Set up event handlers
           this.setupEventListeners();
@@ -84,56 +72,27 @@ class SocketService {
         });
 
         this.socket.on("connect_error", (error) => {
-          if (import.meta.env.MODE !== "production") {
-            console.error("Socket connection error:", error);
-          } else {
-            console.error("Socket connection error occurred");
-          }
-
+          console.error("Socket connection error:", error);
           this.connected = false;
-          this.reconnectAttempts++;
-
-          if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            toast.error(
-              "Unable to establish real-time connection. Chat functionality may be limited."
-            );
-            this._connectPromise = null;
-          }
-
           reject(error);
         });
 
         this.socket.on("disconnect", (reason) => {
-          if (import.meta.env.MODE !== "production") {
-            console.log("Socket disconnected:", reason);
-          }
+          console.log("Socket disconnected:", reason);
           this.connected = false;
 
           if (
             reason === "io server disconnect" ||
             reason === "transport close"
           ) {
-            if (this.reconnectAttempts < this.maxReconnectAttempts) {
-              if (import.meta.env.MODE !== "production") {
-                console.log("Attempting to reconnect...");
-              }
-
-              setTimeout(() => {
-                this.socket.connect();
-                this.reconnectAttempts++;
-              }, 1000);
-            } else {
-              this._connectPromise = null;
-            }
+            console.log("Attempting to reconnect...");
+            setTimeout(() => {
+              this.socket.connect();
+            }, 1000);
           }
         });
       } catch (error) {
-        if (import.meta.env.MODE !== "production") {
-          console.error("Error initializing socket:", error);
-        } else {
-          console.error("Error initializing socket connection");
-        }
-
+        console.error("Error initializing socket:", error);
         this.cleanup();
         this._connectPromise = null;
         reject(error);

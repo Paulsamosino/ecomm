@@ -13,7 +13,6 @@ import {
   ExternalLink,
   DollarSign,
   AlertCircle,
-  MessageSquare,
 } from "lucide-react";
 
 const SellerNavbar = () => {
@@ -33,17 +32,9 @@ const SellerNavbar = () => {
       id: 2,
       title: "Low Stock Alert",
       message: "Product 'Layer Chicken' is running low on stock",
-      time: "1 hour ago",
+      time: "10 minutes ago",
       isRead: false,
       type: "alert",
-    },
-    {
-      id: 3,
-      title: "Payment Received",
-      message: "$150.00 payment has been deposited to your account",
-      time: "2 hours ago",
-      isRead: false,
-      type: "payment",
     },
   ]);
 
@@ -51,15 +42,11 @@ const SellerNavbar = () => {
     switch (type) {
       case "order":
         return (
-          <Store className="h-8 w-8 text-primary p-1.5 bg-primary/10 rounded-full" />
+          <DollarSign className="h-8 w-8 text-green-500 p-1.5 bg-green-50 rounded-full" />
         );
       case "alert":
         return (
-          <AlertCircle className="h-8 w-8 text-orange-500 p-1.5 bg-orange-50 rounded-full" />
-        );
-      case "payment":
-        return (
-          <DollarSign className="h-8 w-8 text-green-500 p-1.5 bg-green-50 rounded-full" />
+          <AlertCircle className="h-8 w-8 text-yellow-500 p-1.5 bg-yellow-50 rounded-full" />
         );
       default:
         return (
@@ -144,7 +131,7 @@ const SellerNavbar = () => {
                       className="text-sm text-primary hover:underline flex items-center justify-center gap-1"
                     >
                       View all notifications
-                      <ChevronRight className="h-4 w-4" />
+                      <ExternalLink className="h-4 w-4" />
                     </Link>
                   </div>
                 </div>
@@ -172,40 +159,28 @@ const SellerNavbar = () => {
             {/* User Menu */}
             <div className="relative ml-2">
               <div className="flex items-center gap-3 px-3 py-1.5 rounded-full bg-gray-50 cursor-pointer hover:bg-gray-100">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-primary font-semibold">
-                    {user?.name?.[0] || "S"}
-                  </span>
-                </div>
-                <div className="hidden md:block">
-                  <p className="text-sm font-medium">{user?.name}</p>
-                  <p className="text-xs text-gray-500">
-                    {user?.sellerProfile?.businessName}
+                <div>
+                  <p className="text-sm font-medium">
+                    {user?.sellerProfile?.businessName || "Your Store"}
                   </p>
+                  <p className="text-xs text-gray-500">{user?.email}</p>
                 </div>
               </div>
             </div>
 
-            {/* Logout */}
-            <button
-              onClick={logout}
-              className="p-2 rounded-full hover:bg-red-50 hover:text-red-500"
-              title="Logout"
-            >
-              <LogOut className="h-5 w-5" />
-            </button>
-
             {/* Mobile menu button */}
-            <button
-              className="md:hidden p-2 rounded-full hover:bg-gray-100"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            >
-              {isMobileMenuOpen ? (
-                <X className="h-5 w-5 text-gray-600" />
-              ) : (
-                <Menu className="h-5 w-5 text-gray-600" />
-              )}
-            </button>
+            <div className="flex md:hidden">
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="p-2 rounded-lg hover:bg-gray-100"
+              >
+                {isMobileMenuOpen ? (
+                  <X className="h-5 w-5 text-gray-600" />
+                ) : (
+                  <Menu className="h-5 w-5 text-gray-600" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
 

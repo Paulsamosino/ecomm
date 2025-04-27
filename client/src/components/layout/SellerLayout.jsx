@@ -13,7 +13,7 @@ import {
   TrendingUp,
   HelpCircle,
   ChevronDown,
-  MessageSquare,
+  Dna,
 } from "lucide-react";
 import SellerNavbar from "./SellerNavbar";
 
@@ -41,8 +41,8 @@ const SellerLayout = () => {
       ],
     },
     {
-      group: "inventory",
-      label: "Inventory",
+      group: "sales",
+      label: "Sales",
       items: [
         {
           name: "Products",
@@ -55,30 +55,30 @@ const SellerLayout = () => {
           icon: ShoppingCart,
         },
         {
-          name: "Breeding Management",
-          path: "/seller/breeding-management",
-          icon: Store,
-        },
-      ],
-    },
-    {
-      group: "customer",
-      label: "Customer",
-      items: [
-        {
-          name: "Messages",
-          path: "/seller/messages",
-          icon: MessageSquare,
-        },
-        {
           name: "Reviews",
           path: "/seller/reviews",
           icon: Star,
         },
         {
+          name: "Breeding Management",
+          path: "/seller/breeding",
+          icon: Dna,
+        },
+      ],
+    },
+    {
+      group: "customers",
+      label: "Customers",
+      items: [
+        {
           name: "Customers",
           path: "/seller/customers",
           icon: Users,
+        },
+        {
+          name: "Cart Management",
+          path: "/seller/cart",
+          icon: ShoppingCart,
         },
       ],
     },
@@ -87,7 +87,7 @@ const SellerLayout = () => {
       label: "Settings",
       items: [
         {
-          name: "Store Settings",
+          name: "Settings",
           path: "/seller/settings",
           icon: Settings,
         },

@@ -3,6 +3,7 @@ import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import Navbar from "@/components/layout/Navbar";
 import ProtectedRoute from "@/components/routes/ProtectedRoute";
+import BuyerRoute from "@/components/routes/BuyerRoute";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { PayPalProvider } from "@/config/paypal";
@@ -84,29 +85,34 @@ const AppContent = () => {
     <>
       {!isSellerRoute && !isAdminRoute && <Navbar />}
       <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<MainLayout />}>
-          <Route index element={<HomePage />} />
-          <Route path="login" element={<LoginPage />} />
-          <Route path="register" element={<RegisterPage />} />
-          <Route path="register/seller" element={<SellerRegisterPage />} />
-          <Route path="products" element={<ProductListPage />} />
-          <Route path="products/:id" element={<ProductDetailPage />} />
-          <Route path="help-center" element={<HelpCenterPage />} />
-          <Route path="contact" element={<ContactUsPage />} />
-          <Route path="cart" element={<CartPage />} />
-          <Route path="checkout" element={<CheckoutPage />} />
-          <Route path="wishlist" element={<WishlistPage />} />
+        {/* Auth Routes */}
+        <Route path="login" element={<LoginPage />} />
+        <Route path="register" element={<RegisterPage />} />
+        <Route path="register/seller" element={<SellerRegisterPage />} />
+
+        {/* Public Routes (needs role-based redirection) */}
+        <Route element={<ProtectedRoute requireAuth={false} />}>
+          <Route path="/" element={<MainLayout />}>
+            <Route index element={<HomePage />} />
+            <Route path="products" element={<ProductListPage />} />
+            <Route path="products/:id" element={<ProductDetailPage />} />
+            <Route path="help-center" element={<HelpCenterPage />} />
+            <Route path="contact" element={<ContactUsPage />} />
+            <Route path="cart" element={<CartPage />} />
+            <Route path="checkout" element={<CheckoutPage />} />
+            <Route path="wishlist" element={<WishlistPage />} />
+          </Route>
         </Route>
 
-        {/* Protected Buyer Routes */}
-        <Route element={<ProtectedRoute />}>
-          <Route path="/" element={<MainLayout />}>
-            <Route path="buyer-dashboard" element={<BuyerDashboardPage />}>
+        {/* Buyer Routes */}
+        <Route path="/buyer" element={<BuyerRoute />}>
+          <Route element={<MainLayout />}>
+            <Route path="dashboard" element={<BuyerDashboardPage />}>
               <Route index element={<BuyerMyPurchase />} />
               <Route path="purchases" element={<BuyerMyPurchase />} />
               <Route path="profile" element={<BuyerManageProfile />} />
             </Route>
+            <Route path="breeding" element={<BreedingManagementPage />} />
             <Route path="chat" element={<EnhancedChatPage />} />
             <Route path="chat/:chatId" element={<EnhancedChatPage />} />
           </Route>
@@ -127,13 +133,18 @@ const AppContent = () => {
             <Route path="reviews" element={<SellerReviews />} />
             <Route path="customers" element={<SellerCustomers />} />
             <Route path="cart" element={<SellerCartManagement />} />
+            <Route path="breeding" element={<BreedingManagementPage />} />
+            <Route
+              path="breeding/projects"
+              element={<BreedingManagementPage />}
+            />
+            <Route
+              path="breeding/calculator"
+              element={<BreedingManagementPage />}
+            />
             <Route path="payments" element={<SellerPayments />} />
             <Route path="settings" element={<SellerSettings />} />
             <Route path="help" element={<SellerHelp />} />
-            <Route
-              path="breeding-management"
-              element={<BreedingManagementPage />}
-            />
           </Route>
         </Route>
 

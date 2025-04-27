@@ -207,6 +207,7 @@ const chatRoutes = require("./src/routes/chat");
 const sellerRoutes = require("./src/routes/seller");
 const blogRoutes = require("./src/routes/blog");
 const adminRoutes = require("./src/routes/admin");
+const breedingRoutes = require("./src/routes/breeding");
 
 // Register routes with proper error handling
 app.use("/api/auth", authRoutes);
@@ -218,6 +219,7 @@ app.use("/api/orders", require("./src/routes/orders"));
 app.use("/api/admin", adminRoutes);
 app.use("/api/reports", require("./src/routes/reports"));
 app.use("/api/upload", require("./src/routes/upload"));
+app.use("/api/breeding", breedingRoutes);
 
 // Basic route for API health check
 app.get("/", (req, res) => {

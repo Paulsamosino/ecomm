@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { apiLogin, apiRegister, apiGetCurrentUser } from "../api/auth";
 import { useNavigate, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
-import { axiosInstance, AUTH_ERROR_EVENT } from "./axios";
+import axiosInstance, { AUTH_ERROR_EVENT } from "@/api/axios";
 
 const AuthContext = createContext();
 
@@ -121,7 +121,7 @@ export const AuthProvider = ({ children }) => {
     return "/";
   };
 
-  // Verify authentication on mount and route changes
+  // Verify authentication only on mount and token changes
   useEffect(() => {
     const verifyAuth = async () => {
       const token = localStorage.getItem("token");
@@ -135,13 +135,6 @@ export const AuthProvider = ({ children }) => {
         console.log("Verifying auth with token...");
         const userData = await apiGetCurrentUser();
         const normalizedUser = normalizeUserData(userData);
-
-        console.log("User data structure:", {
-          id: normalizedUser?._id,
-          email: normalizedUser?.email,
-          isSeller: normalizedUser?.isSeller,
-          isAdmin: normalizedUser?.isAdmin,
-        });
 
         // Validate normalized user data
         if (!normalizedUser?._id) {
@@ -170,7 +163,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     verifyAuth();
-  }, [navigate, location]);
+  }, []); // Empty dependency array - only run on mount
 
   // Set up axios interceptor for token expiration
   useEffect(() => {
@@ -210,6 +203,7 @@ export const AuthProvider = ({ children }) => {
         isAuthenticated: !!user?._id,
         isSeller: user?.isSeller || false,
         isAdmin: user?.isAdmin || false,
+        isBuyer: user && !user.isAdmin && !user.isSeller,
       }}
     >
       {!isLoading && children}

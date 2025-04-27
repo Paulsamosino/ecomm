@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
-import { axiosInstance } from "@/contexts/axios";
+import axiosInstance from "@/api/axios";
 import { apiGetProduct } from "@/api/products";
 import {
   Star,

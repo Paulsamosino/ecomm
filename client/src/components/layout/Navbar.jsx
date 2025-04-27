@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
+import toast from "react-hot-toast";
 import {
   Menu,
   X,
@@ -22,7 +23,15 @@ import {
   Info,
   HelpCircle,
   ClipboardList,
+  Book,
+  Shield,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const Navbar = () => {
   const { user, logout, isAuthenticated } = useAuth();
@@ -36,7 +45,7 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   // Handle scroll effect
-  useEffect(() => {
+  React.useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10);
     };
@@ -45,7 +54,7 @@ const Navbar = () => {
   }, []);
 
   // Close mobile menu when route changes
-  useEffect(() => {
+  React.useEffect(() => {
     setIsMobileMenuOpen(false);
     setIsUserMenuOpen(false);
     setIsCategoriesOpen(false);
@@ -53,10 +62,35 @@ const Navbar = () => {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/products?search=${encodeURIComponent(searchQuery)}`);
-      setIsMobileMenuOpen(false);
+    if (!searchQuery.trim()) {
+      console.log("Navbar: Search attempted with empty query");
+      return;
     }
+    console.log("Navbar: Searching for:", searchQuery);
+    navigate(`/products?search=${encodeURIComponent(searchQuery)}`);
+  };
+
+  const handleLogout = () => {
+    console.log("Navbar: User logout initiated");
+    logout();
+    toast.success("Logged out successfully");
+  };
+
+  // Helper function to check if a route is accessible
+  const canAccessRoute = (route) => {
+    if (route === "/breeding-management") {
+      if (!user) {
+        console.log("Navbar: Breeding management access denied - no user");
+        return false;
+      }
+      if (user.isSeller || user.isAdmin) {
+        console.log("Navbar: Breeding management access denied - seller/admin");
+        return false;
+      }
+      console.log("Navbar: Breeding management access granted for buyer");
+      return true;
+    }
+    return true;
   };
 
   // Mobile navigation items for unauthenticated users
@@ -141,45 +175,9 @@ const Navbar = () => {
               </button>
             </form>
 
-            {/* User related links */}
+            {/* User Menu */}
             {isAuthenticated ? (
               <div className="flex items-center gap-4">
-                {user.role === "seller" ? (
-                  <button
-                    onClick={() => navigate("/seller/dashboard")}
-                    className="px-4 py-2 text-gray-700 hover:text-primary transition-colors"
-                  >
-                    Seller Dashboard
-                  </button>
-                ) : null}
-                <Link to="/buyer-dashboard/purchases">
-                  <button
-                    className="p-2 text-gray-700 hover:text-primary relative"
-                    title="My Orders"
-                  >
-                    <ClipboardList className="h-5 w-5" />
-                  </button>
-                </Link>
-                <Link to="/wishlist">
-                  <button className="p-2 text-gray-700 hover:text-primary relative">
-                    <Heart className="h-5 w-5" />
-                    {wishlistCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                        {wishlistCount}
-                      </span>
-                    )}
-                  </button>
-                </Link>
-                <Link to="/cart">
-                  <button className="p-2 text-gray-700 hover:text-primary relative">
-                    <ShoppingCart className="h-5 w-5" />
-                    {cartItemCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                        {cartItemCount}
-                      </span>
-                    )}
-                  </button>
-                </Link>
                 <UserMenu />
               </div>
             ) : (
@@ -252,13 +250,23 @@ const Navbar = () => {
             </MobileNavItem>
 
             <div className="border-t border-gray-200 my-2"></div>
-            <Link
-              to="/login"
-              className="flex items-center px-3 py-2 text-primary font-medium"
-            >
-              <User className="mr-2 h-5 w-5" />
-              Sign In
-            </Link>
+            {!isAuthenticated ? (
+              <Link
+                to="/login"
+                className="flex items-center px-3 py-2 text-primary font-medium"
+              >
+                <User className="mr-2 h-5 w-5" />
+                Sign In
+              </Link>
+            ) : (
+              <button
+                onClick={handleLogout}
+                className="flex items-center w-full text-left px-3 py-2 text-red-600 font-medium"
+              >
+                <LogOut className="mr-2 h-5 w-5" />
+                Sign Out
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -267,39 +275,57 @@ const Navbar = () => {
 };
 
 // Desktop Nav Item
-const NavItem = ({ children, to, active }) => (
-  <Link
-    to={to}
-    className={`py-2 px-3 text-sm font-medium transition-colors ${
-      active ? "text-primary" : "text-gray-700 hover:text-primary"
-    }`}
-  >
-    {children}
-  </Link>
+const NavItem = React.forwardRef(
+  ({ children, to, active, className, ...props }, ref) => (
+    <Link
+      ref={ref}
+      to={to}
+      className={`py-2 px-3 text-sm font-medium transition-colors ${
+        active ? "text-primary" : "text-gray-700 hover:text-primary"
+      } ${className || ""}`}
+      {...props}
+    >
+      {children}
+    </Link>
+  )
 );
+NavItem.displayName = "NavItem";
 
 // Mobile Nav Item
-const MobileNavItem = ({ children, to, active }) => (
-  <Link
-    to={to}
-    className={`flex items-center px-3 py-2 text-base font-medium ${
-      active ? "text-primary" : "text-gray-700 hover:text-primary"
-    }`}
-  >
-    {children}
-  </Link>
+const MobileNavItem = React.forwardRef(
+  ({ children, to, active, className, ...props }, ref) => (
+    <Link
+      ref={ref}
+      to={to}
+      className={`flex items-center px-3 py-2 text-base font-medium ${
+        active ? "text-primary" : "text-gray-700 hover:text-primary"
+      } ${className || ""}`}
+      {...props}
+    >
+      {children}
+    </Link>
+  )
 );
+MobileNavItem.displayName = "MobileNavItem";
 
 const UserMenu = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const { cartItemCount, wishlistItems } = useCart();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const navigate = useNavigate();
 
   // Use safe access for user properties
   const userRole = user?.role || "";
   const userName = user?.name || "";
   const userEmail = user?.email || "";
   const wishlistCount = isAuthenticated ? wishlistItems?.length || 0 : 0;
+
+  const handleLogout = () => {
+    logout();
+    setIsUserMenuOpen(false);
+    toast.success("Logged out successfully");
+    navigate("/login");
+  };
 
   return (
     <div className="relative">
@@ -321,47 +347,85 @@ const UserMenu = () => {
         <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
           <div className="px-4 py-2 text-xs text-gray-500">Signed in as</div>
           <div className="px-4 py-1 text-sm font-medium">{userEmail}</div>
+
           <div className="border-t border-gray-100 my-1"></div>
 
+          {/* Main Navigation Items */}
+          {!user?.isSeller && !user?.isAdmin && (
+            <>
+              <Link
+                to="/buyer/breeding"
+                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4 mr-2"
+                >
+                  <path d="M9 20.5L2.5 14 9 7.5" />
+                  <path d="M15 7.5l6.5 6.5-6.5 6.5" />
+                </svg>
+                Breeding Management
+              </Link>
+            </>
+          )}
+
+          <Link
+            to="/buyer/dashboard/purchases"
+            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+          >
+            <ClipboardList className="h-4 w-4 mr-2" />
+            My Purchases
+          </Link>
+
+          <Link
+            to="/wishlist"
+            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+          >
+            <Heart className="h-4 w-4 mr-2" />
+            Wishlist {wishlistCount > 0 && `(${wishlistCount})`}
+          </Link>
+
+          <Link
+            to="/cart"
+            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+          >
+            <ShoppingCart className="h-4 w-4 mr-2" />
+            Cart {cartItemCount > 0 && `(${cartItemCount})`}
+          </Link>
+
+          {/* Role-specific sections */}
           {userRole === "seller" && (
             <Link
               to="/seller"
-              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
             >
+              <Store className="h-4 w-4 mr-2" />
               Seller Dashboard
-            </Link>
-          )}
-
-          {userRole === "buyer" && (
-            <Link
-              to="/buyer-dashboard"
-              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-            >
-              My Account
             </Link>
           )}
 
           {userRole === "admin" && (
             <Link
               to="/admin-dashboard"
-              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
             >
+              <Shield className="h-4 w-4 mr-2" />
               Admin Dashboard
             </Link>
           )}
 
-          <Link
-            to="/chat"
-            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-          >
-            Messages
-          </Link>
-
           <div className="border-t border-gray-100 my-1"></div>
           <button
-            onClick={logout}
-            className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+            onClick={handleLogout}
+            className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
           >
+            <LogOut className="h-4 w-4 mr-2" />
             Sign out
           </button>
         </div>

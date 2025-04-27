@@ -2,11 +2,11 @@ const express = require("express");
 const router = express.Router();
 const Report = require("../models/Report");
 const User = require("../models/User");
-const { protect } = require("../middleware/authMiddleware");
+const { auth } = require("../middleware/auth");
 const checkRole = require("../middleware/checkRole");
 
 // Submit a report
-router.post("/", protect, async (req, res) => {
+router.post("/", auth, async (req, res) => {
   try {
     const {
       reportedUserId,
@@ -98,7 +98,7 @@ router.post("/", protect, async (req, res) => {
 });
 
 // Get reports for a user (only their own reports)
-router.get("/my-reports", protect, async (req, res) => {
+router.get("/my-reports", auth, async (req, res) => {
   try {
     const reports = await Report.find({ reporter: req.user._id })
       .populate("reportedUser", "name email")
@@ -119,7 +119,7 @@ router.get("/my-reports", protect, async (req, res) => {
 });
 
 // Admin: Get all reports
-router.get("/", protect, checkRole(["admin"]), async (req, res) => {
+router.get("/", auth, checkRole(["admin"]), async (req, res) => {
   try {
     const reports = await Report.find()
       .populate("reporter", "name email")
@@ -176,7 +176,7 @@ router.get("/", protect, checkRole(["admin"]), async (req, res) => {
 });
 
 // Admin: Update report status
-router.put("/:id/status", protect, checkRole(["admin"]), async (req, res) => {
+router.put("/:id/status", auth, checkRole(["admin"]), async (req, res) => {
   try {
     const { status, resolution } = req.body;
 
@@ -225,7 +225,7 @@ router.put("/:id/status", protect, checkRole(["admin"]), async (req, res) => {
 });
 
 // Get status of a specific report
-router.get("/:id", protect, async (req, res) => {
+router.get("/:id", auth, async (req, res) => {
   try {
     const report = await Report.findOne({
       _id: req.params.id,

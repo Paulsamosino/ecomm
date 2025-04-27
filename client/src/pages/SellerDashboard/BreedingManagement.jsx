@@ -196,21 +196,37 @@ const BreedingManagement = () => {
 
   return (
     <div className="container mx-auto p-4 space-y-6">
+      <h1 className="text-2xl font-bold mb-6 bg-gradient-to-r from-[#d37b33] to-[#ffb464] text-transparent bg-clip-text">
+        Breeding Management
+      </h1>
+
       <Tabs
         defaultValue="calculator"
         value={activeTab}
         onValueChange={setActiveTab}
       >
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="calculator">Breeding Calculator</TabsTrigger>
-          <TabsTrigger value="management">Breeding Management</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-[#fff5e8] to-[#ffeed7] p-1 rounded-xl">
+          <TabsTrigger
+            value="calculator"
+            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#ffb464] data-[state=active]:to-[#ffa040] data-[state=active]:text-white transition-all"
+          >
+            Breeding Calculator
+          </TabsTrigger>
+          <TabsTrigger
+            value="management"
+            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#ffb464] data-[state=active]:to-[#ffa040] data-[state=active]:text-white transition-all"
+          >
+            Breeding Management
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="calculator" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Breeding Calculator</CardTitle>
-              <CardDescription>
+          <Card className="shadow-md border-[#ffb464]/30">
+            <CardHeader className="bg-gradient-to-r from-[#fff5e8] to-[#ffeed7]">
+              <CardTitle className="text-[#a05e2b]">
+                Breeding Calculator
+              </CardTitle>
+              <CardDescription className="text-[#b06a30]">
                 Calculate breeding outcomes and predictions
               </CardDescription>
             </CardHeader>
@@ -218,14 +234,16 @@ const BreedingManagement = () => {
               <div className="grid gap-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="breed1">First Breed</Label>
+                    <Label htmlFor="breed1" className="text-[#a05e2b]">
+                      First Breed
+                    </Label>
                     <Select
                       value={breed1}
                       onValueChange={(value) =>
                         handleBreedChange(value, setBreed1)
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="border-[#ffb464]/30 focus:ring-[#ffb464]">
                         <SelectValue placeholder="Select first breed" />
                       </SelectTrigger>
                       <SelectContent>
@@ -239,14 +257,16 @@ const BreedingManagement = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="breed2">Second Breed</Label>
+                    <Label htmlFor="breed2" className="text-[#a05e2b]">
+                      Second Breed
+                    </Label>
                     <Select
                       value={breed2}
                       onValueChange={(value) =>
                         handleBreedChange(value, setBreed2)
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="border-[#ffb464]/30 focus:ring-[#ffb464]">
                         <SelectValue placeholder="Select second breed" />
                       </SelectTrigger>
                       <SelectContent>
@@ -261,18 +281,20 @@ const BreedingManagement = () => {
                 </div>
 
                 {breedingResult && (
-                  <Card className="mt-4">
-                    <CardHeader>
-                      <CardTitle className="text-lg">
+                  <Card className="mt-4 border-[#ffb464]/30 shadow-md">
+                    <CardHeader className="bg-gradient-to-r from-[#fff5e8] to-[#ffeed7]">
+                      <CardTitle className="text-lg text-[#a05e2b]">
                         {breedingResult.name}
                       </CardTitle>
-                      <CardDescription>
+                      <CardDescription className="text-[#b06a30]">
                         {breedingResult.characteristics}
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div>
-                        <h4 className="font-medium mb-2">Expected Traits</h4>
+                        <h4 className="font-medium mb-2 text-[#a05e2b]">
+                          Expected Traits
+                        </h4>
                         <div className="grid grid-cols-2 gap-2">
                           {Object.entries(breedingResult.expectedTraits).map(
                             ([trait, value]) => (
@@ -280,11 +302,11 @@ const BreedingManagement = () => {
                                 key={trait}
                                 className="flex items-start space-x-2"
                               >
-                                <div className="w-full p-2 rounded-md bg-secondary">
-                                  <p className="font-medium capitalize">
+                                <div className="w-full p-2 rounded-md bg-gradient-to-r from-[#fff5e8] to-[#ffeed7]">
+                                  <p className="font-medium capitalize text-[#a05e2b]">
                                     {trait}
                                   </p>
-                                  <p className="text-sm text-muted-foreground">
+                                  <p className="text-sm text-[#b06a30]">
                                     {value}
                                   </p>
                                 </div>
@@ -295,7 +317,7 @@ const BreedingManagement = () => {
                       </div>
 
                       <div>
-                        <h4 className="font-medium mb-2">
+                        <h4 className="font-medium mb-2 text-[#a05e2b]">
                           Breeding Considerations
                         </h4>
                         <ul className="list-disc list-inside space-y-1">
@@ -303,7 +325,7 @@ const BreedingManagement = () => {
                             (consideration, index) => (
                               <li
                                 key={index}
-                                className="text-sm text-muted-foreground"
+                                className="text-sm text-[#b06a30]"
                               >
                                 {consideration}
                               </li>
@@ -317,38 +339,44 @@ const BreedingManagement = () => {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="maleId">Male ID</Label>
+                    <Label htmlFor="maleId" className="text-[#a05e2b]">
+                      Male ID
+                    </Label>
                     <Input
                       id="maleId"
                       value={maleId}
                       onChange={(e) => setMaleId(e.target.value)}
                       placeholder="Enter male ID"
+                      className="border-[#ffb464]/30 focus:ring-[#ffb464]"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="femaleId">Female ID</Label>
+                    <Label htmlFor="femaleId" className="text-[#a05e2b]">
+                      Female ID
+                    </Label>
                     <Input
                       id="femaleId"
                       value={femaleId}
                       onChange={(e) => setFemaleId(e.target.value)}
                       placeholder="Enter female ID"
+                      className="border-[#ffb464]/30 focus:ring-[#ffb464]"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Breeding Date</Label>
+                  <Label className="text-[#a05e2b]">Breeding Date</Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant={"outline"}
                         className={cn(
-                          "w-full justify-start text-left font-normal",
+                          "w-full justify-start text-left font-normal border-[#ffb464]/30",
                           !date && "text-muted-foreground"
                         )}
                       >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        <CalendarIcon className="mr-2 h-4 w-4 text-[#ffb464]" />
                         {date ? format(date, "PPP") : <span>Pick a date</span>}
                       </Button>
                     </PopoverTrigger>
@@ -358,25 +386,29 @@ const BreedingManagement = () => {
                         selected={date}
                         onSelect={setDate}
                         initialFocus
+                        className="text-[#a05e2b]"
                       />
                     </PopoverContent>
                   </Popover>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="notes">Notes</Label>
+                  <Label htmlFor="notes" className="text-[#a05e2b]">
+                    Notes
+                  </Label>
                   <Input
                     id="notes"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="Add breeding notes"
+                    className="border-[#ffb464]/30 focus:ring-[#ffb464]"
                   />
                 </div>
 
                 <Button
                   onClick={handleAddPair}
                   disabled={!breed1 || !breed2 || !maleId || !femaleId || !date}
-                  className="w-full"
+                  className="w-full bg-gradient-to-r from-[#ffb464] to-[#ffa040] hover:from-[#ffa040] hover:to-[#ff9428] text-white transition-all"
                 >
                   <PlusCircle className="mr-2 h-4 w-4" />
                   Add Breeding Pair
@@ -387,40 +419,50 @@ const BreedingManagement = () => {
         </TabsContent>
 
         <TabsContent value="management" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Active Breeding Pairs</CardTitle>
-              <CardDescription>
+          <Card className="shadow-md border-[#ffb464]/30">
+            <CardHeader className="bg-gradient-to-r from-[#fff5e8] to-[#ffeed7]">
+              <CardTitle className="text-[#a05e2b]">
+                Active Breeding Pairs
+              </CardTitle>
+              <CardDescription className="text-[#b06a30]">
                 Manage your current breeding pairs
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-[#fff5e8]">
                   <TableRow>
-                    <TableHead>Breeds</TableHead>
-                    <TableHead>IDs</TableHead>
-                    <TableHead>Breeding Date</TableHead>
-                    <TableHead>Expected Hatch</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead className="text-[#a05e2b]">Breeds</TableHead>
+                    <TableHead className="text-[#a05e2b]">IDs</TableHead>
+                    <TableHead className="text-[#a05e2b]">
+                      Breeding Date
+                    </TableHead>
+                    <TableHead className="text-[#a05e2b]">
+                      Expected Hatch
+                    </TableHead>
+                    <TableHead className="text-[#a05e2b]">Status</TableHead>
+                    <TableHead className="text-[#a05e2b]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {breedingPairs.map((pair) => (
-                    <TableRow key={pair.id}>
+                    <TableRow key={pair.id} className="hover:bg-[#fff5e8]/50">
                       <TableCell>
-                        <div className="font-medium">{pair.result.name}</div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="font-medium text-[#a05e2b]">
+                          {pair.result.name}
+                        </div>
+                        <div className="text-sm text-[#b06a30]">
                           {pair.breed1} × {pair.breed2}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-[#b06a30]">
                         <div>♂ {pair.maleId}</div>
                         <div>♀ {pair.femaleId}</div>
                       </TableCell>
-                      <TableCell>{format(pair.breedingDate, "PP")}</TableCell>
-                      <TableCell>
+                      <TableCell className="text-[#b06a30]">
+                        {format(pair.breedingDate, "PP")}
+                      </TableCell>
+                      <TableCell className="text-[#b06a30]">
                         {format(pair.expectedHatchDate, "PP")}
                       </TableCell>
                       <TableCell>
@@ -430,7 +472,7 @@ const BreedingManagement = () => {
                             updatePairStatus(pair.id, value)
                           }
                         >
-                          <SelectTrigger className="w-[120px]">
+                          <SelectTrigger className="w-[120px] border-[#ffb464]/30 focus:ring-[#ffb464]">
                             <SelectValue placeholder="Status" />
                           </SelectTrigger>
                           <SelectContent>
@@ -446,6 +488,7 @@ const BreedingManagement = () => {
                           variant="ghost"
                           size="sm"
                           onClick={() => setBreedingResult(pair.result)}
+                          className="text-[#ffb464] hover:text-[#a05e2b] hover:bg-[#fff5e8]"
                         >
                           <Info className="h-4 w-4" />
                         </Button>
@@ -456,7 +499,7 @@ const BreedingManagement = () => {
                     <TableRow>
                       <TableCell
                         colSpan={6}
-                        className="text-center text-muted-foreground"
+                        className="text-center text-[#b06a30] h-32"
                       >
                         No breeding pairs added yet
                       </TableCell>

@@ -4,7 +4,7 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
-const auth = require("../middleware/auth");
+const { auth } = require("../middleware/auth");
 const cloudinary = require("cloudinary").v2;
 
 // Configure multer for temporary storage

@@ -2,16 +2,17 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Loader2, Save, AlertCircle } from "lucide-react";
+import { Loader2, Save, AlertCircle, RefreshCw } from "lucide-react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-import { axiosInstance } from "@/contexts/axios";
+import axiosInstance from "@/api/axios";
 
 const SellerSettings = () => {
   const { user, updateUser } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState(null);
   const [formData, setFormData] = useState({
     businessName: "",
     email: "",
@@ -32,31 +33,45 @@ const SellerSettings = () => {
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
+    fetchSellerProfile();
+  }, [user]);
+
+  const fetchSellerProfile = async () => {
     if (!user) {
       navigate("/login");
       return;
     }
 
-    if (user?.sellerProfile) {
-      setFormData({
-        businessName: user.sellerProfile.businessName || "",
-        email: user.email || "",
-        phone: user.sellerProfile.phone || "",
-        address: user.sellerProfile.address || "",
-        city: user.sellerProfile.city || "",
-        state: user.sellerProfile.state || "",
-        zipCode: user.sellerProfile.zipCode || "",
-        description: user.sellerProfile.description || "",
-        paymentMethods: user.sellerProfile.paymentMethods || "",
-        shippingPolicy: user.sellerProfile.shippingPolicy || "",
-        returnPolicy: user.sellerProfile.returnPolicy || "",
-        bankName: user.sellerProfile.bankName || "",
-        accountNumber: user.sellerProfile.accountNumber || "",
-        accountHolderName: user.sellerProfile.accountHolderName || "",
-      });
+    setLoading(true);
+    setLoadError(null);
+
+    try {
+      if (user?.sellerProfile) {
+        setFormData({
+          businessName: user.sellerProfile.businessName || "",
+          email: user.email || "",
+          phone: user.sellerProfile.phone || "",
+          address: user.sellerProfile.address || "",
+          city: user.sellerProfile.city || "",
+          state: user.sellerProfile.state || "",
+          zipCode: user.sellerProfile.zipCode || "",
+          description: user.sellerProfile.description || "",
+          paymentMethods: user.sellerProfile.paymentMethods || "",
+          shippingPolicy: user.sellerProfile.shippingPolicy || "",
+          returnPolicy: user.sellerProfile.returnPolicy || "",
+          bankName: user.sellerProfile.bankName || "",
+          accountNumber: user.sellerProfile.accountNumber || "",
+          accountHolderName: user.sellerProfile.accountHolderName || "",
+        });
+      }
+    } catch (error) {
+      console.error("Error loading seller profile:", error);
+      setLoadError("Failed to load your seller profile. Please try again.");
+      toast.error("Error loading profile data");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [user, navigate]);
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -141,6 +156,24 @@ const SellerSettings = () => {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)]">
+        <div className="text-center mb-6">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">
+            Error Loading Profile
+          </h2>
+          <p className="text-gray-600 mb-6">{loadError}</p>
+          <Button onClick={fetchSellerProfile}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Try Again
+          </Button>
+        </div>
       </div>
     );
   }

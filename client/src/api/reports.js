@@ -1,4 +1,4 @@
-import { axiosInstance } from "@/contexts/axios";
+import axiosInstance from "@/api/axios";
 
 /**
  * Submit a new report

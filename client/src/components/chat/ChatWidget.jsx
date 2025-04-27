@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { axiosInstance } from "@/contexts/axios";
+import axiosInstance from "@/api/axios";
 import { socketService } from "@/services/socket";
 import {
   MessageSquare,

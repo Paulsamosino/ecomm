@@ -7,7 +7,7 @@ const { upload } = require("../config/cloudinary");
 const mongoose = require("mongoose");
 
 // Get seller's products
-router.get("/seller", auth, async (req, res) => {
+router.get("/seller", auth.auth, async (req, res) => {
   try {
     if (!req.user || !req.user.id) {
       return res
@@ -37,7 +37,7 @@ router.get("/seller", auth, async (req, res) => {
 });
 
 // Create a new product
-router.post("/", auth, upload.array("images", 5), async (req, res) => {
+router.post("/", auth.auth, upload.array("images", 5), async (req, res) => {
   try {
     console.log("Request body:", req.body);
     console.log("Request files:", req.files);
@@ -191,6 +191,14 @@ router.get("/", async (req, res) => {
         "seller",
         "name email sellerProfile.businessName sellerProfile.rating"
       )
+      .populate({
+        path: "breedingStatus.currentPair",
+        select: "status events startDate",
+        populate: {
+          path: "sire dam",
+          select: "name breed gender",
+        },
+      })
       .sort(sortOption)
       .skip(skip)
       .limit(limitInt);
@@ -228,7 +236,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // Update a product
-router.put("/:id", auth, upload.array("images", 5), async (req, res) => {
+router.put("/:id", auth.auth, upload.array("images", 5), async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
 
@@ -263,7 +271,7 @@ router.put("/:id", auth, upload.array("images", 5), async (req, res) => {
 });
 
 // Delete a product
-router.delete("/:id", auth, async (req, res) => {
+router.delete("/:id", auth.auth, async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
 

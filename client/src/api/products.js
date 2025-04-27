@@ -1,4 +1,4 @@
-import { axiosInstance } from "@/contexts/axios";
+import axiosInstance from "@/api/axios";
 
 export const apiAddProduct = async (productData) => {
   const response = await axiosInstance.post("/products", productData, {
@@ -10,10 +10,20 @@ export const apiAddProduct = async (productData) => {
 };
 
 export const apiGetProducts = async (queryParams) => {
-  const response = await axiosInstance.get("/products", {
-    params: queryParams,
-  });
-  return response.data;
+  try {
+    // Ensure method is defined in config
+    const response = await axiosInstance.get("/products", {
+      params: queryParams || {},
+      headers: {
+        // Ensure headers are properly defined
+        "Content-Type": "application/json",
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    throw error;
+  }
 };
 
 export const apiGetProduct = async (id) => {

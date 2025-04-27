@@ -1,11 +1,11 @@
 const express = require("express");
 const router = express.Router();
-const { protect } = require("../middleware/authMiddleware");
+const { auth } = require("../middleware/auth");
 const { validateChatAccess } = require("../middleware/chatMiddleware");
 const chatController = require("../controllers/chatController");
 
 // Apply authentication middleware to all routes
-router.use(protect);
+router.use(auth);
 
 // Debug middleware to log request details
 router.use((req, res, next) => {

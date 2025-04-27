@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { axiosInstance } from "@/contexts/axios";
+import axiosInstance from "@/api/axios";
+import { socketService } from "@/services/socket";
 import {
   Search,
   MessageSquare,
@@ -23,7 +23,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
-import { socketService } from "@/services/socket";
 
 // Helper function to normalize user ID
 const normalizeUserId = (user) => {

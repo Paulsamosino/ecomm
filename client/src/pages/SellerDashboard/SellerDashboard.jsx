@@ -9,6 +9,8 @@ import {
   Users,
   BarChart3,
   ExternalLink,
+  ClipboardList,
+  Dna,
 } from "lucide-react";
 import {
   getSellerStats,
@@ -207,11 +209,8 @@ const SellerDashboard = () => {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Loading Dashboard...</h2>
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-        </div>
+      <div className="container mx-auto px-4 py-8 flex justify-center items-center h-[50vh]">
+        <p>Loading dashboard data...</p>
       </div>
     );
   }
@@ -224,7 +223,7 @@ const SellerDashboard = () => {
           <p className="text-gray-600 mt-1">Welcome back, {user?.name}</p>
         </div>
         <Link
-          to="/seller/post-product"
+          to="/seller/products/new"
           className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
         >
           Post New Product
@@ -233,28 +232,34 @@ const SellerDashboard = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <StatCard
-          title="Total Products"
-          value={stats.totalProducts}
-          icon={Package}
-          description="Active listings"
-        />
-        <StatCard
           title="Total Sales"
           value={`₱${stats.totalSales.toLocaleString()}`}
           icon={DollarSign}
-          description="Lifetime sales"
+          description="All completed orders"
+        />
+        <StatCard
+          title="Monthly Revenue"
+          value={`₱${stats.monthlyRevenue.toLocaleString()}`}
+          icon={BarChart3}
+          description="Revenue this month"
+        />
+        <StatCard
+          title="Active Products"
+          value={stats.totalProducts}
+          icon={Package}
+          description="Currently listed items"
         />
         <StatCard
           title="Pending Orders"
           value={stats.pendingOrders}
           icon={ShoppingCart}
-          description="Orders to fulfill"
+          description="Orders awaiting processing"
         />
         <StatCard
           title="Average Rating"
           value={stats.averageRating.toFixed(1)}
           icon={Star}
-          description={`From ${recentReviews.length} reviews`}
+          description="Overall customer satisfaction"
         />
         <StatCard
           title="Total Customers"
@@ -262,53 +267,64 @@ const SellerDashboard = () => {
           icon={Users}
           description="Unique buyers"
         />
-        <StatCard
-          title="Monthly Revenue"
-          value={`₱${stats.monthlyRevenue.toLocaleString()}`}
-          icon={BarChart3}
-          description="This month"
-        />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white rounded-lg p-6 shadow-md">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Recent Orders</h2>
-            <Link
-              to="/seller/orders"
-              className="text-primary hover:text-primary/80 flex items-center text-sm"
-            >
-              View All <ExternalLink className="w-4 h-4 ml-1" />
-            </Link>
-          </div>
-          <div className="divide-y divide-gray-200">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1 bg-white rounded-lg p-6 shadow-md">
+          <h2 className="text-xl font-semibold mb-4">Recent Orders</h2>
+          <div className="space-y-2">
             {recentOrders.length > 0 ? (
               recentOrders.map((order) => (
                 <OrderRow key={order._id} order={order} />
               ))
             ) : (
-              <p className="text-gray-500 py-4">No recent orders</p>
+              <p className="text-gray-500 text-sm">No recent orders.</p>
             )}
           </div>
+          <Link
+            to="/seller/orders"
+            className="text-primary hover:underline mt-4 inline-block text-sm font-medium"
+          >
+            View All Orders <ExternalLink className="inline w-3 h-3 ml-1" />
+          </Link>
         </div>
-        <div className="bg-white rounded-lg p-6 shadow-md">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Recent Reviews</h2>
-            <Link
-              to="/seller/reviews"
-              className="text-primary hover:text-primary/80 flex items-center text-sm"
-            >
-              View All <ExternalLink className="w-4 h-4 ml-1" />
-            </Link>
-          </div>
-          <div className="divide-y divide-gray-200">
+
+        <div className="lg:col-span-1 bg-white rounded-lg p-6 shadow-md">
+          <h2 className="text-xl font-semibold mb-4">Recent Reviews</h2>
+          <div className="space-y-2">
             {recentReviews.length > 0 ? (
               recentReviews.map((review) => (
                 <ReviewCard key={review._id} review={review} />
               ))
             ) : (
-              <p className="text-gray-500 py-4">No reviews yet</p>
+              <p className="text-gray-500 text-sm">No recent reviews.</p>
             )}
+          </div>
+          <Link
+            to="/seller/reviews"
+            className="text-primary hover:underline mt-4 inline-block text-sm font-medium"
+          >
+            View All Reviews <ExternalLink className="inline w-3 h-3 ml-1" />
+          </Link>
+        </div>
+
+        <div className="lg:col-span-1 bg-white rounded-lg p-6 shadow-md">
+          <h2 className="text-xl font-semibold mb-4">Management</h2>
+          <div className="space-y-4">
+            <Link
+              to="/seller/products/new"
+              className="flex items-center p-3 bg-primary/5 hover:bg-primary/10 rounded-md transition-colors"
+            >
+              <Package className="w-5 h-5 text-primary mr-3" />
+              <span>Add New Product</span>
+            </Link>
+            <Link
+              to="/seller/breeding"
+              className="flex items-center p-3 bg-primary/5 hover:bg-primary/10 rounded-md transition-colors"
+            >
+              <Dna className="w-5 h-5 text-primary mr-3" />
+              <span>Manage Breeding</span>
+            </Link>
           </div>
         </div>
       </div>
