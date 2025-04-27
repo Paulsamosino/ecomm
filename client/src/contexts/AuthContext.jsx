@@ -56,7 +56,7 @@ export const AuthProvider = ({ children }) => {
         // Validate normalized user data
         if (!normalizedUser?._id) {
           console.error("Invalid user data received:", response.user);
-          throw new Error("Invalid user data received");
+          throw new Error("Invalid user data structure");
         }
 
         setUser(normalizedUser);
@@ -71,7 +71,9 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (err) {
       console.error("Login error:", err);
-      const errorMessage = err.response?.data?.message || "Failed to login";
+      // Use the specific error message from our enhanced API call
+      const errorMessage =
+        err.message || "Failed to login. Please try again later.";
       setError(errorMessage);
       toast.error(errorMessage);
       setUser(null);

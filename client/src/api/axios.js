@@ -39,11 +39,18 @@ axiosInstance.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Add retry configuration
+    // Add retry configuration and request details for better debugging
     config.metadata = {
       startTime: new Date().getTime(),
       retryCount: 0,
+      url: config.url,
+      method: config.method,
     };
+
+    // Log requests in development mode
+    if (import.meta.env.MODE === "development") {
+      console.log(`Request: ${config.method?.toUpperCase()} ${config.url}`);
+    }
 
     return config;
   },

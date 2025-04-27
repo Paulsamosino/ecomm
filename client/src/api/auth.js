@@ -10,12 +10,44 @@ import axiosInstance from "./axios";
 export const apiLogin = async (credentials) => {
   try {
     const response = await axiosInstance.post("/auth/login", credentials);
+
+    // Validate response structure
+    if (!response.data || !response.data.token || !response.data.user) {
+      console.error("Invalid login response structure:", response.data);
+      throw new Error(
+        "Server returned an invalid response. Please try again later."
+      );
+    }
+
     return {
       user: response.data.user,
       token: response.data.token,
     };
   } catch (error) {
     console.error("Login API error:", error);
+
+    // Handle specific error cases
+    if (error.response) {
+      // Server returned an error response
+      const status = error.response.status;
+      const responseData = error.response.data;
+
+      if (status === 429) {
+        throw new Error(
+          "Too many login attempts. Please try again in a few minutes."
+        );
+      } else if (status === 401) {
+        throw new Error(
+          responseData?.message ||
+            "Invalid credentials. Please check your email and password."
+        );
+      } else if (status >= 500) {
+        throw new Error("Server error. Please try again later.");
+      } else if (responseData?.message) {
+        throw new Error(responseData.message);
+      }
+    }
+
     throw error;
   }
 };
