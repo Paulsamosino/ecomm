@@ -304,9 +304,16 @@ exports.login = async (req, res) => {
       }
 
       // Reset login attempts on successful login
-      user.loginAttempts = 0;
-      user.lastLogin = new Date();
-      await user.save();
+      // Use updateOne to bypass schema validation
+      await User.updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            loginAttempts: 0,
+            lastLogin: new Date(),
+          },
+        }
+      );
 
       const { token, jwtId } = createJwtToken(user._id);
 
