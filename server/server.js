@@ -25,20 +25,28 @@ const allowedDomains = [
   "https://chickenpoultry.shop",
   "https://www.chickenpoultry.shop",
   "https://poultrymart.onrender.com",
+  "https://ecomm-git-main-ecomms-projects-807aa19d.vercel.app",
+  "https://chickenpoultry.netlify.app",
 ];
 
 // CORS configuration
 app.use(
   cors({
     origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps, curl requests)
       if (!origin) return callback(null, true);
+
+      // Check if origin is in allowed list or matches our patterns
       if (
         allowedDomains.includes(origin) ||
+        origin.endsWith(".vercel.app") ||
         origin.endsWith(".render.com") ||
-        origin.endsWith(".chickenpoultry.shop")
+        origin.endsWith(".chickenpoultry.shop") ||
+        origin.endsWith(".netlify.app")
       ) {
-        callback(null, true);
+        callback(null, origin); // Note: Return the origin, not just true
       } else {
+        console.log(`Blocked request from disallowed origin: ${origin}`);
         callback(new Error("Not allowed by CORS"));
       }
     },
@@ -51,6 +59,8 @@ app.use(
       "Origin",
       "Accept",
     ],
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   })
 );
 
@@ -63,7 +73,8 @@ app.options("*", function (req, res) {
     allowedDomains.includes(origin) ||
     (origin && origin.endsWith(".vercel.app")) ||
     (origin && origin.endsWith(".chickenpoultry.shop")) ||
-    (origin && origin.endsWith(".render.com"))
+    (origin && origin.endsWith(".render.com")) ||
+    (origin && origin.endsWith(".netlify.app"))
   ) {
     res.header("Access-Control-Allow-Origin", origin);
     res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
@@ -74,7 +85,8 @@ app.options("*", function (req, res) {
     res.header("Access-Control-Allow-Credentials", "true");
     res.sendStatus(204);
   } else {
-    res.sendStatus(403);
+    console.log(`Blocked general preflight from disallowed origin: ${origin}`);
+    res.status(403).json({ error: "CORS not allowed for this origin" }).end();
   }
 });
 
@@ -82,11 +94,13 @@ app.options("*", function (req, res) {
 app.options("/api/auth/*", (req, res) => {
   const origin = req.headers.origin;
 
+  // Check if the origin is allowed
   if (
     allowedDomains.includes(origin) ||
     (origin && origin.endsWith(".vercel.app")) ||
     (origin && origin.endsWith(".chickenpoultry.shop")) ||
-    (origin && origin.endsWith(".render.com"))
+    (origin && origin.endsWith(".render.com")) ||
+    (origin && origin.endsWith(".netlify.app"))
   ) {
     res
       .status(204)
@@ -100,8 +114,8 @@ app.options("/api/auth/*", (req, res) => {
       })
       .end();
   } else {
-    // Make sure we respond with 204 for OPTIONS requests, not 403
-    res.status(204).end();
+    console.log(`Blocked auth preflight from disallowed origin: ${origin}`);
+    res.status(403).json({ error: "CORS not allowed for this origin" }).end();
   }
 });
 

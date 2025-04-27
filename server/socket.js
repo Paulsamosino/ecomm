@@ -3,6 +3,7 @@ const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const User = require("./src/models/User");
 const Chat = require("./src/models/Chat");
+const { Server } = require("socket.io");
 
 // Store active user sockets with role information
 const userSockets = new Map();
@@ -26,15 +27,20 @@ const allowedDomains = [
 ];
 
 const setupSocketServer = (server) => {
-  const io = socketIo(server, {
+  // Allow connections from all our domains
+  const io = new Server(server, {
     cors: {
       origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps)
+        if (!origin) return callback(null, true);
+
+        // Check if origin is allowed
         if (
-          !origin ||
           allowedDomains.includes(origin) ||
           origin.includes("chickenpoultry.shop") ||
           origin.includes(".vercel.app") ||
-          origin.includes(".render.com")
+          origin.includes(".render.com") ||
+          origin.includes(".netlify.app")
         ) {
           callback(null, true);
         } else {

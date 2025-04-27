@@ -17,7 +17,6 @@ const allowedDomains = [
   "http://localhost:5173",
   "https://chickenpoultry.shop",
   "https://www.chickenpoultry.shop",
-  "https://api.chickenpoultry.shop",
   "https://poultrymart-client.onrender.com",
   "https://poultrymart-api.onrender.com",
   "https://ecomm-git-main-ecomms-projects-807aa19d.vercel.app",
@@ -59,6 +58,11 @@ app.use(
 
       // Allow render.com domains in production
       if (origin && origin.endsWith(".render.com")) {
+        return callback(null, origin);
+      }
+
+      // Allow netlify.app domains
+      if (origin && origin.endsWith(".netlify.app")) {
         return callback(null, origin);
       }
 
