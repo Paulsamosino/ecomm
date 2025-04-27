@@ -239,11 +239,13 @@ exports.register = async (req, res) => {
 
 exports.login = async (req, res) => {
   try {
-    // Log login attempt (without credentials)
-    console.log(
-      "Login attempt for email:",
-      req.body.email ? req.body.email.substring(0, 3) + "..." : "not provided"
-    );
+    // Production-friendly logging without exposing user info
+    if (process.env.NODE_ENV !== "production") {
+      console.log(
+        "Login attempt for email:",
+        req.body.email ? req.body.email.substring(0, 3) + "..." : "not provided"
+      );
+    }
 
     const { email, password } = req.body;
 
@@ -258,10 +260,14 @@ exports.login = async (req, res) => {
     }
 
     const sanitizedEmail = sanitize(email.toLowerCase().trim());
-    console.log(
-      "Finding user with email:",
-      sanitizedEmail.substring(0, 3) + "..."
-    );
+
+    // Only log in development mode
+    if (process.env.NODE_ENV !== "production") {
+      console.log(
+        "Finding user with email:",
+        sanitizedEmail.substring(0, 3) + "..."
+      );
+    }
 
     try {
       // Find user and explicitly select password and loginAttempts fields
@@ -269,37 +275,53 @@ exports.login = async (req, res) => {
         .select("+password +loginAttempts")
         .exec()
         .catch((err) => {
-          console.error("Database query error:", err);
+          const logMsg = "Database query error";
+          console.error(
+            logMsg,
+            process.env.NODE_ENV !== "production" ? err : ""
+          );
           throw new Error("Database query failed");
         });
 
       if (!user) {
-        console.log("No user found with the provided email");
+        // Log in development only
+        if (process.env.NODE_ENV !== "production") {
+          console.log("No user found with the provided email");
+        }
         return res.status(401).json({
           message: MESSAGES.INVALID_CREDENTIALS,
         });
       }
 
       if (!user.password) {
-        console.error("Password field not loaded");
+        const logMsg = "Password field not loaded";
+        console.error(logMsg);
         return res.status(500).json({
           message: "Server configuration error",
         });
       }
 
-      console.log("User found, checking password");
+      // Only log in development mode
+      if (process.env.NODE_ENV !== "production") {
+        console.log("User found, checking password");
+      }
+
       try {
         const passwordMatch = await user.matchPassword(password);
 
         if (!passwordMatch) {
-          console.log("Password does not match");
+          // Only log in development mode
+          if (process.env.NODE_ENV !== "production") {
+            console.log("Password does not match");
+          }
           await user.incrementLoginAttempts();
           return res.status(401).json({
             message: MESSAGES.INVALID_CREDENTIALS,
           });
         }
       } catch (err) {
-        console.error("Password comparison error:", err);
+        const logMsg = "Password comparison error";
+        console.error(logMsg, process.env.NODE_ENV !== "production" ? err : "");
         return res.status(500).json({
           message: "Error verifying credentials",
         });
@@ -324,7 +346,12 @@ exports.login = async (req, res) => {
         $push: { activeSessions: jwtId },
       });
 
-      console.log("Login successful for user ID:", user._id);
+      // More secure production logging - doesn't expose user details
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Login successful for user ID:", user._id);
+      } else {
+        console.log("Login successful");
+      }
 
       const userData = formatUserResponse(user);
       res.json({
@@ -333,12 +360,25 @@ exports.login = async (req, res) => {
         token: token,
       });
     } catch (err) {
-      console.error("Database error during login:", err.message);
+      const logMsg = "Database error during login";
+      console.error(
+        logMsg,
+        process.env.NODE_ENV !== "production" ? `: ${err.message}` : ""
+      );
       throw err; // Rethrow to be caught by outer try/catch
     }
   } catch (err) {
-    console.error("Login error:", err.message);
-    console.error("Error stack:", err.stack);
+    const logMsg = "Login error";
+    console.error(
+      logMsg,
+      process.env.NODE_ENV !== "production" ? `: ${err.message}` : ""
+    );
+
+    // Only log stack traces in development
+    if (process.env.NODE_ENV !== "production") {
+      console.error("Error stack:", err.stack);
+    }
+
     res.status(500).json({ message: MESSAGES.SERVER_ERROR });
   }
 };
