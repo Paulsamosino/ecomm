@@ -176,8 +176,8 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Prepare user data
-    const userData = {
+    // Prepare user registration data
+    const registrationData = {
       name: sanitizedName,
       email: sanitizedEmail,
       password,
@@ -187,7 +187,7 @@ exports.register = async (req, res) => {
     };
 
     if (isSeller && sellerProfile) {
-      userData.sellerProfile = {
+      registrationData.sellerProfile = {
         businessName: sellerProfile.businessName || "",
         description: sellerProfile.description || "",
         address: {
@@ -204,7 +204,7 @@ exports.register = async (req, res) => {
     }
 
     // Create user
-    const user = await User.create(userData);
+    const user = await User.create(registrationData);
     const { token, jwtId } = createJwtToken(user._id);
 
     // Update user's last login
@@ -213,9 +213,11 @@ exports.register = async (req, res) => {
       $push: { activeSessions: jwtId },
     });
 
+    const formattedUser = formatUserResponse(user);
     res.status(201).json({
       success: true,
-      ...formatUserResponse(user, token),
+      user: formattedUser,
+      token: token,
     });
   } catch (err) {
     if (err.name === "ValidationError") {
@@ -324,9 +326,11 @@ exports.login = async (req, res) => {
 
       console.log("Login successful for user ID:", user._id);
 
+      const userData = formatUserResponse(user);
       res.json({
         success: true,
-        ...formatUserResponse(user, token),
+        user: userData,
+        token: token,
       });
     } catch (err) {
       console.error("Database error during login:", err.message);
