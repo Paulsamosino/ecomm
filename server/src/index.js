@@ -110,43 +110,82 @@ app.use("/api/seller", sellerRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/reports", reportRoutes);
 
-// Connect to MongoDB with enhanced error handling
-mongoose
-  .connect(process.env.MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
-  .then(() => {
-    console.log("Connected to MongoDB successfully");
-    console.log("Database:", mongoose.connection.db.databaseName);
-    console.log("Host:", mongoose.connection.host);
-  })
-  .catch((err) => {
-    console.error("MongoDB connection error details:");
-    console.error("Error name:", err.name);
-    console.error("Error message:", err.message);
-    console.error("Full error:", err);
-    process.exit(1); // Exit if cannot connect to database
-  });
-
-// Error handling middleware with more details
-app.use((err, req, res, next) => {
+// Global error handler
+const errorHandler = (err, req, res, next) => {
   console.error("Error details:");
   console.error("Error name:", err.name);
   console.error("Error message:", err.message);
   console.error("Stack trace:", err.stack);
+  console.error("Request path:", req.path);
+  console.error("Request method:", req.method);
+  console.error("Request IP:", req.ip);
 
-  // Send more detailed error response in development
+  // Determine status code
+  let statusCode = err.status || 500;
+  if (err.name === "ValidationError") statusCode = 400;
+  if (err.name === "CastError") statusCode = 400;
+  if (err.name === "JsonWebTokenError") statusCode = 401;
+  if (err.name === "TokenExpiredError") statusCode = 401;
+
+  // Prepare error response
   const errorResponse = {
-    message: "Something went wrong!",
-    error: process.env.NODE_ENV === "development" ? err.message : undefined,
+    message: err.message || "Something went wrong!",
+    status: statusCode,
+    ...(process.env.NODE_ENV === "development" && {
+      stack: err.stack,
+      details: err,
+    }),
   };
 
-  res.status(500).json(errorResponse);
-});
+  res.status(statusCode).json(errorResponse);
+};
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log("Environment:", process.env.NODE_ENV || "development");
-});
+// Register error handler
+app.use(errorHandler);
+
+// Import database connection
+const connectDB = require("../config/db");
+
+const startServer = async () => {
+  try {
+    // Connect to MongoDB
+    await connectDB();
+
+    // Start server only after successful DB connection
+    const PORT = process.env.PORT || 5000;
+    const server = app.listen(PORT, () => {
+      console.log(
+        `Server running in ${
+          process.env.NODE_ENV || "development"
+        } mode on port ${PORT}`
+      );
+
+      // Log application details
+      console.log("Application Details:");
+      console.log("==================");
+      console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+      console.log(
+        `API URL: ${
+          process.env.NODE_ENV === "production"
+            ? "https://poultrymart-api.onrender.com"
+            : `http://localhost:${PORT}`
+        }`
+      );
+      console.log(`MongoDB Host: ${mongoose.connection.host}`);
+      console.log(`Database Name: ${mongoose.connection.db.databaseName}`);
+    });
+
+    // Handle unhandled promise rejections
+    process.on("unhandledRejection", (err) => {
+      console.error("Unhandled Promise Rejection:", err);
+      // Close server & exit process
+      server.close(() => process.exit(1));
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
+};
+
+// Start the server
+startServer();

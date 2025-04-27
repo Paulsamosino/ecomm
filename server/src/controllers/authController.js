@@ -262,9 +262,14 @@ exports.login = async (req, res) => {
     );
 
     try {
-      const user = await User.findOne({ email: sanitizedEmail }).select(
-        "+password +loginAttempts"
-      );
+      // Find user and explicitly select password and loginAttempts fields
+      const user = await User.findOne({ email: sanitizedEmail })
+        .select("+password +loginAttempts")
+        .exec()
+        .catch((err) => {
+          console.error("Database query error:", err);
+          throw new Error("Database query failed");
+        });
 
       if (!user) {
         console.log("No user found with the provided email");
@@ -273,13 +278,28 @@ exports.login = async (req, res) => {
         });
       }
 
-      console.log("User found, checking password");
-      const passwordMatch = await user.matchPassword(password);
+      if (!user.password) {
+        console.error("Password field not loaded");
+        return res.status(500).json({
+          message: "Server configuration error",
+        });
+      }
 
-      if (!passwordMatch) {
-        console.log("Password does not match");
-        return res.status(401).json({
-          message: MESSAGES.INVALID_CREDENTIALS,
+      console.log("User found, checking password");
+      try {
+        const passwordMatch = await user.matchPassword(password);
+
+        if (!passwordMatch) {
+          console.log("Password does not match");
+          await user.incrementLoginAttempts();
+          return res.status(401).json({
+            message: MESSAGES.INVALID_CREDENTIALS,
+          });
+        }
+      } catch (err) {
+        console.error("Password comparison error:", err);
+        return res.status(500).json({
+          message: "Error verifying credentials",
         });
       }
 
