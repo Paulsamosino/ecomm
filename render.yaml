@@ -26,7 +26,14 @@ services:
   - type: web
     name: poultrymart-client
     env: static
-    buildCommand: npm install && cd client && npm install && npm run build
+    buildCommand: |
+      # Use Node.js version from .nvmrc
+      export NODE_VERSION=$(cat .nvmrc)
+      nvm use $NODE_VERSION
+      # Install client dependencies with dev dependencies
+      cd client && npm ci --include=dev
+      # Build the project with production environment
+      NODE_ENV=production npm run build
     staticPublishPath: ./client/dist
     pullRequestPreviewsEnabled: true
     routes:
@@ -36,7 +43,16 @@ services:
     headers:
       - path: /*
         name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /index.html
+        name: Cache-Control
         value: no-cache
     envVars:
       - key: VITE_API_URL
-        value: https://poultrymart-api.onrender.com
+        value: https://api.chickenpoultry.shop
+      - key: VITE_SOCKET_URL
+        value: https://api.chickenpoultry.shop
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22.14.0
