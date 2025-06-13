@@ -7,6 +7,73 @@ const Order = require("../models/Order");
 const User = require("../models/User");
 const sellerController = require("../controllers/sellerController");
 
+// Public routes for accessing seller information without authentication
+
+// Get public seller profile by ID
+router.get("/:sellerId/profile", async (req, res) => {
+  try {
+    const { sellerId } = req.params;
+
+    // Validate sellerId
+    if (!mongoose.Types.ObjectId.isValid(sellerId)) {
+      return res.status(400).json({ message: "Invalid seller ID" });
+    }
+
+    const seller = await User.findOne({
+      _id: sellerId,
+      isSeller: true,
+    })
+      .select("name email sellerProfile isOnline lastActive")
+      .populate(
+        "sellerProfile",
+        "businessName description storeType rating contactInfo"
+      );
+
+    if (!seller) {
+      return res.status(404).json({ message: "Seller not found" });
+    }
+
+    res.json(seller);
+  } catch (error) {
+    console.error("Error fetching seller profile:", error);
+    res.status(500).json({ message: "Error fetching seller profile" });
+  }
+});
+
+// Get public seller products by seller ID
+router.get("/:sellerId/products", async (req, res) => {
+  try {
+    const { sellerId } = req.params;
+
+    // Validate sellerId
+    if (!mongoose.Types.ObjectId.isValid(sellerId)) {
+      return res.status(400).json({ message: "Invalid seller ID" });
+    }
+
+    // Check if seller exists
+    const seller = await User.findOne({
+      _id: sellerId,
+      isSeller: true,
+    });
+
+    if (!seller) {
+      return res.status(404).json({ message: "Seller not found" });
+    }
+
+    const products = await Product.find({
+      seller: sellerId,
+      isActive: { $ne: false }, // Only show active products
+    }).sort({
+      createdAt: -1,
+    });
+
+    res.json(products);
+  } catch (error) {
+    console.error("Error fetching seller products:", error);
+    res.status(500).json({ message: "Error fetching seller products" });
+  }
+});
+
 // Get all sellers
 router.get("/all", protect, async (req, res) => {
   try {

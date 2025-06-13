@@ -162,7 +162,7 @@ const SellerReviews = () => {
                     <option value="2">2 Stars</option>
                     <option value="1">1 Star</option>
                   </select>
-                  <Filter className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
+                  <Filter className="absolute right-3 top-2.5 h-5 w-5 text-gray-400 pointer-events-none" />
                 </div>
 
                 <div className="relative">

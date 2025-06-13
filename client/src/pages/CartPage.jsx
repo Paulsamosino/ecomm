@@ -120,23 +120,23 @@ const CartPage = () => {
 
                     {/* Quantity Controls and Remove */}
                     <div className="flex items-center justify-between mt-4">
-                      <div className="flex items-center border border-gray-200 rounded-md">
+                      <div className="flex items-center border-2 border-orange-200 rounded-lg bg-gradient-to-br from-orange-50 to-orange-100 overflow-hidden shadow-sm hover:border-orange-300 hover:shadow-md transition-all duration-200">
                         <button
                           onClick={() =>
                             updateCartItemQuantity(item._id, item.quantity - 1)
                           }
-                          className="px-3 py-1 text-gray-600 hover:bg-gray-50"
+                          className="px-3 py-2 text-orange-600 hover:text-orange-700 hover:bg-orange-100 transition-colors font-medium"
                         >
                           <Minus className="h-4 w-4" />
                         </button>
-                        <span className="px-4 py-1 text-center min-w-[40px]">
+                        <span className="px-4 py-2 text-center min-w-[40px] text-orange-800 font-bold">
                           {item.quantity}
                         </span>
                         <button
                           onClick={() =>
                             updateCartItemQuantity(item._id, item.quantity + 1)
                           }
-                          className="px-3 py-1 text-gray-600 hover:bg-gray-50"
+                          className="px-3 py-2 text-orange-600 hover:text-orange-700 hover:bg-orange-100 transition-colors font-medium"
                         >
                           <Plus className="h-4 w-4" />
                         </button>

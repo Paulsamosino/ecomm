@@ -363,13 +363,19 @@ function generateDescription(category, breed, qualities = []) {
 }
 
 function generateSpecifications(category, breed, qualities = []) {
-  const specs = [
-    { name: "Category", value: category },
-    { name: "Breed/Type", value: breed },
-  ];
+  const specs = [];
 
-  if (category !== "other") {
+  if (category === "other") {
+    // For equipment, feed, and supplies
     specs.push(
+      { name: "Category", value: category },
+      { name: "Type", value: breed }
+    );
+  } else {
+    // For livestock (chicken, duck, turkey, etc.)
+    specs.push(
+      { name: "Category", value: category },
+      { name: "Breed", value: breed },
       { name: "Purpose", value: qualities.join(", ") },
       {
         name: "Temperament",

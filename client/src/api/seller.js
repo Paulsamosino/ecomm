@@ -1,4 +1,4 @@
-import axiosInstance from "@/api/axios";
+import { axiosInstance } from "@/contexts/axios";
 
 // Get seller dashboard statistics
 export const getSellerStats = async () => {
@@ -57,6 +57,18 @@ export const getSellerCustomers = async () => {
 // Analytics
 export const getSellerAnalytics = async () => {
   const response = await axiosInstance.get("/seller/analytics");
+  return response.data;
+};
+
+// Get public seller profile by ID
+export const apiGetSellerProfile = async (sellerId) => {
+  const response = await axiosInstance.get(`/seller/${sellerId}/profile`);
+  return response.data;
+};
+
+// Get seller's products by seller ID
+export const apiGetSellerProducts = async (sellerId) => {
+  const response = await axiosInstance.get(`/seller/${sellerId}/products`);
   return response.data;
 };
 

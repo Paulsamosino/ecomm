@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import axiosInstance from "@/api/axios";
-import { socketService } from "@/services/socket";
+import { axiosInstance } from "@/contexts/axios";
 import {
   Search,
   MessageSquare,
@@ -23,6 +23,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
+import { socketService } from "@/services/socket";
+
+// Import our new enhanced components
+import EnhancedMessage from "@/components/chat/EnhancedMessage";
+import EnhancedChatInput from "@/components/chat/EnhancedChatInput";
+import ChatMessageSearch from "@/components/chat/ChatMessageSearch";
+import ChatNotificationService from "@/components/chat/ChatNotificationService";
 
 // Helper function to normalize user ID
 const normalizeUserId = (user) => {
@@ -66,8 +73,18 @@ const EnhancedChatPage = () => {
   const [sellerSearchQuery, setSellerSearchQuery] = useState("");
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
+  // Enhanced messaging states
+  const [editingMessage, setEditingMessage] = useState(null);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [typingUsers, setTypingUsers] = useState(new Set());
+  const [isTyping, setIsTyping] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({});
+
   const messagesEndRef = useRef();
   const inputRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
   // Initialize socket connection with proper authentication
   useEffect(() => {
@@ -177,6 +194,84 @@ const EnhancedChatPage = () => {
     socketService.onNewMessage(handleNewMessage);
     socketService.onMessageStatus(handleMessageStatus);
     socketService.on("user_status", handleUserStatus);
+
+    // Enhanced event handlers
+    const handleMessageEdited = (data) => {
+      if (data.chatId === chatId) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg._id === data.messageId
+              ? {
+                  ...msg,
+                  content: data.newContent,
+                  isEdited: true,
+                  editedAt: new Date(),
+                }
+              : msg
+          )
+        );
+        toast.success("Message edited");
+      }
+    };
+
+    const handleMessageDeleted = (data) => {
+      if (data.chatId === chatId) {
+        setMessages((prev) => prev.filter((msg) => msg._id !== data.messageId));
+        toast.success("Message deleted");
+      }
+    };
+
+    const handleMessageReaction = (data) => {
+      if (data.chatId === chatId) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg._id === data.messageId
+              ? { ...msg, reactions: data.reactions }
+              : msg
+          )
+        );
+      }
+    };
+
+    const handleTyping = (data) => {
+      if (data.chatId === chatId && data.userId !== normalizeUserId(user)) {
+        if (data.isTyping) {
+          setTypingUsers((prev) => new Set([...prev, data.userId]));
+        } else {
+          setTypingUsers((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(data.userId);
+            return newSet;
+          });
+        }
+      }
+    };
+
+    const handleFileUploadProgress = (data) => {
+      if (data.chatId === chatId) {
+        setUploadProgress((prev) => ({
+          ...prev,
+          [data.fileName]: data.progress,
+        }));
+
+        if (data.progress === 100) {
+          setTimeout(() => {
+            setUploadProgress((prev) => {
+              const newProgress = { ...prev };
+              delete newProgress[data.fileName];
+              return newProgress;
+            });
+          }, 2000);
+        }
+      }
+    };
+
+    // Set up enhanced event listeners
+    socketService.onMessageEdited(handleMessageEdited);
+    socketService.onMessageDeleted(handleMessageDeleted);
+    socketService.onMessageReaction(handleMessageReaction);
+    socketService.onTyping(handleTyping);
+    socketService.onFileUploadProgress(handleFileUploadProgress);
 
     // Handle window focus/blur for read receipts
     const handleWindowFocus = () => {

@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { auth } = require("../middleware/auth");
+const { protect } = require("../middleware/authMiddleware");
 const Order = require("../models/Order");
 const Product = require("../models/Product");
 const User = require("../models/User");
@@ -11,7 +11,7 @@ const {
 } = require("../utils/emailService");
 
 // Create a new order
-router.post("/", auth, async (req, res) => {
+router.post("/", protect, async (req, res) => {
   try {
     const { items, paymentInfo, totalAmount, shippingAddress } = req.body;
 
@@ -130,7 +130,7 @@ router.post("/", auth, async (req, res) => {
 });
 
 // Get buyer's orders
-router.get("/my", auth, async (req, res) => {
+router.get("/my", protect, async (req, res) => {
   try {
     const orders = await Order.find({ buyer: req.user._id })
       .populate("items.product")
@@ -143,7 +143,7 @@ router.get("/my", auth, async (req, res) => {
 });
 
 // Get order details
-router.get("/:id", auth, async (req, res) => {
+router.get("/:id", protect, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
       .populate("buyer", "name email")
@@ -171,7 +171,7 @@ router.get("/:id", auth, async (req, res) => {
 });
 
 // Update order status (seller only)
-router.put("/:id/status", auth, async (req, res) => {
+router.put("/:id/status", protect, async (req, res) => {
   try {
     const { status, trackingNumber, notes } = req.body;
     const order = await Order.findById(req.params.id)
@@ -220,7 +220,7 @@ router.put("/:id/status", auth, async (req, res) => {
 });
 
 // Process refund
-router.post("/:id/refund", auth, async (req, res) => {
+router.post("/:id/refund", protect, async (req, res) => {
   try {
     const { refundId, reason } = req.body;
     const order = await Order.findById(req.params.id);
@@ -249,7 +249,7 @@ router.post("/:id/refund", auth, async (req, res) => {
 });
 
 // Add review to order
-router.post("/:id/review", auth, async (req, res) => {
+router.post("/:id/review", protect, async (req, res) => {
   try {
     const { rating, comment } = req.body;
     const order = await Order.findById(req.params.id).populate(

@@ -259,7 +259,7 @@ const SellerCustomers = () => {
                     </div>
                   </td>
                   <td className="py-4 px-4">
-                    ${customer.totalSpent.toLocaleString()}
+                    ₱{customer.totalSpent.toLocaleString()}
                   </td>
                   <td className="py-4 px-4">
                     <div>

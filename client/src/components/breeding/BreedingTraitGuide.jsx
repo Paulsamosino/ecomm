@@ -1,326 +1,562 @@
 import React, { useState } from "react";
 import {
   Card,
+  CardContent,
   CardHeader,
   CardTitle,
   CardDescription,
-  CardContent,
+  CardFooter,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { AlertCircle, BookOpen, Feather, Egg, Star } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  Book,
+  Dna,
+  Egg,
+  Feather,
+  Heart,
+  Scale,
+  Thermometer,
+  Info,
+  Search,
+} from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 const BreedingTraitGuide = () => {
-  const [activeTab, setActiveTab] = useState("basics");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState("genetic");
+
+  // Trait data
+  const traits = {
+    genetic: [
+      {
+        id: "dominant-recessive",
+        title: "Dominant vs. Recessive Traits",
+        description:
+          "Understanding how dominant and recessive genes affect offspring appearance and traits.",
+        content: (
+          <>
+            <p className="mb-4">
+              In poultry breeding, traits are passed from parents to offspring through genes that can be either dominant or recessive:
+            </p>
+            <ul className="space-y-2 mb-4">
+              <li>
+                <span className="font-medium">Dominant traits</span> are expressed whenever the gene is present, even if only inherited from one parent.
+              </li>
+              <li>
+                <span className="font-medium">Recessive traits</span> are only expressed when two copies of the gene are present (one from each parent).
+              </li>
+            </ul>
+            <p className="mb-4">
+              For example, in many chicken breeds, black feather color is dominant over white. A chicken with even one copy of the black gene will display black feathers.
+            </p>
+            <div className="bg-muted p-3 rounded-md mb-4">
+              <h4 className="font-medium mb-2">Example: Feather Color Inheritance</h4>
+              <p className="text-sm">
+                If B = black (dominant) and b = white (recessive):
+              </p>
+              <ul className="text-sm mt-2">
+                <li>BB = Black feathers</li>
+                <li>Bb = Black feathers (carries white gene)</li>
+                <li>bb = White feathers</li>
+              </ul>
+            </div>
+          </>
+        ),
+      },
+      {
+        id: "heterosis",
+        title: "Hybrid Vigor (Heterosis)",
+        description:
+          "The increased strength, growth rate, and fertility that can result from crossbreeding.",
+        content: (
+          <>
+            <p className="mb-4">
+              Hybrid vigor, or heterosis, is the improved biological quality in a hybrid offspring. When two different breeds are crossed, the offspring often show:
+            </p>
+            <ul className="space-y-2 mb-4">
+              <li>Increased growth rate and size</li>
+              <li>Better disease resistance</li>
+              <li>Improved fertility</li>
+              <li>Enhanced overall performance</li>
+            </ul>
+            <p className="mb-4">
+              This phenomenon occurs because crossbreeding helps mask harmful recessive genes that might be present in purebred lines.
+            </p>
+            <div className="bg-muted p-3 rounded-md mb-4">
+              <h4 className="font-medium mb-2">Example: Commercial Applications</h4>
+              <p className="text-sm">
+                Many commercial egg layers are hybrid crosses specifically designed to maximize egg production while maintaining good feed conversion efficiency.
+              </p>
+            </div>
+          </>
+        ),
+      },
+      {
+        id: "heritability",
+        title: "Heritability",
+        description:
+          "The degree to which a trait is passed from parent to offspring.",
+        content: (
+          <>
+            <p className="mb-4">
+              Heritability measures how much of the variation in a trait is due to genetic factors versus environmental influences:
+            </p>
+            <ul className="space-y-2 mb-4">
+              <li>
+                <span className="font-medium">High heritability traits</span> (0.5-1.0) are strongly influenced by genetics and respond well to selective breeding. Examples include feather color and comb type.
+              </li>
+              <li>
+                <span className="font-medium">Medium heritability traits</span> (0.2-0.5) are influenced by both genetics and environment. Examples include body weight and egg size.
+              </li>
+              <li>
+                <span className="font-medium">Low heritability traits</span> (0-0.2) are more influenced by environment than genetics. Examples include fertility and hatchability.
+              </li>
+            </ul>
+            <p className="mb-4">
+              Understanding heritability helps breeders decide which traits can be effectively improved through selective breeding versus management improvements.
+            </p>
+          </>
+        ),
+      },
+      {
+        id: "genetic-defects",
+        title: "Genetic Defects & Lethal Genes",
+        description:
+          "Harmful genetic traits that can affect offspring health and viability.",
+        content: (
+          <>
+            <p className="mb-4">
+              Some genetic traits can be harmful or even fatal to offspring. Responsible breeding requires awareness of these potential issues:
+            </p>
+            <ul className="space-y-2 mb-4">
+              <li>
+                <span className="font-medium">Lethal genes</span> cause death, usually during embryonic development.
+              </li>
+              <li>
+                <span className="font-medium">Semi-lethal genes</span> severely reduce viability but don't always cause death.
+              </li>
+              <li>
+                <span className="font-medium">Genetic defects</span> may affect quality of life without being fatal.
+              </li>
+            </ul>
+            <div className="bg-muted p-3 rounded-md mb-4">
+              <h4 className="font-medium mb-2">Common Genetic Issues</h4>
+              <ul className="text-sm">
+                <li><span className="font-medium">Creeper gene</span> - Shortens legs but is lethal when homozygous</li>
+                <li><span className="font-medium">Frizzle gene</span> - Causes feathers to curl outward, can lead to temperature regulation issues</li>
+                <li><span className="font-medium">Crooked toes</span> - Hereditary condition affecting mobility</li>
+              </ul>
+            </div>
+            <p>
+              Careful selection of breeding stock and understanding of genetic inheritance patterns can help minimize these issues.
+            </p>
+          </>
+        ),
+      },
+    ],
+    production: [
+      {
+        id: "egg-production",
+        title: "Egg Production Traits",
+        description:
+          "Factors affecting egg quantity, size, color, and quality.",
+        content: (
+          <>
+            <p className="mb-4">
+              Egg production traits are economically important and influenced by both genetics and environment:
+            </p>
+            <ul className="space-y-2 mb-4">
+              <li>
+                <span className="font-medium">Egg quantity</span> - Number of eggs laid per year (ranges from 150-300+ depending on breed)
+              </li>
+              <li>
+                <span className="font-medium">Egg size</span> - Typically measured in grams or categorized (small, medium, large, etc.)
+              </li>
+              <li>
+                <span className="font-medium">Shell color</span> - Determined by genetics (white, brown, blue, green)
+              </li>
+              <li>
+                <span className="font-medium">Shell quality</span> - Thickness, strength, and texture
+              </li>
+              <li>
+                <span className="font-medium">Interior quality</span> - Albumen height, yolk color, and absence of blood/meat spots
+              </li>
+            </ul>
+            <div className="bg-muted p-3 rounded-md mb-4">
+              <h4 className="font-medium mb-2">Top Egg Production Breeds</h4>
+              <ul className="text-sm">
+                <li><span className="font-medium">Leghorn</span> - 250-300+ white eggs annually</li>
+                <li><span className="font-medium">Rhode Island Red</span> - 250-300 brown eggs annually</li>
+                <li><span className="font-medium">Australorp</span> - 250+ brown eggs annually</li>
+                <li><span className="font-medium">Ameraucana</span> - 180-200 blue eggs annually</li>
+              </ul>
+            </div>
+          </>
+        ),
+      },
+      {
+        id: "meat-production",
+        title: "Meat Production Traits",
+        description:
+          "Characteristics related to growth rate, feed efficiency, and meat quality.",
+        content: (
+          <>
+            <p className="mb-4">
+              Meat production traits determine the efficiency and quality of birds raised for meat:
+            </p>
+            <ul className="space-y-2 mb-4">
+              <li>
+                <span className="font-medium">Growth rate</span> - Speed of weight gain
+              </li>
+              <li>
+                <span className="font-medium">Feed conversion ratio</span> - Amount of feed required to produce a unit of weight gain
+              </li>
+              <li>
+                <span className="font-medium">Breast meat yield</span> - Proportion of breast meat to total body weight
+              </li>
+              <li>
+                <span className="font-medium">Meat quality</span> - Texture, flavor, and fat content
+              </li>
+              <li>
+                <span className="font-medium">Carcass yield</span> - Percentage of usable meat after processing
+              </li>
+            </ul>
+            <div className="bg-muted p-3 rounded-md mb-4">
+              <h4 className="font-medium mb-2">Top Meat Production Breeds</h4>
+              <ul className="text-sm">
+                <li><span className="font-medium">Cornish Cross</span> - Rapid growth, ready for market in 6-8 weeks</li>
+                <li><span className="font-medium">Jersey Giant</span> - Large size but slower growth (16-20 weeks)</li>
+                <li><span className="font-medium">Bresse</span> - Known for exceptional meat quality</li>
+                <li><span className="font-medium">Freedom Ranger</span> - Good growth rate for pasture-raised systems</li>
+              </ul>
+            </div>
+          </>
+        ),
+      },
+      {
+        id: "dual-purpose",
+        title: "Dual-Purpose Traits",
+        description:
+          "Balanced characteristics for both egg and meat production.",
+        content: (
+          <>
+            <p className="mb-4">
+              Dual-purpose breeds offer a compromise between specialized egg and meat production:
+            </p>
+            <ul className="space-y-2 mb-4">
+              <li>
+                <span className="font-medium">Moderate egg production</span> - Usually 180-250 eggs annually
+              </li>
+              <li>
+                <span className="font-medium">Good body size</span> - Sufficient for meat production but not as large as dedicated meat breeds
+              </li>
+              <li>
+                <span className="font-medium">Feed efficiency</span> - Balanced for both growth and egg laying
+              </li>
+              <li>
+                <span className="font-medium">Hardiness</span> - Often more adaptable to varied conditions than highly specialized breeds
+              </li>
+            </ul>
+            <div className="bg-muted p-3 rounded-md mb-4">
+              <h4 className="font-medium mb-2">Popular Dual-Purpose Breeds</h4>
+              <ul className="text-sm">
+                <li><span className="font-medium">Orpington</span> - Good egg production with substantial body size</li>
+                <li><span className="font-medium">Plymouth Rock</span> - Consistent egg layer with good meat quality</li>
+                <li><span className="font-medium">Wyandotte</span> - Decent egg production and meaty carcass</li>
+                <li><span className="font-medium">Sussex</span> - Reliable egg layer that grows to good size</li>
+              </ul>
+            </div>
+          </>
+        ),
+      },
+    ],
+    compatibility: [
+      {
+        id: "breed-compatibility",
+        title: "Breed Compatibility Factors",
+        description:
+          "Key considerations when matching breeds for successful breeding.",
+        content: (
+          <>
+            <p className="mb-4">
+              When selecting breeds to cross, several factors affect compatibility and success:
+            </p>
+            <ul className="space-y-2 mb-4">
+              <li>
+                <span className="font-medium">Size difference</span> - Significant size disparities between breeds can cause mating difficulties or egg fertility issues
+              </li>
+              <li>
+                <span className="font-medium">Genetic distance</span> - Closely related breeds may not exhibit as much hybrid vigor
+              </li>
+              <li>
+                <span className="font-medium">Temperament</span> - Aggressive breeds paired with docile ones may result in mating stress
+              </li>
+              <li>
+                <span className="font-medium">Breeding season alignment</span> - Some breeds have stronger seasonal breeding patterns than others
+              </li>
+            </ul>
+            <div className="bg-muted p-3 rounded-md mb-4">
+              <h4 className="font-medium mb-2">Compatibility Guidelines</h4>
+              <ul className="text-sm">
+                <li>Match breeds of similar size when possible</li>
+                <li>Consider using artificial insemination for breeds with significant size differences</li>
+                <li>Research breed-specific mating behaviors before pairing</li>
+                <li>Monitor new breeding pairs closely for compatibility issues</li>
+              </ul>
+            </div>
+          </>
+        ),
+      },
+      {
+        id: "climate-adaptation",
+        title: "Climate Adaptation",
+        description:
+          "How different breeds adapt to various climate conditions.",
+        content: (
+          <>
+            <p className="mb-4">
+              Climate adaptation traits are crucial for breeding success in specific environments:
+            </p>
+            <ul className="space-y-2 mb-4">
+              <li>
+                <span className="font-medium">Cold tolerance</span> - Determined by factors like comb size, feather density, and body mass
+              </li>
+              <li>
+                <span className="font-medium">Heat tolerance</span> - Influenced by body size, feather type, and comb size
+              </li>
+              <li>
+                <span className="font-medium">Humidity adaptation</span> - Affects respiratory health and egg quality
+              </li>
+              <li>
+                <span className="font-medium">Foraging ability</span> - Important for free-range systems in various climates
+              </li>
+            </ul>
+            <div className="bg-muted p-3 rounded-md mb-4">
+              <h4 className="font-medium mb-2">Climate-Adapted Breeds</h4>
+              <ul className="text-sm">
+                <li><span className="font-medium">Cold-hardy</span>: Brahma, Wyandotte, Orpington, Chantecler</li>
+                <li><span className="font-medium">Heat-tolerant</span>: Leghorn, Minorca, Andalusian, Fayoumi</li>
+                <li><span className="font-medium">Adaptable</span>: Rhode Island Red, Plymouth Rock, Sussex</li>
+              </ul>
+            </div>
+          </>
+        ),
+      },
+      {
+        id: "disease-resistance",
+        title: "Disease Resistance",
+        description:
+          "Genetic factors affecting immunity and disease susceptibility.",
+        content: (
+          <>
+            <p className="mb-4">
+              Disease resistance varies significantly between breeds and can be improved through selective breeding:
+            </p>
+            <ul className="space-y-2 mb-4">
+              <li>
+                <span className="font-medium">Natural immunity</span> - Some breeds have evolved stronger resistance to specific pathogens
+              </li>
+              <li>
+                <span className="font-medium">Genetic disease resistance</span> - Certain genes provide protection against specific diseases
+              </li>
+              <li>
+                <span className="font-medium">Stress resistance</span> - Ability to maintain health under environmental stress
+              </li>
+              <li>
+                <span className="font-medium">Parasite resistance</span> - Ability to withstand internal and external parasites
+              </li>
+            </ul>
+            <div className="bg-muted p-3 rounded-md mb-4">
+              <h4 className="font-medium mb-2">Breeds with Notable Disease Resistance</h4>
+              <ul className="text-sm">
+                <li><span className="font-medium">Fayoumi</span> - Strong resistance to Marek's disease and coccidiosis</li>
+                <li><span className="font-medium">Asil</span> - Excellent general disease resistance</li>
+                <li><span className="font-medium">Leghorn</span> - Good resistance to respiratory diseases</li>
+                <li><span className="font-medium">Jungle Fowl</span> - Natural resistance to many poultry diseases</li>
+              </ul>
+            </div>
+          </>
+        ),
+      },
+      {
+        id: "behavioral-traits",
+        title: "Behavioral Traits",
+        description:
+          "Temperament, broodiness, and other behavioral characteristics.",
+        content: (
+          <>
+            <p className="mb-4">
+              Behavioral traits significantly impact breeding success and management requirements:
+            </p>
+            <ul className="space-y-2 mb-4">
+              <li>
+                <span className="font-medium">Broodiness</span> - Tendency to sit on and hatch eggs
+              </li>
+              <li>
+                <span className="font-medium">Temperament</span> - Docility vs. aggression
+              </li>
+              <li>
+                <span className="font-medium">Flightiness</span> - Tendency to fly or attempt escape
+              </li>
+              <li>
+                <span className="font-medium">Foraging behavior</span> - Active vs. passive foraging
+              </li>
+              <li>
+                <span className="font-medium">Maternal instincts</span> - Care of young after hatching
+              </li>
+            </ul>
+            <div className="bg-muted p-3 rounded-md mb-4">
+              <h4 className="font-medium mb-2">Behavioral Trait Examples</h4>
+              <ul className="text-sm">
+                <li><span className="font-medium">Highly broody</span>: Silkie, Cochin, Orpington</li>
+                <li><span className="font-medium">Rarely broody</span>: Leghorn, Minorca, Production Reds</li>
+                <li><span className="font-medium">Docile</span>: Brahma, Sussex, Orpington</li>
+                <li><span className="font-medium">More aggressive</span>: Game breeds, Asil, Malay</li>
+              </ul>
+            </div>
+          </>
+        ),
+      },
+    ],
+  };
+
+  // Filter traits based on search query
+  const filteredTraits = Object.entries(traits).reduce(
+    (acc, [category, categoryTraits]) => {
+      const filtered = categoryTraits.filter(
+        (trait) =>
+          trait.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          trait.description.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      if (filtered.length > 0) {
+        acc[category] = filtered;
+      }
+      return acc;
+    },
+    {}
+  );
+
+  const hasResults = Object.values(filteredTraits).some(
+    (category) => category.length > 0
+  );
+
+  const getCategoryIcon = (category) => {
+    switch (category) {
+      case "genetic":
+        return <Dna className="h-5 w-5" />;
+      case "production":
+        return <Egg className="h-5 w-5" />;
+      case "compatibility":
+        return <Heart className="h-5 w-5" />;
+      default:
+        return <Info className="h-5 w-5" />;
+    }
+  };
 
   return (
-    <Card className="shadow-md border-[#ffb464]/30">
-      <CardHeader className="bg-gradient-to-r from-[#fff5e8] to-[#ffeed7]">
-        <CardTitle className="text-[#a05e2b] flex items-center">
-          <BookOpen className="mr-2 h-5 w-5" />
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h2 className="text-2xl font-bold flex items-center gap-2">
+          <Book className="h-6 w-6" />
           Breeding Trait Guide
-        </CardTitle>
-        <CardDescription className="text-[#b06a30]">
-          Understanding key traits when selecting breeding stock
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-4 bg-[#fff5e8] rounded-lg mb-4">
-            <TabsTrigger
-              value="basics"
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#ffb464] data-[state=active]:to-[#ffa040] data-[state=active]:text-white"
-            >
-              Basics
+        </h2>
+        <div className="relative w-full sm:w-[300px]">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search traits..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-8"
+          />
+        </div>
+      </div>
+
+      {searchQuery ? (
+        <div className="space-y-6">
+          {!hasResults ? (
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col items-center justify-center p-6">
+                <Info className="h-10 w-10 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">No Results Found</h3>
+                <p className="text-center text-muted-foreground">
+                  No traits match your search query. Try different keywords.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            Object.entries(filteredTraits).map(([category, categoryTraits]) => (
+              <div key={category} className="space-y-4">
+                <h3 className="text-xl font-semibold flex items-center gap-2">
+                  {getCategoryIcon(category)}
+                  {category.charAt(0).toUpperCase() + category.slice(1)} Traits
+                </h3>
+                <div className="space-y-4">
+                  {categoryTraits.map((trait) => (
+                    <Card key={trait.id}>
+                      <CardHeader className="pb-2">
+                        <CardTitle>{trait.title}</CardTitle>
+                        <CardDescription>{trait.description}</CardDescription>
+                      </CardHeader>
+                      <CardContent>{trait.content}</CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      ) : (
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="space-y-6"
+        >
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="genetic" className="flex items-center gap-2">
+              <Dna className="h-4 w-4" />
+              Genetic
             </TabsTrigger>
-            <TabsTrigger
-              value="genetics"
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#ffb464] data-[state=active]:to-[#ffa040] data-[state=active]:text-white"
-            >
-              Genetics
-            </TabsTrigger>
-            <TabsTrigger
-              value="production"
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#ffb464] data-[state=active]:to-[#ffa040] data-[state=active]:text-white"
-            >
+            <TabsTrigger value="production" className="flex items-center gap-2">
+              <Egg className="h-4 w-4" />
               Production
             </TabsTrigger>
             <TabsTrigger
               value="compatibility"
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#ffb464] data-[state=active]:to-[#ffa040] data-[state=active]:text-white"
+              className="flex items-center gap-2"
             >
+              <Heart className="h-4 w-4" />
               Compatibility
             </TabsTrigger>
           </TabsList>
 
-          <div className="pt-5">
-            <ScrollArea className="h-[300px] pr-4">
-              <TabsContent value="basics" className="mt-0">
-                <Accordion type="single" collapsible className="w-full">
-                  <AccordionItem value="item-1">
-                    <AccordionTrigger className="text-[#a05e2b] hover:text-[#d37b33]">
-                      What to look for in breeding stock
-                    </AccordionTrigger>
-                    <AccordionContent className="text-[#b06a30]">
-                      When selecting birds for breeding, prioritize health,
-                      vigor, and standard breed conformity. Look for clear eyes,
-                      clean nostrils, good feather quality, and strong legs.
-                      Avoid birds with visible defects or signs of illness. The
-                      best breeding specimens should represent the ideal
-                      characteristics of their breed.
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="item-2">
-                    <AccordionTrigger className="text-[#a05e2b] hover:text-[#d37b33]">
-                      Understanding breeding age
-                    </AccordionTrigger>
-                    <AccordionContent className="text-[#b06a30]">
-                      For most poultry breeds, hens can start breeding at 5-6
-                      months of age, while roosters reach sexual maturity at 4-5
-                      months. However, it's often best to wait until birds are
-                      fully mature (8-10 months) for optimal fertility and to
-                      better evaluate their adult characteristics before
-                      breeding.
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="item-3">
-                    <AccordionTrigger className="text-[#a05e2b] hover:text-[#d37b33]">
-                      Breeding ratios
-                    </AccordionTrigger>
-                    <AccordionContent className="text-[#b06a30]">
-                      For chickens, maintain a ratio of 1 rooster to 8-12 hens
-                      for optimal fertility. For ducks, 1 drake to 4-6 ducks is
-                      ideal. For turkeys, 1 tom can service 6-10 hens. Exceeding
-                      these ratios can lead to reduced fertility rates and
-                      potential injury to hens from excessive mating.
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="item-4">
-                    <AccordionTrigger className="text-[#a05e2b] hover:text-[#d37b33]">
-                      Seasonal breeding considerations
-                    </AccordionTrigger>
-                    <AccordionContent className="text-[#b06a30]">
-                      Many poultry breeds have natural breeding seasons,
-                      typically starting in spring as daylight hours increase.
-                      Egg production and fertility are usually highest during
-                      this period. You can extend breeding season using
-                      artificial lighting to maintain 14-16 hours of light
-                      daily.
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              </TabsContent>
-
-              <TabsContent value="genetics" className="mt-0">
-                <Accordion type="single" collapsible className="w-full">
-                  <AccordionItem value="item-1">
-                    <AccordionTrigger className="text-[#a05e2b] hover:text-[#d37b33]">
-                      Dominant vs. Recessive traits
-                    </AccordionTrigger>
-                    <AccordionContent className="text-[#b06a30]">
-                      In poultry genetics, dominant traits will always show when
-                      present (only one copy needed), while recessive traits
-                      only appear when a bird has two copies. For example, pea
-                      comb is dominant over single comb, and white feathers are
-                      often dominant over colored plumage in many breeds.
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="item-2">
-                    <AccordionTrigger className="text-[#a05e2b] hover:text-[#d37b33]">
-                      Understanding hybrid vigor
-                    </AccordionTrigger>
-                    <AccordionContent className="text-[#b06a30]">
-                      Hybrid vigor (heterosis) occurs when unrelated breeds are
-                      crossed, resulting in offspring with increased health,
-                      size, or productivity beyond either parent.
-                      First-generation (F1) crosses show the most hybrid vigor.
-                      This effect diminishes in subsequent generations, so
-                      maintain separate purebred lines for ongoing crosses.
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="item-3">
-                    <AccordionTrigger className="text-[#a05e2b] hover:text-[#d37b33]">
-                      Sex-linked traits
-                    </AccordionTrigger>
-                    <AccordionContent className="text-[#b06a30]">
-                      Sex-linked traits allow for chick sexing at hatch based on
-                      color. Common crosses include Rhode Island Red roosters
-                      with Barred Rock hens (producing black sex-links) or Rhode
-                      Island Red roosters with Rhode Island White hens
-                      (producing red sex-links). Male chicks will be one color
-                      and females another.
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="item-4">
-                    <AccordionTrigger className="text-[#a05e2b] hover:text-[#d37b33]">
-                      Inbreeding vs. Linebreeding
-                    </AccordionTrigger>
-                    <AccordionContent className="text-[#b06a30]">
-                      Inbreeding (mating close relatives) can fix desirable
-                      traits but may lead to reduced vigor and fertility over
-                      time. Linebreeding (more distant relatives) provides more
-                      moderate trait consolidation with fewer negative effects.
-                      For beginners, we recommend outbreeding until you gain
-                      experience with genetic principles.
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              </TabsContent>
-
-              <TabsContent value="production" className="mt-0">
-                <Accordion type="single" collapsible className="w-full">
-                  <AccordionItem value="item-1">
-                    <AccordionTrigger className="text-[#a05e2b] hover:text-[#d37b33]">
-                      Egg production traits
-                    </AccordionTrigger>
-                    <AccordionContent className="text-[#b06a30]">
-                      When breeding for egg production, select hens that begin
-                      laying early (18-20 weeks), maintain consistent
-                      production, and have good laying persistence. Egg size,
-                      shell quality, and color consistency are also important
-                      traits. Production breeds like Leghorns typically lay
-                      250-300 eggs annually, while dual-purpose breeds lay
-                      180-250.
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="item-2">
-                    <AccordionTrigger className="text-[#a05e2b] hover:text-[#d37b33]">
-                      Meat production traits
-                    </AccordionTrigger>
-                    <AccordionContent className="text-[#b06a30]">
-                      For meat production, focus on growth rate, feed conversion
-                      efficiency, and carcass yield. The Cornish Cross (Cornish
-                      × White Rock) is the industry standard for fast growth,
-                      reaching market weight in 6-8 weeks. Heritage breeds grow
-                      more slowly but often have better flavor and are better
-                      suited for pastured environments.
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="item-3">
-                    <AccordionTrigger className="text-[#a05e2b] hover:text-[#d37b33]">
-                      Broodiness traits
-                    </AccordionTrigger>
-                    <AccordionContent className="text-[#b06a30]">
-                      Broodiness (the desire to sit on and hatch eggs) has been
-                      selectively bred out of modern production breeds. If you
-                      want natural reproduction, consider Silkies, Cochins, or
-                      Orpingtons, which are excellent broody hens. Some heritage
-                      breeds like Dominiques and Plymouth Rocks retain moderate
-                      broodiness traits.
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="item-4">
-                    <AccordionTrigger className="text-[#a05e2b] hover:text-[#d37b33]">
-                      Foraging ability
-                    </AccordionTrigger>
-                    <AccordionContent className="text-[#b06a30]">
-                      Birds with good foraging ability can find a significant
-                      portion of their diet through insects, seeds, and plants,
-                      reducing feed costs. Heritage breeds typically excel at
-                      foraging, with breeds like Welsummers, Australorps, and
-                      Marans being particularly adept. This trait is important
-                      for free-range and pasture-based operations.
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              </TabsContent>
-
-              <TabsContent value="compatibility" className="mt-0">
-                <Accordion type="single" collapsible className="w-full">
-                  <AccordionItem value="item-1">
-                    <AccordionTrigger className="text-[#a05e2b] hover:text-[#d37b33]">
-                      Breed compatibility for crossbreeding
-                    </AccordionTrigger>
-                    <AccordionContent className="text-[#b06a30]">
-                      When crossbreeding, birds of similar size work best. Large
-                      disparities in size can lead to mating difficulties and
-                      potential injury. Roosters should not be significantly
-                      larger than hens. For best results, cross breeds with
-                      complementary traits – for example, a breed with excellent
-                      egg production with one known for cold hardiness.
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="item-2">
-                    <AccordionTrigger className="text-[#a05e2b] hover:text-[#d37b33]">
-                      Popular breed combinations
-                    </AccordionTrigger>
-                    <AccordionContent className="text-[#b06a30]">
-                      <ul className="list-disc pl-5 space-y-1">
-                        <li>
-                          Rhode Island Red × Plymouth Rock: Excellent egg-laying
-                          with good cold hardiness
-                        </li>
-                        <li>
-                          Sussex × Orpington: Exceptional meat quality with
-                          docile temperament
-                        </li>
-                        <li>
-                          Leghorn × Australorp: High egg production with better
-                          winter laying
-                        </li>
-                        <li>
-                          Cornish × Plymouth Rock: Fast-growing meat birds
-                          (Cornish Cross)
-                        </li>
-                        <li>
-                          Pekin × Muscovy: Produces sterile Mulard ducks with
-                          excellent meat quality
-                        </li>
-                      </ul>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="item-3">
-                    <AccordionTrigger className="text-[#a05e2b] hover:text-[#d37b33]">
-                      Compatibility with existing flock
-                    </AccordionTrigger>
-                    <AccordionContent className="text-[#b06a30]">
-                      When introducing new breeding stock to your flock,
-                      consider temperament compatibility. Aggressive breeds may
-                      bully gentler ones. Mix birds of similar size and activity
-                      level. Always quarantine new birds for at least 30 days
-                      before introducing them to prevent disease transmission to
-                      your established flock.
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="item-4">
-                    <AccordionTrigger className="text-[#a05e2b] hover:text-[#d37b33]">
-                      Climate adaptability
-                    </AccordionTrigger>
-                    <AccordionContent className="text-[#b06a30]">
-                      Match breeds to your climate for best breeding results.
-                      Mediterranean breeds (Leghorns, Anconas) tolerate heat
-                      well but may struggle in cold. Asian breeds (Brahmas,
-                      Cochins) with feathered feet and small combs excel in cold
-                      but may suffer in heat. American breeds (Plymouth Rocks,
-                      Rhode Island Reds) are generally adaptable to varied
-                      climates.
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              </TabsContent>
-            </ScrollArea>
-          </div>
+          {Object.entries(traits).map(([category, categoryTraits]) => (
+            <TabsContent key={category} value={category} className="space-y-6">
+              <div className="grid gap-6 md:grid-cols-2">
+                {categoryTraits.map((trait) => (
+                  <Card key={trait.id}>
+                    <CardHeader>
+                      <CardTitle>{trait.title}</CardTitle>
+                      <CardDescription>{trait.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent>{trait.content}</CardContent>
+                  </Card>
+                ))}
+              </div>
+            </TabsContent>
+          ))}
         </Tabs>
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 };
 

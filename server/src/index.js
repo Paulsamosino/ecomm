@@ -17,22 +17,19 @@ const allowedDomains = [
   "http://localhost:5173",
   "https://chickenpoultry.shop",
   "https://www.chickenpoultry.shop",
-  "https://poultrymart-client.onrender.com",
-  "https://poultrymart-api.onrender.com",
+  "https://api.chickenpoultry.shop",
   "https://ecomm-git-main-ecomms-projects-807aa19d.vercel.app",
   "https://chickenpoultry.netlify.app",
 ];
 
-// Request logging middleware - only in development
-if (process.env.NODE_ENV !== "production") {
-  app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-    console.log("Request origin:", req.headers.origin);
-    console.log("Request headers:", req.headers);
-    console.log("Request body:", req.body);
-    next();
-  });
-}
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  console.log("Request origin:", req.headers.origin);
+  console.log("Request headers:", req.headers);
+  console.log("Request body:", req.body);
+  next();
+});
 
 // CORS configuration with enhanced preflight handling
 app.use(
@@ -53,16 +50,6 @@ app.use(
 
       // Allow chickenpoultry.shop subdomains
       if (origin && origin.endsWith(".chickenpoultry.shop")) {
-        return callback(null, origin);
-      }
-
-      // Allow render.com domains in production
-      if (origin && origin.endsWith(".render.com")) {
-        return callback(null, origin);
-      }
-
-      // Allow netlify.app domains
-      if (origin && origin.endsWith(".netlify.app")) {
         return callback(null, origin);
       }
 
@@ -110,82 +97,43 @@ app.use("/api/seller", sellerRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/reports", reportRoutes);
 
-// Global error handler
-const errorHandler = (err, req, res, next) => {
+// Connect to MongoDB with enhanced error handling
+mongoose
+  .connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => {
+    console.log("Connected to MongoDB successfully");
+    console.log("Database:", mongoose.connection.db.databaseName);
+    console.log("Host:", mongoose.connection.host);
+  })
+  .catch((err) => {
+    console.error("MongoDB connection error details:");
+    console.error("Error name:", err.name);
+    console.error("Error message:", err.message);
+    console.error("Full error:", err);
+    process.exit(1); // Exit if cannot connect to database
+  });
+
+// Error handling middleware with more details
+app.use((err, req, res, next) => {
   console.error("Error details:");
   console.error("Error name:", err.name);
   console.error("Error message:", err.message);
   console.error("Stack trace:", err.stack);
-  console.error("Request path:", req.path);
-  console.error("Request method:", req.method);
-  console.error("Request IP:", req.ip);
 
-  // Determine status code
-  let statusCode = err.status || 500;
-  if (err.name === "ValidationError") statusCode = 400;
-  if (err.name === "CastError") statusCode = 400;
-  if (err.name === "JsonWebTokenError") statusCode = 401;
-  if (err.name === "TokenExpiredError") statusCode = 401;
-
-  // Prepare error response
+  // Send more detailed error response in development
   const errorResponse = {
-    message: err.message || "Something went wrong!",
-    status: statusCode,
-    ...(process.env.NODE_ENV === "development" && {
-      stack: err.stack,
-      details: err,
-    }),
+    message: "Something went wrong!",
+    error: process.env.NODE_ENV === "development" ? err.message : undefined,
   };
 
-  res.status(statusCode).json(errorResponse);
-};
+  res.status(500).json(errorResponse);
+});
 
-// Register error handler
-app.use(errorHandler);
-
-// Import database connection
-const connectDB = require("../config/db");
-
-const startServer = async () => {
-  try {
-    // Connect to MongoDB
-    await connectDB();
-
-    // Start server only after successful DB connection
-    const PORT = process.env.PORT || 5000;
-    const server = app.listen(PORT, () => {
-      console.log(
-        `Server running in ${
-          process.env.NODE_ENV || "development"
-        } mode on port ${PORT}`
-      );
-
-      // Log application details
-      console.log("Application Details:");
-      console.log("==================");
-      console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
-      console.log(
-        `API URL: ${
-          process.env.NODE_ENV === "production"
-            ? "https://poultrymart-api.onrender.com"
-            : `http://localhost:${PORT}`
-        }`
-      );
-      console.log(`MongoDB Host: ${mongoose.connection.host}`);
-      console.log(`Database Name: ${mongoose.connection.db.databaseName}`);
-    });
-
-    // Handle unhandled promise rejections
-    process.on("unhandledRejection", (err) => {
-      console.error("Unhandled Promise Rejection:", err);
-      // Close server & exit process
-      server.close(() => process.exit(1));
-    });
-  } catch (error) {
-    console.error("Failed to start server:", error);
-    process.exit(1);
-  }
-};
-
-// Start the server
-startServer();
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log("Environment:", process.env.NODE_ENV || "development");
+});

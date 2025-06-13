@@ -6,7 +6,17 @@ const User = require("../models/User");
 const extractUserId = (user) => {
   if (!user) return null;
   if (typeof user === "string") return user;
-  return (user._id || user.id)?.toString();
+  if (user instanceof mongoose.Types.ObjectId) return user.toString();
+
+  // Handle different user object formats
+  if (typeof user === "object") {
+    const id = user._id || user.id;
+    if (id) {
+      return typeof id === "string" ? id : id.toString();
+    }
+  }
+
+  return null;
 };
 
 // Helper function to safely compare two user IDs that might be in different formats
@@ -32,8 +42,8 @@ exports.validateChatAccess = async (req, res, next) => {
     }
 
     const chat = await Chat.findById(chatId)
-      .populate("buyer", "name email id _id isSeller")
-      .populate("seller", "name email id _id isSeller");
+      .populate("buyer", "name email _id isSeller")
+      .populate("seller", "name email _id isSeller");
 
     if (!chat) {
       return res.status(404).json({ message: "Chat not found" });

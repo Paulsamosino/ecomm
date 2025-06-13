@@ -8,6 +8,7 @@ class SocketService {
     this.listeners = new Map();
     this.currentChatId = null;
     this.baseURL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+    this.socketURL = import.meta.env.VITE_SOCKET_URL || this.baseURL;
     this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
   }
 
@@ -42,15 +43,16 @@ class SocketService {
         console.log("Connecting as:", isSeller ? "seller" : "buyer");
 
         // Create socket with improved config
-        this.socket = io(this.baseURL, {
+        this.socket = io(this.socketURL, {
           auth: { token },
-          transports: ["websocket", "polling"], // Allow both for better reliability
+          transports: ["polling", "websocket"], // Prefer polling first for reliability
           query: { isSeller: String(isSeller) },
           reconnection: true,
-          reconnectionAttempts: 5,
-          reconnectionDelay: 1000,
-          timeout: 10000,
-          forceNew: true,
+          reconnectionAttempts: 3,
+          reconnectionDelay: 2000,
+          timeout: 20000,
+          forceNew: false, // Don't force new connection
+          upgrade: true, // Allow transport upgrades
         });
 
         // Set up connection handlers
@@ -74,22 +76,30 @@ class SocketService {
         this.socket.on("connect_error", (error) => {
           console.error("Socket connection error:", error);
           this.connected = false;
+          this._connectPromise = null;
           reject(error);
         });
 
         this.socket.on("disconnect", (reason) => {
           console.log("Socket disconnected:", reason);
           this.connected = false;
+          this._connectPromise = null;
 
-          if (
-            reason === "io server disconnect" ||
-            reason === "transport close"
-          ) {
-            console.log("Attempting to reconnect...");
+          // Only attempt reconnection for certain reasons
+          if (reason === "io server disconnect") {
+            console.log("Server disconnected, attempting to reconnect...");
             setTimeout(() => {
-              this.socket.connect();
-            }, 1000);
+              if (!this.socket?.connected) {
+                this.socket?.connect();
+              }
+            }, 2000);
           }
+        });
+
+        // Add error handler for socket errors
+        this.socket.on("error", (error) => {
+          console.error("Socket error:", error);
+          this.connected = false;
         });
       } catch (error) {
         console.error("Error initializing socket:", error);
@@ -140,6 +150,7 @@ class SocketService {
 
   cleanup() {
     this.connected = false;
+    this._connectPromise = null;
     if (this.socket) {
       // Remove event listeners but keep track of our app-level registered listeners
       this.socket.removeAllListeners();
@@ -206,6 +217,38 @@ class SocketService {
     this.on("typing", callback);
   }
 
+  onMessageEdited(callback) {
+    this.on("message_edited", callback);
+  }
+
+  onMessageDeleted(callback) {
+    this.on("message_deleted", callback);
+  }
+
+  onReactionAdded(callback) {
+    this.on("reaction_added", callback);
+  }
+
+  onReactionRemoved(callback) {
+    this.on("reaction_removed", callback);
+  }
+
+  onFileUploadProgress(callback) {
+    this.on("file_upload_progress", callback);
+  }
+
+  onChatArchived(callback) {
+    this.on("chat_archived", callback);
+  }
+
+  onChatBlocked(callback) {
+    this.on("chat_blocked", callback);
+  }
+
+  onChatBlockedByOther(callback) {
+    this.on("chat_blocked_by_other", callback);
+  }
+
   // Emit event with error handling
   emit(event, data) {
     if (!this.socket?.connected) {
@@ -232,21 +275,168 @@ class SocketService {
 
   // Send a message
   sendMessage(chatId, message) {
+    return new Promise((resolve, reject) => {
+      if (!this.socket?.connected) {
+        console.warn("Socket not connected when trying to send message");
+        reject(new Error("Connection lost. Please try again."));
+        return;
+      }
+
+      try {
+        // Set up one-time listeners for response
+        const messageId = message.tempId || `msg-${Date.now()}`;
+
+        const successHandler = (data) => {
+          if (data.tempId === messageId || data.messageId === messageId) {
+            this.socket.off("message_sent", successHandler);
+            this.socket.off("message_error", errorHandler);
+            resolve(data);
+          }
+        };
+
+        const errorHandler = (error) => {
+          if (error.tempId === messageId || error.messageId === messageId) {
+            this.socket.off("message_sent", successHandler);
+            this.socket.off("message_error", errorHandler);
+            reject(new Error(error.message || "Failed to send message"));
+          }
+        };
+
+        // Set up listeners with timeout
+        this.socket.on("message_sent", successHandler);
+        this.socket.on("message_error", errorHandler);
+
+        // Emit the message
+        this.socket.emit("new_message", {
+          chatId,
+          message: { ...message, tempId: messageId },
+        });
+
+        console.log("Message sent via socket:", {
+          chatId,
+          messageContent: message.content,
+          tempId: messageId,
+        });
+
+        // Set a timeout for the response
+        setTimeout(() => {
+          this.socket.off("message_sent", successHandler);
+          this.socket.off("message_error", errorHandler);
+          resolve({ tempId: messageId, success: true }); // Assume success if no error
+        }, 5000);
+      } catch (error) {
+        console.error("Error sending message:", error);
+        reject(error);
+      }
+    });
+  }
+
+  // Edit a message
+  editMessage(chatId, messageId, newContent) {
     if (!this.socket?.connected) {
       toast.error("Connection lost. Please try again.");
       return false;
     }
 
     try {
-      this.socket.emit("new_message", { chatId, message });
-      console.log("Message sent via socket:", {
-        chatId,
-        messageContent: message.content,
-      });
+      this.socket.emit("edit_message", { chatId, messageId, newContent });
       return true;
     } catch (error) {
-      console.error("Error sending message:", error);
-      toast.error("Failed to send message");
+      console.error("Error editing message:", error);
+      toast.error("Failed to edit message");
+      return false;
+    }
+  }
+
+  // Delete a message
+  deleteMessage(chatId, messageId) {
+    if (!this.socket?.connected) {
+      toast.error("Connection lost. Please try again.");
+      return false;
+    }
+
+    try {
+      this.socket.emit("delete_message", { chatId, messageId });
+      return true;
+    } catch (error) {
+      console.error("Error deleting message:", error);
+      toast.error("Failed to delete message");
+      return false;
+    }
+  }
+
+  // Add reaction to message
+  addReaction(chatId, messageId, emoji) {
+    if (!this.socket?.connected) {
+      toast.error("Connection lost. Please try again.");
+      return false;
+    }
+
+    try {
+      this.socket.emit("add_reaction", { chatId, messageId, emoji });
+      return true;
+    } catch (error) {
+      console.error("Error adding reaction:", error);
+      toast.error("Failed to add reaction");
+      return false;
+    }
+  }
+
+  // Remove reaction from message
+  removeReaction(chatId, messageId) {
+    if (!this.socket?.connected) {
+      toast.error("Connection lost. Please try again.");
+      return false;
+    }
+
+    try {
+      this.socket.emit("remove_reaction", { chatId, messageId });
+      return true;
+    } catch (error) {
+      console.error("Error removing reaction:", error);
+      toast.error("Failed to remove reaction");
+      return false;
+    }
+  }
+
+  // Send file upload progress
+  sendFileUploadProgress(chatId, fileName, progress) {
+    if (this.isConnected()) {
+      return this.emit("file_upload_progress", { chatId, fileName, progress });
+    }
+    return false;
+  }
+
+  // Archive chat
+  archiveChat(chatId) {
+    if (!this.socket?.connected) {
+      toast.error("Connection lost. Please try again.");
+      return false;
+    }
+
+    try {
+      this.socket.emit("archive_chat", { chatId });
+      return true;
+    } catch (error) {
+      console.error("Error archiving chat:", error);
+      toast.error("Failed to archive chat");
+      return false;
+    }
+  }
+
+  // Block chat
+  blockChat(chatId) {
+    if (!this.socket?.connected) {
+      toast.error("Connection lost. Please try again.");
+      return false;
+    }
+
+    try {
+      this.socket.emit("block_chat", { chatId });
+      return true;
+    } catch (error) {
+      console.error("Error blocking chat:", error);
+      toast.error("Failed to block chat");
       return false;
     }
   }
@@ -268,22 +458,33 @@ class SocketService {
 
   // Join a chat room
   joinChat(chatId) {
-    if (!chatId) return false;
+    return new Promise((resolve, reject) => {
+      if (!chatId) {
+        reject(new Error("No chat ID provided"));
+        return;
+      }
 
-    console.log("Joining chat:", chatId);
-    this.currentChatId = chatId;
+      console.log("Joining chat:", chatId);
+      this.currentChatId = chatId;
 
-    if (this.isConnected()) {
-      return this.emit("join_chat", { chatId });
-    }
-
-    // If not connected, try to reconnect
-    if (this.socket && !this.socket.connected) {
-      console.log("Socket disconnected, attempting to reconnect...");
-      this.socket.connect();
-    }
-
-    return false;
+      if (this.isConnected()) {
+        try {
+          this.socket.emit("join_chat", { chatId });
+          console.log("Successfully joined chat:", chatId);
+          resolve(true);
+        } catch (error) {
+          console.error("Error joining chat:", error);
+          reject(error);
+        }
+      } else {
+        // If not connected, try to reconnect
+        if (this.socket && !this.socket.connected) {
+          console.log("Socket disconnected, attempting to reconnect...");
+          this.socket.connect();
+        }
+        reject(new Error("Socket not connected"));
+      }
+    });
   }
 
   // Leave a chat room

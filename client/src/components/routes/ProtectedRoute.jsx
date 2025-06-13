@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 
-const ProtectedRoute = ({ allowedRoles = [], requireAuth = true }) => {
+const ProtectedRoute = ({ allowedRoles = [], restrictTo = null }) => {
   const { user, isLoading } = useAuth();
   const location = useLocation();
 
@@ -16,25 +16,47 @@ const ProtectedRoute = ({ allowedRoles = [], requireAuth = true }) => {
     );
   }
 
-  // For routes that require authentication
-  if (requireAuth && !user) {
+  if (!user) {
     toast.error("Please login to access this page");
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // If user is logged in, handle role-based redirection
-  if (user) {
-    if (user.isAdmin && !location.pathname.startsWith("/admin")) {
+  // Check if route requires specific roles
+  if (allowedRoles.length > 0) {
+    const isAdmin = user.isAdmin || user.role === "admin";
+    const isSeller = user.isSeller;
+
+    let hasRequiredRole = false;
+
+    if (allowedRoles.includes("admin") && isAdmin) {
+      hasRequiredRole = true;
+    } else if (allowedRoles.includes("seller") && isSeller) {
+      hasRequiredRole = true;
+    } else if (allowedRoles.includes("buyer") && !isAdmin && !isSeller) {
+      hasRequiredRole = true;
+    }
+
+    if (!hasRequiredRole) {
+      toast.error("You don't have permission to access this page");
+
+      // Redirect to the appropriate dashboard based on role
+      if (isAdmin) {
+        return <Navigate to="/admin" replace />;
+      } else if (isSeller) {
+        return <Navigate to="/seller/dashboard" replace />;
+      } else {
+        return <Navigate to="/" replace />;
+      }
+    }
+  }
+
+  // Handle restrictions based on user types
+  if (restrictTo === "buyer" && (user.isSeller || user.isAdmin)) {
+    toast.error("This page is only accessible to buyers");
+    if (user.isAdmin) {
       return <Navigate to="/admin" replace />;
-    } else if (user.isSeller && !location.pathname.startsWith("/seller")) {
+    } else {
       return <Navigate to="/seller/dashboard" replace />;
-    } else if (
-      !user.isAdmin &&
-      !user.isSeller &&
-      (location.pathname.startsWith("/admin") ||
-        location.pathname.startsWith("/seller"))
-    ) {
-      return <Navigate to="/" replace />;
     }
   }
 

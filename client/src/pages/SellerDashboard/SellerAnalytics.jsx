@@ -62,7 +62,7 @@ const StatCard = ({
   className = "",
 }) => (
   <div
-    className={`bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all ${className}`}
+    className={`bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all ${className}`}
   >
     <div className="flex items-center justify-between mb-4">
       <div className="bg-primary/10 p-3 rounded-full">
@@ -106,8 +106,11 @@ const CustomerSegmentCard = ({
       style={{ backgroundColor: COLORS[segment.toLowerCase()] }}
     />
     <div className="flex-1">
-      <div className="flex items-center justify-between mb-1">
-        <h4 className="text-lg font-semibold text-gray-900">{segment}</h4>
+      <div className="flex flex-wrap gap-3 sm:gap-4">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-[#FF6B6B]"></div>
+          <span className="text-xs sm:text-sm text-gray-600">VIP</span>
+        </div>
         <span className="text-sm font-medium text-gray-500">
           {((count / total) * 100).toFixed(2)}%
         </span>
@@ -441,9 +444,9 @@ const SellerAnalytics = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-8 mb-6 sm:mb-8">
         <div>
-          <h1 className="text-3xl font-bold mb-2">Analytics Dashboard</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">Analytics Dashboard</h1>
           <p className="text-gray-600">
             Comprehensive insights into your store's performance
           </p>
@@ -461,7 +464,7 @@ const SellerAnalytics = () => {
       </div>
 
       {/* Overview Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
         <StatCard
           title="Total Revenue"
           value={`₱${stats.totalRevenue.toLocaleString()}`}
@@ -492,10 +495,10 @@ const SellerAnalytics = () => {
       </div>
 
       {/* Sales Trend */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold mb-6">Revenue Trend</h2>
-          <div className="h-[400px]">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 mb-6 sm:mb-8">
+        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+          <h2 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6">Revenue Trend</h2>
+          <div className="h-[300px] sm:h-[400px]">
             {salesData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={salesData}>
@@ -541,9 +544,9 @@ const SellerAnalytics = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold mb-6">Hourly Performance</h2>
-          <div className="h-[400px]">
+        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+          <h2 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6">Hourly Performance</h2>
+          <div className="h-[300px] sm:h-[400px]">
             {hourlyStats.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={hourlyStats}>
@@ -558,8 +561,16 @@ const SellerAnalytics = () => {
                   />
                   <Tooltip
                     formatter={(value, name) => [
-                      name === "revenue" ? `₱${value.toLocaleString()}` : value,
-                      name === "revenue" ? "Revenue" : "Orders",
+                      name === "revenue"
+                        ? `₱${value.toLocaleString()}`
+                        : name === "averageOrderValue"
+                        ? `₱${value.toLocaleString()}`
+                        : value,
+                      name
+                        .replace(/([A-Z])/g, " $1")
+                        .charAt(0)
+                        .toUpperCase() +
+                        name.replace(/([A-Z])/g, " $1").slice(1),
                     ]}
                   />
                   <Legend />
@@ -587,22 +598,21 @@ const SellerAnalytics = () => {
       </div>
 
       {/* Customer Segments and Product Performance */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold">Customer Segments</h2>
-            <div className="flex items-center space-x-4">
-              {Object.entries(COLORS).map(([key, color]) => (
-                <div key={key} className="flex items-center">
-                  <div
-                    className="w-3 h-3 rounded-full mr-2"
-                    style={{ backgroundColor: color }}
-                  />
-                  <span className="text-sm text-gray-600 capitalize">
-                    {key}
-                  </span>
-                </div>
-              ))}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 mb-6 sm:mb-8">
+        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
+            <h2 className="text-lg sm:text-xl font-semibold">Customer Segments</h2>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#FF6B6B]"></div>
+              <span className="text-xs sm:text-sm text-gray-600">VIP</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#4ECDC4]"></div>
+              <span className="text-xs sm:text-sm text-gray-600">Regular</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#45B7D1]"></div>
+              <span className="text-xs sm:text-sm text-gray-600">Occasional</span>
             </div>
           </div>
           <div className="space-y-4">
@@ -622,9 +632,9 @@ const SellerAnalytics = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
           <h2 className="text-xl font-semibold mb-6">Top Products</h2>
-          <div className="h-[400px]">
+          <div className="h-[300px] sm:h-[400px]">
             {productPerformance.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart

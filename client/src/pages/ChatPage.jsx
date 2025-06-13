@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import axiosInstance from "@/api/axios";
+import { axiosInstance } from "@/contexts/axios";
 import { socketService } from "@/services/socket";
 import { Loader2, Send, Search, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";

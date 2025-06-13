@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import axiosInstance from "@/api/axios";
+import { axiosInstance } from "@/contexts/axios";
 import { socketService } from "@/services/socket";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
@@ -233,21 +233,21 @@ const EnhancedChatWidget = () => {
       toast.error("Failed to load conversation");
     }
   };
-
   const handleSelectChat = async (chat) => {
     setCurrentChat(chat);
     setLoading(true);
 
     try {
       const response = await axiosInstance.get(`/chat/${chat._id}/messages`);
-      setMessages(response.data || []);
+      const messagesData = response.data.messages || response.data || [];
+      setMessages(messagesData);
 
       // Mark messages as read when opening chat
       if (chat.unreadCount > 0) {
         socketService.joinChat(chat._id);
 
         // Mark unread messages as read
-        const unreadMessages = response.data.filter(
+        const unreadMessages = messagesData.filter(
           (msg) =>
             msg.senderId !== user._id && msg.status !== MESSAGE_STATUS.READ
         );
@@ -586,75 +586,76 @@ const EnhancedChatWidget = () => {
                 >
                   <Maximize2 className="h-4 w-4" />
                 </Button>
-              </div>
-
+              </div>{" "}
               {/* Messages area */}
               <div className="flex-1 overflow-y-auto p-3 bg-gray-50">
-                {messages.map((message, index) => {
-                  const isSender = message.senderId === user._id;
-                  const isFirstInGroup =
-                    index === 0 ||
-                    messages[index - 1].senderId !== message.senderId;
-                  const isLastInGroup =
-                    index === messages.length - 1 ||
-                    messages[index + 1]?.senderId !== message.senderId;
+                {Array.isArray(messages) &&
+                  messages.map((message, index) => {
+                    const isSender = message.senderId === user._id;
+                    const isFirstInGroup =
+                      index === 0 ||
+                      messages[index - 1].senderId !== message.senderId;
+                    const isLastInGroup =
+                      index === messages.length - 1 ||
+                      messages[index + 1]?.senderId !== message.senderId;
 
-                  return (
-                    <div
-                      key={message._id || `temp-${index}`}
-                      className={`flex items-end gap-1.5 ${
-                        isSender ? "justify-end" : "justify-start"
-                      } ${isFirstInGroup ? "mt-3" : "mt-1"}`}
-                    >
-                      {!isSender && isFirstInGroup && (
-                        <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                          <Store className="h-3 w-3 text-gray-500" />
-                        </div>
-                      )}
+                    return (
                       <div
-                        className={`px-3 py-2 rounded-lg text-sm max-w-[75%] ${
-                          isSender
-                            ? "bg-primary text-white rounded-br-none"
-                            : "bg-white border border-gray-100 rounded-bl-none"
-                        }`}
+                        key={message._id || `temp-${index}`}
+                        className={`flex items-end gap-1.5 ${
+                          isSender ? "justify-end" : "justify-start"
+                        } ${isFirstInGroup ? "mt-3" : "mt-1"}`}
                       >
-                        {message.image && (
-                          <img
-                            src={message.image}
-                            alt="Shared image"
-                            className="rounded mb-1 max-w-full cursor-pointer"
-                            onClick={() => window.open(message.image, "_blank")}
-                          />
+                        {!isSender && isFirstInGroup && (
+                          <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                            <Store className="h-3 w-3 text-gray-500" />
+                          </div>
                         )}
-
-                        {/* Display shared product if available */}
-                        {message.productData && (
-                          <ProductShareCard
-                            product={message.productData}
-                            onViewProduct={handleViewProduct}
-                          />
-                        )}
-
-                        {message.content && <p>{message.content}</p>}
-                        <span
-                          className={`text-[10px] ${
-                            isSender ? "text-white/70" : "text-gray-400"
-                          } flex items-center gap-0.5`}
+                        <div
+                          className={`px-3 py-2 rounded-lg text-sm max-w-[75%] ${
+                            isSender
+                              ? "bg-primary text-white rounded-br-none"
+                              : "bg-white border border-gray-100 rounded-bl-none"
+                          }`}
                         >
-                          {formatTime(message.createdAt)}
-                          {isSender && (
-                            <span className="ml-1">
-                              {getMessageStatusIcon(message.status)}
-                            </span>
+                          {message.image && (
+                            <img
+                              src={message.image}
+                              alt="Shared image"
+                              className="rounded mb-1 max-w-full cursor-pointer"
+                              onClick={() =>
+                                window.open(message.image, "_blank")
+                              }
+                            />
                           )}
-                        </span>
+
+                          {/* Display shared product if available */}
+                          {message.productData && (
+                            <ProductShareCard
+                              product={message.productData}
+                              onViewProduct={handleViewProduct}
+                            />
+                          )}
+
+                          {message.content && <p>{message.content}</p>}
+                          <span
+                            className={`text-[10px] ${
+                              isSender ? "text-white/70" : "text-gray-400"
+                            } flex items-center gap-0.5`}
+                          >
+                            {formatTime(message.createdAt)}
+                            {isSender && (
+                              <span className="ml-1">
+                                {getMessageStatusIcon(message.status)}
+                              </span>
+                            )}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
                 <div ref={messagesEndRef} />
               </div>
-
               {/* Message input */}
               <div className="flex-shrink-0 border-t bg-white p-3">
                 <form onSubmit={handleSendMessage}>

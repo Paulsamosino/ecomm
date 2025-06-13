@@ -88,7 +88,7 @@ const WishlistPage = () => {
 
                   <div className="flex space-x-2">
                     <button
-                      onClick={() => removeFromWishlist(item._id)}
+                      onClick={() => removeFromWishlist(item._id, false)}
                       className="p-2 text-red-500 hover:bg-red-50 rounded-full"
                       title="Remove from wishlist"
                     >

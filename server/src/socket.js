@@ -171,6 +171,9 @@ const initializeSocket = (server) => {
           _id: message._id || new mongoose.Types.ObjectId(),
           content: message.content.trim(),
           senderId,
+          type: message.type || "text",
+          attachments: message.attachments || [],
+          replyTo: message.replyTo || null,
           status: "SENT",
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -219,6 +222,262 @@ const initializeSocket = (server) => {
           message: "Failed to process message",
           error: error.message,
         });
+      }
+    });
+
+    // Message editing
+    socket.on("edit_message", async (data) => {
+      try {
+        const { chatId, messageId, newContent } = data;
+        const userId = socket.user._id.toString();
+
+        const chat = await Chat.findById(chatId);
+        if (!chat) {
+          socket.emit("error", { message: "Chat not found" });
+          return;
+        }
+
+        const message = chat.messages.id(messageId);
+        if (!message || message.senderId.toString() !== userId) {
+          socket.emit("error", {
+            message: "Message not found or unauthorized",
+          });
+          return;
+        }
+
+        // Update message
+        message.content = newContent;
+        message.isEdited = true;
+        message.editedAt = new Date();
+        message.updatedAt = new Date();
+
+        await chat.save();
+
+        // Emit to all users in chat
+        io.to(chatId).emit("message_edited", {
+          chatId,
+          messageId,
+          newContent,
+          editedAt: message.editedAt,
+        });
+      } catch (error) {
+        console.error("Error editing message:", error);
+        socket.emit("error", { message: "Failed to edit message" });
+      }
+    });
+
+    // Message deletion
+    socket.on("delete_message", async (data) => {
+      try {
+        const { chatId, messageId } = data;
+        const userId = socket.user._id.toString();
+
+        const chat = await Chat.findById(chatId);
+        if (!chat) {
+          socket.emit("error", { message: "Chat not found" });
+          return;
+        }
+
+        const message = chat.messages.id(messageId);
+        if (!message || message.senderId.toString() !== userId) {
+          socket.emit("error", {
+            message: "Message not found or unauthorized",
+          });
+          return;
+        }
+
+        // Soft delete
+        message.isDeleted = true;
+        message.deletedAt = new Date();
+        message.updatedAt = new Date();
+
+        await chat.save();
+
+        // Emit to all users in chat
+        io.to(chatId).emit("message_deleted", {
+          chatId,
+          messageId,
+          deletedAt: message.deletedAt,
+        });
+      } catch (error) {
+        console.error("Error deleting message:", error);
+        socket.emit("error", { message: "Failed to delete message" });
+      }
+    });
+
+    // Message reactions
+    socket.on("add_reaction", async (data) => {
+      try {
+        const { chatId, messageId, emoji } = data;
+        const userId = socket.user._id.toString();
+
+        const chat = await Chat.findById(chatId);
+        if (!chat) {
+          socket.emit("error", { message: "Chat not found" });
+          return;
+        }
+
+        const message = chat.messages.id(messageId);
+        if (!message) {
+          socket.emit("error", { message: "Message not found" });
+          return;
+        }
+
+        // Remove existing reaction from this user if exists
+        message.reactions = message.reactions.filter(
+          (reaction) => reaction.userId.toString() !== userId
+        );
+
+        // Add new reaction
+        message.reactions.push({
+          userId,
+          emoji,
+          createdAt: new Date(),
+        });
+
+        message.updatedAt = new Date();
+        await chat.save();
+
+        // Emit to all users in chat
+        io.to(chatId).emit("reaction_added", {
+          chatId,
+          messageId,
+          reaction: {
+            userId,
+            emoji,
+            user: {
+              _id: socket.user._id,
+              name: socket.user.name,
+            },
+          },
+        });
+      } catch (error) {
+        console.error("Error adding reaction:", error);
+        socket.emit("error", { message: "Failed to add reaction" });
+      }
+    });
+
+    // Remove reaction
+    socket.on("remove_reaction", async (data) => {
+      try {
+        const { chatId, messageId } = data;
+        const userId = socket.user._id.toString();
+
+        const chat = await Chat.findById(chatId);
+        if (!chat) {
+          socket.emit("error", { message: "Chat not found" });
+          return;
+        }
+
+        const message = chat.messages.id(messageId);
+        if (!message) {
+          socket.emit("error", { message: "Message not found" });
+          return;
+        }
+
+        // Remove reaction from this user
+        message.reactions = message.reactions.filter(
+          (reaction) => reaction.userId.toString() !== userId
+        );
+
+        message.updatedAt = new Date();
+        await chat.save();
+
+        // Emit to all users in chat
+        io.to(chatId).emit("reaction_removed", {
+          chatId,
+          messageId,
+          userId,
+        });
+      } catch (error) {
+        console.error("Error removing reaction:", error);
+        socket.emit("error", { message: "Failed to remove reaction" });
+      }
+    });
+
+    // File upload progress (for real-time updates)
+    socket.on("file_upload_progress", (data) => {
+      const { chatId, fileName, progress } = data;
+      socket.to(chatId).emit("file_upload_progress", {
+        userId: socket.user._id,
+        fileName,
+        progress,
+      });
+    });
+
+    // Chat archive/unarchive
+    socket.on("archive_chat", async (data) => {
+      try {
+        const { chatId } = data;
+        const userId = socket.user._id.toString();
+
+        const chat = await Chat.findById(chatId);
+        if (!chat) {
+          socket.emit("error", { message: "Chat not found" });
+          return;
+        }
+
+        // Check if user is participant
+        const buyerId = chat.buyer.toString();
+        const sellerId = chat.seller.toString();
+
+        if (userId !== buyerId && userId !== sellerId) {
+          socket.emit("error", { message: "Unauthorized" });
+          return;
+        }
+
+        // Archive for this user
+        if (!chat.archivedBy) chat.archivedBy = [];
+        if (!chat.archivedBy.includes(userId)) {
+          chat.archivedBy.push(userId);
+        }
+
+        await chat.save();
+
+        socket.emit("chat_archived", { chatId });
+      } catch (error) {
+        console.error("Error archiving chat:", error);
+        socket.emit("error", { message: "Failed to archive chat" });
+      }
+    });
+
+    // Chat block/unblock
+    socket.on("block_chat", async (data) => {
+      try {
+        const { chatId } = data;
+        const userId = socket.user._id.toString();
+
+        const chat = await Chat.findById(chatId);
+        if (!chat) {
+          socket.emit("error", { message: "Chat not found" });
+          return;
+        }
+
+        // Check if user is participant
+        const buyerId = chat.buyer.toString();
+        const sellerId = chat.seller.toString();
+
+        if (userId !== buyerId && userId !== sellerId) {
+          socket.emit("error", { message: "Unauthorized" });
+          return;
+        }
+
+        // Block for this user
+        if (!chat.blockedBy) chat.blockedBy = [];
+        if (!chat.blockedBy.includes(userId)) {
+          chat.blockedBy.push(userId);
+        }
+
+        await chat.save();
+
+        socket.emit("chat_blocked", { chatId });
+
+        // Notify other participant
+        const otherUserId = userId === buyerId ? sellerId : buyerId;
+        socket.to(otherUserId).emit("chat_blocked_by_other", { chatId });
+      } catch (error) {
+        console.error("Error blocking chat:", error);
+        socket.emit("error", { message: "Failed to block chat" });
       }
     });
 

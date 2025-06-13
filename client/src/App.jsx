@@ -3,15 +3,18 @@ import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import Navbar from "@/components/layout/Navbar";
 import ProtectedRoute from "@/components/routes/ProtectedRoute";
-import BuyerRoute from "@/components/routes/BuyerRoute";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { PayPalProvider } from "@/config/paypal";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 import MainLayout from "@/components/layout/MainLayout";
 import SellerLayout from "@/components/layout/SellerLayout";
 import AdminLayout from "@/components/layout/AdminLayout";
 import EnhancedChatWidget from "@/components/chat/EnhancedChatWidget";
 import { chatNotificationService } from "@/services/chatNotificationService";
+import RedirectBasedOnRole from "@/components/routes/RedirectBasedOnRole";
+import AdminRoute from "@/components/routes/AdminRoute";
+import HomeRedirect from "@/components/routes/HomeRedirect";
 
 // Import Pages
 import HomePage from "@/pages/HomePage";
@@ -25,6 +28,7 @@ import WishlistPage from "@/pages/WishlistPage";
 import CheckoutPage from "@/pages/CheckoutPage";
 import HelpCenterPage from "@/pages/HelpCenterPage";
 import ContactUsPage from "@/pages/ContactUsPage";
+import SellerStorePage from "@/pages/SellerStorePage";
 
 // Import Dashboard Pages
 import SellerDashboard from "@/pages/SellerDashboard/SellerDashboard";
@@ -85,33 +89,44 @@ const AppContent = () => {
     <>
       {!isSellerRoute && !isAdminRoute && <Navbar />}
       <Routes>
-        {/* Auth Routes */}
-        <Route path="login" element={<LoginPage />} />
-        <Route path="register" element={<RegisterPage />} />
-        <Route path="register/seller" element={<SellerRegisterPage />} />
-
-        {/* Public Routes (needs role-based redirection) */}
-        <Route element={<ProtectedRoute requireAuth={false} />}>
-          <Route path="/" element={<MainLayout />}>
-            <Route index element={<HomePage />} />
-            <Route path="products" element={<ProductListPage />} />
-            <Route path="products/:id" element={<ProductDetailPage />} />
-            <Route path="help-center" element={<HelpCenterPage />} />
-            <Route path="contact" element={<ContactUsPage />} />
-            <Route path="cart" element={<CartPage />} />
-            <Route path="checkout" element={<CheckoutPage />} />
-            <Route path="wishlist" element={<WishlistPage />} />
+        {/* Public Routes */}
+        <Route path="/" element={<MainLayout />}>
+          <Route index element={<HomeRedirect />} />
+          <Route path="login" element={<LoginPage />} />
+          <Route path="register" element={<RegisterPage />} />
+          <Route path="register/seller" element={<SellerRegisterPage />} />
+          <Route path="products" element={<ProductListPage />} />
+          <Route path="products/:id" element={<ProductDetailPage />} />
+          <Route path="seller/:sellerId" element={<SellerStorePage />} />
+          <Route path="help-center" element={<HelpCenterPage />} />
+          <Route path="contact" element={<ContactUsPage />} />
+          <Route path="cart" element={<ProtectedRoute restrictTo="buyer" />}>
+            <Route index element={<CartPage />} />
+          </Route>
+          <Route
+            path="checkout"
+            element={<ProtectedRoute restrictTo="buyer" />}
+          >
+            <Route index element={<CheckoutPage />} />
+          </Route>
+          <Route
+            path="wishlist"
+            element={<ProtectedRoute restrictTo="buyer" />}
+          >
+            <Route index element={<WishlistPage />} />
           </Route>
         </Route>
 
-        {/* Buyer Routes */}
-        <Route path="/buyer" element={<BuyerRoute />}>
-          <Route element={<MainLayout />}>
-            <Route path="dashboard" element={<BuyerDashboardPage />}>
-              <Route index element={<BuyerMyPurchase />} />
-              <Route path="purchases" element={<BuyerMyPurchase />} />
-              <Route path="profile" element={<BuyerManageProfile />} />
-            </Route>
+        {/* Protected Buyer Routes */}
+        <Route
+          element={
+            <ProtectedRoute allowedRoles={["buyer"]} restrictTo="buyer" />
+          }
+        >
+          <Route path="/buyer-dashboard" element={<BuyerDashboardPage />}>
+            <Route index element={<BuyerMyPurchase />} />
+            <Route path="purchases" element={<BuyerMyPurchase />} />
+            <Route path="profile" element={<BuyerManageProfile />} />
             <Route path="breeding" element={<BreedingManagementPage />} />
             <Route path="chat" element={<EnhancedChatPage />} />
             <Route path="chat/:chatId" element={<EnhancedChatPage />} />
@@ -133,26 +148,19 @@ const AppContent = () => {
             <Route path="reviews" element={<SellerReviews />} />
             <Route path="customers" element={<SellerCustomers />} />
             <Route path="cart" element={<SellerCartManagement />} />
-            <Route path="breeding" element={<BreedingManagementPage />} />
-            <Route
-              path="breeding/projects"
-              element={<BreedingManagementPage />}
-            />
-            <Route
-              path="breeding/calculator"
-              element={<BreedingManagementPage />}
-            />
             <Route path="payments" element={<SellerPayments />} />
+            <Route path="account" element={<SellerSettings />} />
             <Route path="settings" element={<SellerSettings />} />
             <Route path="help" element={<SellerHelp />} />
+            <Route
+              path="breeding-management"
+              element={<BreedingManagementPage />}
+            />
           </Route>
         </Route>
 
         {/* Protected Admin Routes */}
-        <Route
-          path="/admin"
-          element={<ProtectedRoute allowedRoles={["admin"]} />}
-        >
+        <Route path="/admin" element={<AdminRoute />}>
           <Route element={<AdminLayout />}>
             <Route index element={<AdminDashboardPage />} />
             <Route path="users" element={<AdminManageUsers />} />
@@ -162,6 +170,11 @@ const AppContent = () => {
             <Route path="settings" element={<AdminSettings />} />
             <Route path="help" element={<AdminHelp />} />
           </Route>
+        </Route>
+
+        {/* Redirect routes based on user role */}
+        <Route path="/" element={<ProtectedRoute />}>
+          <Route path="dashboard" element={<RedirectBasedOnRole />} />
         </Route>
 
         {/* Redirect to home if no route matches */}
@@ -177,31 +190,33 @@ const AppContent = () => {
 const App = () => {
   return (
     <AuthProvider>
-      <CartProvider>
-        <PayPalProvider>
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              duration: 3000,
-              style: {
-                background: "#333",
-                color: "#fff",
-              },
-              success: {
+      <NotificationProvider>
+        <CartProvider>
+          <PayPalProvider>
+            <Toaster
+              position="top-center"
+              reverseOrder={false}
+              toastOptions={{
                 style: {
-                  background: "#36d399",
+                  background: "#333",
+                  color: "#fff",
                 },
-              },
-              error: {
-                style: {
-                  background: "#f87272",
+                success: {
+                  style: {
+                    background: "#36d399",
+                  },
                 },
-              },
-            }}
-          />
-          <AppContent />
-        </PayPalProvider>
-      </CartProvider>
+                error: {
+                  style: {
+                    background: "#f87272",
+                  },
+                },
+              }}
+            />
+            <AppContent />
+          </PayPalProvider>
+        </CartProvider>
+      </NotificationProvider>
     </AuthProvider>
   );
 };

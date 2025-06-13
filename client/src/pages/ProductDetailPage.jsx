@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
-import axiosInstance from "@/api/axios";
+import { axiosInstance } from "@/contexts/axios";
 import { apiGetProduct } from "@/api/products";
 import {
   Star,
@@ -27,6 +27,9 @@ import {
   Minus,
   Store,
   Flag,
+  Egg,
+  Wheat,
+  Sun,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
@@ -159,11 +162,10 @@ const ProductDetailPage = () => {
     }
 
     if (isInWishlist(product._id)) {
-      removeFromWishlist(product._id);
-      toast.success("Removed from wishlist");
+      // Pass false to prevent double toast notification
+      removeFromWishlist(product._id, false);
     } else {
       addToWishlist(product);
-      toast.success("Added to wishlist");
     }
   };
 
@@ -213,7 +215,8 @@ const ProductDetailPage = () => {
       return;
     }
 
-    addToCart({ ...product, quantity });
+    // Pass false to prevent duplicate toast in CartContext
+    addToCart({ ...product, quantity }, quantity, false);
     toast.success(`Added ${quantity} item(s) to cart`);
   };
 
@@ -247,7 +250,7 @@ const ProductDetailPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
       </div>
     );
   }
@@ -266,7 +269,7 @@ const ProductDetailPage = () => {
           </p>
           <Link
             to="/products"
-            className="flex items-center text-primary hover:text-primary/80 transition-colors"
+            className="flex items-center text-orange-600 hover:text-orange-700 transition-colors"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Products
@@ -300,37 +303,50 @@ const ProductDetailPage = () => {
       : 0);
 
   return (
-    <div className="bg-white">
+    <div className="bg-gradient-to-b from-orange-50 to-white min-h-screen">
+      {/* Farm-themed background elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div
+          className="absolute inset-0 bg-repeat opacity-5"
+          style={{
+            backgroundImage:
+              "url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48ZyBmaWxsPSIjZmM5ODMwIiBmaWxsLW9wYWNpdHk9IjAuNCIgZmlsbC1ydWxlPSJldmVub2RkIj48cGF0aCBkPSJNMCAwaDIwdjIwSDB6Ii8+PHBhdGggZD0iTTIwIDBoMjB2MjBIMjB6Ii8+PHBhdGggZD0iTTAgMjBoMjB2MjBIMHoiLz48cGF0aCBkPSJNMjAgMjBoMjB2MjBIMjB6Ii8+PC9nPjwvc3ZnPg==')",
+          }}
+        />
+        <div className="absolute top-20 -right-20 w-64 h-64 bg-orange-400/10 rounded-full blur-[80px] animate-pulse-slow" />
+        <div className="absolute bottom-40 -left-20 w-80 h-80 bg-yellow-400/10 rounded-full blur-[100px] animate-pulse-slow" />
+      </div>
+
       {/* Breadcrumbs */}
-      <div className="bg-gray-50 py-4 border-b border-gray-200">
+      <div className="bg-white/50 py-4 border-b border-orange-100 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center text-sm text-gray-500">
-            <Link to="/" className="hover:text-gray-900">
+            <Link to="/" className="hover:text-orange-600">
               Home
             </Link>
-            <span className="mx-2">•</span>
-            <Link to="/products" className="hover:text-gray-900">
+            <span className="mx-2 text-orange-300">•</span>
+            <Link to="/products" className="hover:text-orange-600">
               Products
             </Link>
-            <span className="mx-2">•</span>
+            <span className="mx-2 text-orange-300">•</span>
             <Link
               to={`/products?category=${product.category}`}
-              className="hover:text-gray-900"
+              className="hover:text-orange-600"
             >
               {product.category || "Poultry"}
             </Link>
-            <span className="mx-2">•</span>
-            <span className="text-gray-900 font-medium">{product.name}</span>
+            <span className="mx-2 text-orange-300">•</span>
+            <span className="text-orange-700 font-medium">{product.name}</span>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           {/* Product Images */}
           <div>
             {/* Main Image */}
-            <div className="relative rounded-lg overflow-hidden border border-gray-200 bg-white mb-4">
+            <div className="relative rounded-lg overflow-hidden border border-orange-100 bg-white mb-4 shadow-sm hover:shadow-md transition-all">
               <div className="aspect-w-1 aspect-h-1">
                 <img
                   src={product.images?.[currentImageIndex] || "/1f425.png"}
@@ -348,24 +364,24 @@ const ProductDetailPage = () => {
                 <>
                   <button
                     onClick={handlePreviousImage}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 p-2 rounded-full shadow-md hover:bg-white transition-colors"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-gradient-to-r from-orange-400 to-orange-500 p-2 rounded-full shadow-md hover:shadow-lg transition-all text-white"
                     aria-label="Previous image"
                   >
-                    <ChevronLeft className="h-5 w-5 text-gray-700" />
+                    <ChevronLeft className="h-5 w-5" />
                   </button>
                   <button
                     onClick={handleNextImage}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 p-2 rounded-full shadow-md hover:bg-white transition-colors"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-gradient-to-r from-orange-400 to-orange-500 p-2 rounded-full shadow-md hover:shadow-lg transition-all text-white"
                     aria-label="Next image"
                   >
-                    <ChevronRight className="h-5 w-5 text-gray-700" />
+                    <ChevronRight className="h-5 w-5" />
                   </button>
                 </>
               )}
 
               {/* Discount badge */}
               {product.discount > 0 && (
-                <div className="absolute top-4 left-4 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-md">
+                <div className="absolute top-4 left-4 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold px-2 py-1 rounded-md shadow-sm">
                   {product.discount}% OFF
                 </div>
               )}
@@ -501,10 +517,10 @@ const ProductDetailPage = () => {
                 {discountedPrice ? (
                   <>
                     <div className="text-3xl font-bold text-gray-900">
-                      ${discountedPrice.toFixed(2)}
+                      ₱{discountedPrice.toFixed(2)}
                     </div>
                     <div className="text-lg text-gray-500 line-through">
-                      ${product.price.toFixed(2)}
+                      ₱{product.price.toFixed(2)}
                     </div>
                     <div className="text-sm font-medium text-red-600 ml-2">
                       {product.discount}% OFF
@@ -512,7 +528,7 @@ const ProductDetailPage = () => {
                   </>
                 ) : (
                   <div className="text-3xl font-bold text-gray-900">
-                    ${product.price.toFixed(2)}
+                    ₱{product.price.toFixed(2)}
                   </div>
                 )}
               </div>
@@ -527,11 +543,11 @@ const ProductDetailPage = () => {
                 Quantity
               </label>
               <div className="flex items-center gap-4">
-                <div className="flex items-center border border-gray-300 rounded-md">
+                <div className="flex items-center border-2 border-orange-200 rounded-lg bg-gradient-to-br from-orange-50 to-orange-100 overflow-hidden shadow-sm hover:border-orange-300 hover:shadow-md transition-all duration-200">
                   <button
                     onClick={decrementQuantity}
                     disabled={quantity <= 1}
-                    className="px-3 py-2 text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                    className="px-4 py-3 text-orange-600 hover:text-orange-700 hover:bg-orange-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
                   >
                     <Minus className="h-4 w-4" />
                   </button>
@@ -542,18 +558,18 @@ const ProductDetailPage = () => {
                     max={product.quantity}
                     value={quantity}
                     onChange={handleQuantityChange}
-                    className="w-14 text-center border-0 focus:ring-0"
+                    className="w-16 text-center border-0 focus:ring-0 focus:outline-none bg-transparent text-orange-800 font-bold text-lg"
                   />
                   <button
                     onClick={incrementQuantity}
                     disabled={quantity >= product.quantity}
-                    className="px-3 py-2 text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                    className="px-4 py-3 text-orange-600 hover:text-orange-700 hover:bg-orange-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
                   >
                     <Plus className="h-4 w-4" />
                   </button>
                 </div>
 
-                <div className="text-sm text-gray-500">
+                <div className="text-sm text-orange-600 font-medium bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
                   {product.quantity} available
                 </div>
               </div>
@@ -583,8 +599,11 @@ const ProductDetailPage = () => {
             </div>
 
             {/* Quick Details */}
-            <div className="bg-gray-50 rounded-lg p-4 mb-6">
-              <h3 className="font-medium text-gray-900 mb-2">Quick Details</h3>
+            <div className="bg-white rounded-lg p-4 mb-6 border border-orange-100 shadow-sm">
+              <h3 className="font-medium text-gray-900 mb-2 flex items-center">
+                <Egg className="h-4 w-4 mr-2 text-orange-500" />
+                Quick Details
+              </h3>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 {product.breed && (
                   <div>
@@ -620,7 +639,7 @@ const ProductDetailPage = () => {
               {product.specifications?.length > 1 && (
                 <button
                   onClick={() => setActiveTab("specifications")}
-                  className="text-primary text-sm font-medium mt-2 flex items-center hover:underline"
+                  className="text-orange-600 text-sm font-medium mt-2 flex items-center hover:text-orange-700"
                 >
                   <span>See all specifications</span>
                   <ChevronRight className="h-4 w-4 ml-1" />
@@ -629,77 +648,69 @@ const ProductDetailPage = () => {
             </div>
 
             {/* Seller Card */}
-            <div className="border border-gray-200 rounded-lg p-4">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Store className="h-6 w-6 text-primary" />
+            <div className="bg-white rounded-lg p-4 shadow-sm border border-orange-100">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white">
+                  <Store className="h-6 w-6" />
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <h3 className="font-medium">{sellerName}</h3>
-                    {product.seller?.sellerProfile?.rating && (
-                      <div className="flex items-center text-sm">
-                        <Star className="h-4 w-4 text-yellow-400 fill-yellow-400 mr-1" />
-                        <span>{product.seller.sellerProfile.rating}</span>
-                      </div>
+                <div>
+                  <div className="flex items-center">
+                    <h3 className="font-medium text-gray-900">{sellerName}</h3>
+                    {product.seller?.verified && (
+                      <CheckCircle className="h-4 w-4 ml-1 text-green-500 fill-green-500" />
                     )}
                   </div>
-                  {product.seller?.createdAt && (
-                    <p className="text-sm text-gray-500 mb-3">
-                      Member since{" "}
-                      {new Date(product.seller.createdAt).toLocaleDateString(
-                        undefined,
-                        { year: "numeric", month: "long" }
-                      )}
-                      {product.seller?.sellerProfile?.totalSales && (
-                        <>
-                          <span className="mx-2">•</span>
-                          {product.seller.sellerProfile.totalSales}+ sales
-                        </>
-                      )}
-                    </p>
-                  )}
-                  {(product.seller?.sellerProfile?.responseRate ||
-                    product.seller?.sellerProfile?.responseTime) && (
-                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-500 mb-4">
-                      {product.seller?.sellerProfile?.responseRate && (
-                        <div className="flex items-center">
-                          <CheckCircle className="h-3 w-3 text-green-500 mr-1" />
-                          <span>
-                            {product.seller.sellerProfile.responseRate}%
-                            Response Rate
-                          </span>
-                        </div>
-                      )}
-                      {product.seller?.sellerProfile?.responseTime && (
-                        <div className="flex items-center">
-                          <Clock className="h-3 w-3 text-green-500 mr-1" />
-                          <span>
-                            Responds {product.seller.sellerProfile.responseTime}
-                          </span>
-                        </div>
-                      )}
+                  <p className="text-sm text-gray-500">Seller</p>
+                  <div className="flex items-center mt-1">
+                    <div className="flex items-center">
+                      <MapPin className="h-4 w-4 text-gray-400" />
+                      <span className="text-xs text-gray-500 ml-1">
+                        {product.location || "Location not specified"}
+                      </span>
                     </div>
-                  )}
-                  {product.seller?._id && product.seller?._id !== user?._id && (
-                    <div className="flex flex-col gap-2">
-                      <button
-                        onClick={handleMessageSeller}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-md hover:bg-primary/20 transition-colors text-sm font-medium"
-                      >
-                        <MessageSquare className="h-4 w-4" />
-                        Contact Seller
-                      </button>
-                      <button
-                        onClick={() => setIsReportModalOpen(true)}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors text-sm font-medium"
-                      >
-                        <Flag className="h-4 w-4" />
-                        Report Seller
-                      </button>
+                    <div className="flex items-center ml-3">
+                      <Clock className="h-4 w-4 text-gray-400" />
+                      <span className="text-xs text-gray-500 ml-1">
+                        Member since{" "}
+                        {product.seller?.createdAt
+                          ? new Date(
+                              product.seller.createdAt
+                            ).toLocaleDateString("en-US", {
+                              year: "numeric",
+                              month: "short",
+                            })
+                          : "N/A"}
+                      </span>
                     </div>
-                  )}
+                  </div>
                 </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                  onClick={() => navigate(`/seller/${product.seller?._id}`)}
+                >
+                  View Store
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                  onClick={handleMessageSeller}
+                >
+                  Contact
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-red-600 border-orange-200 hover:bg-red-50"
+                  onClick={() => setIsReportModalOpen(true)}
+                >
+                  <Flag className="h-4 w-4 mr-1" />
+                  Report
+                </Button>
               </div>
             </div>
           </div>
@@ -707,13 +718,13 @@ const ProductDetailPage = () => {
 
         {/* Product Tabs - Description, Specifications, Reviews */}
         <div className="mt-12">
-          <div className="border-b border-gray-200">
+          <div className="border-b border-orange-100">
             <nav className="flex space-x-8" aria-label="Product details tabs">
               <button
                 onClick={() => setActiveTab("description")}
                 className={`pb-4 px-1 text-sm font-medium ${
                   activeTab === "description"
-                    ? "border-b-2 border-primary text-primary"
+                    ? "border-b-2 border-orange-500 text-orange-600"
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                 }`}
               >
@@ -723,7 +734,7 @@ const ProductDetailPage = () => {
                 onClick={() => setActiveTab("specifications")}
                 className={`pb-4 px-1 text-sm font-medium ${
                   activeTab === "specifications"
-                    ? "border-b-2 border-primary text-primary"
+                    ? "border-b-2 border-orange-500 text-orange-600"
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                 }`}
               >
@@ -733,7 +744,7 @@ const ProductDetailPage = () => {
                 onClick={() => setActiveTab("shipping")}
                 className={`pb-4 px-1 text-sm font-medium ${
                   activeTab === "shipping"
-                    ? "border-b-2 border-primary text-primary"
+                    ? "border-b-2 border-orange-500 text-orange-600"
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                 }`}
               >
@@ -743,7 +754,7 @@ const ProductDetailPage = () => {
                 onClick={() => setActiveTab("reviews")}
                 className={`pb-4 px-1 text-sm font-medium ${
                   activeTab === "reviews"
-                    ? "border-b-2 border-primary text-primary"
+                    ? "border-b-2 border-orange-500 text-orange-600"
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                 }`}
               >
@@ -1002,17 +1013,25 @@ const ProductDetailPage = () => {
         {/* Similar Products Section */}
         {similarProducts.length > 0 && (
           <div className="mt-16">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              Similar Products
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div className="flex items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-900">
+                Similar Products
+              </h2>
+              <Link
+                to="/products"
+                className="ml-auto text-sm font-medium text-orange-600 hover:text-orange-700"
+              >
+                View all
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {similarProducts.map((product) => (
                 <Link
                   key={product._id}
                   to={`/products/${product._id}`}
-                  className="group bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all border border-gray-200"
+                  className="group rounded-lg overflow-hidden border border-orange-100 bg-white shadow-sm hover:shadow-md transition-all"
                 >
-                  <div className="aspect-square bg-amber-50 relative">
+                  <div className="aspect-square bg-orange-50 relative">
                     <img
                       src={product.images?.[0] || "/1f425.png"}
                       alt={product.name}
@@ -1022,13 +1041,13 @@ const ProductDetailPage = () => {
                       }}
                     />
                     {product.discount > 0 && (
-                      <div className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
+                      <div className="absolute top-2 left-2 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold px-2 py-1 rounded shadow-sm">
                         {product.discount}% OFF
                       </div>
                     )}
                   </div>
                   <div className="p-4">
-                    <h3 className="font-medium text-gray-900 group-hover:text-amber-600 transition-colors mb-1 truncate">
+                    <h3 className="font-medium text-gray-900 group-hover:text-orange-600 transition-colors mb-1 truncate">
                       {product.name}
                     </h3>
                     {product.breed && (
@@ -1037,7 +1056,7 @@ const ProductDetailPage = () => {
                       </p>
                     )}
                     <div className="flex items-center justify-between">
-                      <div className="font-bold text-amber-600">
+                      <div className="font-bold text-orange-600">
                         ${product.price?.toFixed(2)}
                       </div>
                       {product.rating > 0 && (
@@ -1061,8 +1080,8 @@ const ProductDetailPage = () => {
       <ReportModal
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
-        reportedUserId={product?.seller?._id}
-        reporterRole="buyer"
+        productId={product._id}
+        productName={product.name}
       />
     </div>
   );

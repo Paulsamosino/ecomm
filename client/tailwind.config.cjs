@@ -7,12 +7,12 @@ module.exports = {
         sans: ["Inter", "sans-serif"],
       },
       colors: {
-        primary: "#ffb761",
+        primary: "#FF7F50",
         secondary: "#8B4513",
         accent: {
-          light: "#ffd4a3",
-          DEFAULT: "#ffb761",
-          dark: "#e69c4a",
+          light: "#FFB299",
+          DEFAULT: "#FF7F50",
+          dark: "#E66A3E",
         },
         brown: {
           light: "#a65d1e",
@@ -35,6 +35,19 @@ module.exports = {
         float: "float 3s ease-in-out infinite",
         blink: "blink 4s ease-in-out infinite",
         "bounce-slow": "bounce 3s ease-in-out infinite",
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
+        in: "in 0.2s ease-out",
+        out: "out 0.2s ease-in",
+        "fade-in-0": "fade-in-0 0.2s ease-in-out",
+        "fade-out-0": "fade-out-0 0.2s ease-in-out",
+        "zoom-in-95": "zoom-in-95 0.2s ease-in-out",
+        "zoom-out-95": "zoom-out-95 0.2s ease-in-out",
+        "slide-in-from-top-2": "slide-in-from-top-2 0.2s ease-out",
+        "slide-in-from-bottom-2": "slide-in-from-bottom-2 0.2s ease-out",
+        "slide-in-from-left-2": "slide-in-from-left-2 0.2s ease-out",
+        "slide-in-from-right-2": "slide-in-from-right-2 0.2s ease-out",
+        progress: "progress 1.5s ease-in-out infinite",
       },
       keyframes: {
         fadeIn: {
@@ -53,6 +66,59 @@ module.exports = {
           "0%, 100%": { transform: "scale(1)", opacity: "1" },
           "50%": { transform: "scale(0.8)", opacity: "0.5" },
         },
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+        in: {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        out: {
+          from: { opacity: "1" },
+          to: { opacity: "0" },
+        },
+        "fade-in-0": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        "fade-out-0": {
+          from: { opacity: "1" },
+          to: { opacity: "0" },
+        },
+        "zoom-in-95": {
+          from: { opacity: "0", transform: "scale(0.95)" },
+          to: { opacity: "1", transform: "scale(1)" },
+        },
+        "zoom-out-95": {
+          from: { opacity: "1", transform: "scale(1)" },
+          to: { opacity: "0", transform: "scale(0.95)" },
+        },
+        "slide-in-from-top-2": {
+          from: { opacity: "0", transform: "translateY(-0.5rem)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "slide-in-from-bottom-2": {
+          from: { opacity: "0", transform: "translateY(0.5rem)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "slide-in-from-left-2": {
+          from: { opacity: "0", transform: "translateX(-0.5rem)" },
+          to: { opacity: "1", transform: "translateX(0)" },
+        },
+        "slide-in-from-right-2": {
+          from: { opacity: "0", transform: "translateX(0.5rem)" },
+          to: { opacity: "1", transform: "translateX(0)" },
+        },
+        progress: {
+          "0%": { width: "0%", marginLeft: "0%" },
+          "50%": { width: "100%", marginLeft: "0%" },
+          "100%": { width: "0%", marginLeft: "100%" },
+        },
       },
     },
   },
@@ -61,9 +127,9 @@ module.exports = {
     themes: [
       {
         c_and_p_theme: {
-          primary: "#ffb761",
+          primary: "#FF7F50",
           secondary: "#8B4513",
-          accent: "#ffd4a3",
+          accent: "#FFB299",
           neutral: "#3d4451",
           "base-100": "#ffffff",
           info: "#3abff8",

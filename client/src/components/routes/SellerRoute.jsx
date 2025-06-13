@@ -21,10 +21,14 @@ const SellerRoute = () => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // If authenticated but not a seller, redirect to home
+  // If authenticated but not a seller, redirect based on role
   if (!user.isSeller) {
     toast.error("Access denied. Seller account required.");
-    return <Navigate to="/" replace />;
+    if (user.isAdmin) {
+      return <Navigate to="/admin" replace />;
+    } else {
+      return <Navigate to="/" replace />;
+    }
   }
 
   return <Outlet />;

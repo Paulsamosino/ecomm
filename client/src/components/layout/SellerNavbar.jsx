@@ -1,220 +1,243 @@
-import React, { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import toast from "react-hot-toast";
 import {
-  Bell,
   Menu,
   X,
+  Package,
+  ShoppingBag,
+  Users,
+  MessageSquare,
   LogOut,
-  Settings,
-  Store,
-  HelpCircle,
-  Plus,
-  ExternalLink,
-  DollarSign,
-  AlertCircle,
+  ChevronDown,
+  User,
+  Bell,
+  PlusCircle,
+  Wheat, // Farm-themed icon
+  Sun, // Farm-themed icon
+  Egg, // Farm-themed icon
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import ProfileAvatar from "@/components/ui/ProfileAvatar";
 
 const SellerNavbar = () => {
   const { user, logout } = useAuth();
+  const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [notifications] = useState([
-    {
-      id: 1,
-      title: "New Order",
-      message: "You have received a new order #123",
-      time: "5 minutes ago",
-      isRead: false,
-      type: "order",
-    },
-    {
-      id: 2,
-      title: "Low Stock Alert",
-      message: "Product 'Layer Chicken' is running low on stock",
-      time: "10 minutes ago",
-      isRead: false,
-      type: "alert",
-    },
-  ]);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const getNotificationIcon = (type) => {
-    switch (type) {
-      case "order":
-        return (
-          <DollarSign className="h-8 w-8 text-green-500 p-1.5 bg-green-50 rounded-full" />
-        );
-      case "alert":
-        return (
-          <AlertCircle className="h-8 w-8 text-yellow-500 p-1.5 bg-yellow-50 rounded-full" />
-        );
-      default:
-        return (
-          <Bell className="h-8 w-8 text-gray-400 p-1.5 bg-gray-50 rounded-full" />
-        );
-    }
+  // Handle scroll effect
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 10);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Close mobile menu when route changes
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location]);
+
+  const handleLogout = () => {
+    logout();
+    toast.success("Logged out successfully");
   };
 
   return (
-    <nav className="bg-white border-b border-gray-200">
-      <div className="px-4 mx-auto">
-        <div className="flex h-16 items-center justify-between">
-          {/* Left section - Logo and Store Name */}
-          <div className="flex items-center gap-3">
-            <Link to="/seller" className="flex items-center gap-2">
-              <Store className="h-8 w-8 text-primary" />
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">Seller Hub</h1>
-                <p className="text-xs text-gray-500">Manage your business</p>
-              </div>
+    <nav
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        isScrolled
+          ? "bg-gradient-to-r from-orange-400 to-orange-600 shadow-md"
+          : "bg-gradient-to-r from-orange-400 to-orange-600"
+      }`}
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between h-16">
+          <div className="flex items-center">
+            {/* Logo */}
+            <Link to="/seller/dashboard" className="flex items-center">
+              <span className="text-2xl font-bold text-white mr-2">C&P</span>
+              <span className="hidden md:inline-block text-sm font-medium text-white">
+                Seller Center
+              </span>
+              <Egg className="h-5 w-5 ml-2 text-white" />
             </Link>
           </div>
 
-          {/* Right section - Actions */}
-          <div className="flex items-center gap-4">
-            {/* Quick Actions */}
-            <Link
-              to="/seller/products/new"
-              className="hidden md:flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-            >
-              <Plus className="h-5 w-5" />
-              <span>Add Product</span>
-            </Link>
+          <div className="flex items-center space-x-4">
+            {/* Add New Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="hidden md:flex items-center gap-1 bg-white text-orange-600 border-white hover:bg-white/90"
+                >
+                  <PlusCircle className="h-4 w-4" />
+                  <span>Add New</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link to="/seller/products/new" className="cursor-pointer">
+                    <Package className="mr-2 h-4 w-4" />
+                    <span>New Product</span>
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Notifications */}
+            <button className="p-2 text-white hover:text-white/80 relative">
+              <Bell className="h-5 w-5" />
+              <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-yellow-300"></span>
+            </button>
+
+            {/* User Menu */}
             <div className="relative">
               <button
-                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                className="p-2 rounded-full hover:bg-gray-100 relative"
+                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                className="flex items-center space-x-2 focus:outline-none"
               >
-                <Bell className="h-5 w-5 text-gray-600" />
-                {notifications.some((n) => !n.isRead) && (
-                  <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500" />
-                )}
+                <ProfileAvatar user={user} size="sm" />
+                <span className="hidden md:inline-block text-sm font-medium text-white">
+                  {user?.name || "Account"}
+                </span>
+                <ChevronDown className="h-4 w-4 text-white" />
               </button>
 
-              {/* Notifications dropdown */}
-              {isNotificationsOpen && (
-                <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-                  <div className="px-4 py-2 border-b border-gray-100">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold">Notifications</h3>
-                      <button className="text-xs text-primary hover:underline">
-                        Mark all as read
-                      </button>
+              {/* User Dropdown */}
+              {isUserMenuOpen && (
+                <div className="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+                  <div className="py-1">
+                    <div className="px-4 py-3 border-b">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {user?.name || "Seller"}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {user?.email || ""}
+                      </p>
                     </div>
-                  </div>
-                  <div className="max-h-96 overflow-y-auto">
-                    {notifications.map((notification) => (
-                      <div
-                        key={notification.id}
-                        className="px-4 py-3 hover:bg-gray-50 cursor-pointer flex items-start gap-3"
-                      >
-                        {getNotificationIcon(notification.type)}
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">
-                            {notification.title}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            {notification.message}
-                          </p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            {notification.time}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="px-4 py-2 border-t border-gray-100">
                     <Link
-                      to="/seller/notifications"
-                      className="text-sm text-primary hover:underline flex items-center justify-center gap-1"
+                      to="/seller-dashboard/profile"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
-                      View all notifications
-                      <ExternalLink className="h-4 w-4" />
+                      <User className="h-4 w-4 mr-2 text-orange-500" />
+                      My Account
                     </Link>
+                    <Link
+                      to="/seller-dashboard/orders"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      <Package className="h-4 w-4 mr-2 text-orange-500" />
+                      My Orders
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left flex items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sign out
+                    </button>
                   </div>
                 </div>
               )}
             </div>
+          </div>
 
-            {/* Help */}
-            <Link
-              to="/seller/help"
-              className="p-2 rounded-full hover:bg-gray-100"
-              title="Help Center"
+          {/* Mobile menu button */}
+          <div className="flex items-center md:hidden">
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="inline-flex items-center justify-center p-2 rounded-md text-white hover:text-white/80 focus:outline-none"
             >
-              <HelpCircle className="h-5 w-5 text-gray-600" />
-            </Link>
-
-            {/* Settings */}
-            <Link
-              to="/seller/settings"
-              className="p-2 rounded-full hover:bg-gray-100"
-              title="Settings"
-            >
-              <Settings className="h-5 w-5 text-gray-600" />
-            </Link>
-
-            {/* User Menu */}
-            <div className="relative ml-2">
-              <div className="flex items-center gap-3 px-3 py-1.5 rounded-full bg-gray-50 cursor-pointer hover:bg-gray-100">
-                <div>
-                  <p className="text-sm font-medium">
-                    {user?.sellerProfile?.businessName || "Your Store"}
-                  </p>
-                  <p className="text-xs text-gray-500">{user?.email}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Mobile menu button */}
-            <div className="flex md:hidden">
-              <button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="p-2 rounded-lg hover:bg-gray-100"
-              >
-                {isMobileMenuOpen ? (
-                  <X className="h-5 w-5 text-gray-600" />
-                ) : (
-                  <Menu className="h-5 w-5 text-gray-600" />
-                )}
-              </button>
-            </div>
+              {isMobileMenuOpen ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
+            </button>
           </div>
         </div>
-
-        {/* Mobile menu */}
-        {isMobileMenuOpen && (
-          <div className="md:hidden py-4 border-t border-gray-100">
-            <div className="flex flex-col space-y-2">
-              <Link
-                to="/seller/products/new"
-                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg"
-              >
-                <Plus className="h-5 w-5" />
-                <span>Add Product</span>
-              </Link>
-              <Link
-                to="/seller/help"
-                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg"
-              >
-                <HelpCircle className="h-5 w-5" />
-                <span>Help Center</span>
-              </Link>
-              <Link
-                to="/seller/settings"
-                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg"
-              >
-                <Settings className="h-5 w-5" />
-                <span>Settings</span>
-              </Link>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Mobile menu */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden bg-white border-t">
+          <div className="px-2 pt-2 pb-3 space-y-1">
+            <Link
+              to="/seller/dashboard"
+              className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
+                location.pathname === "/seller/dashboard"
+                  ? "bg-orange-100 text-orange-600"
+                  : "text-gray-600 hover:bg-orange-50"
+              }`}
+            >
+              <Sun className="h-5 w-5 mr-3" />
+              <span>Dashboard</span>
+            </Link>
+            <Link
+              to="/seller/products"
+              className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
+                location.pathname === "/seller/products"
+                  ? "bg-orange-100 text-orange-600"
+                  : "text-gray-600 hover:bg-orange-50"
+              }`}
+            >
+              <Package className="h-5 w-5 mr-3" />
+              <span>Products</span>
+            </Link>
+            <Link
+              to="/seller/orders"
+              className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
+                location.pathname === "/seller/orders"
+                  ? "bg-orange-100 text-orange-600"
+                  : "text-gray-600 hover:bg-orange-50"
+              }`}
+            >
+              <ShoppingBag className="h-5 w-5 mr-3" />
+              <span>Orders</span>
+            </Link>
+            <Link
+              to="/seller/customers"
+              className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
+                location.pathname === "/seller/customers"
+                  ? "bg-orange-100 text-orange-600"
+                  : "text-gray-600 hover:bg-orange-50"
+              }`}
+            >
+              <Users className="h-5 w-5 mr-3" />
+              <span>Customers</span>
+            </Link>
+            <Link
+              to="/seller/messages"
+              className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
+                location.pathname === "/seller/messages"
+                  ? "bg-orange-100 text-orange-600"
+                  : "text-gray-600 hover:bg-orange-50"
+              }`}
+            >
+              <MessageSquare className="h-5 w-5 mr-3" />
+              <span>Messages</span>
+            </Link>
+          </div>
+        </div>
+      )}
     </nav>
   );
 };
+
+// NavItem component is not needed anymore as we simplified the navbar
 
 export default SellerNavbar;

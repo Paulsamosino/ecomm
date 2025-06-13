@@ -4,24 +4,11 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
-const { auth } = require("../middleware/auth");
-const cloudinary = require("cloudinary").v2;
+const auth = require("../middleware/auth");
+const { uploadToCloudinary } = require("../config/cloudinary");
 
-// Configure multer for temporary storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = "uploads/temp";
-    // Create directory if it doesn't exist
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
-  },
-});
+// Configure multer for memory storage (for Cloudinary)
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage,
@@ -46,26 +33,26 @@ router.post("/image", auth, upload.single("image"), async (req, res) => {
     }
 
     // Upload to Cloudinary
-    const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: "poultrymart",
-      use_filename: true,
+    const result = await uploadToCloudinary(req.file.buffer, {
+      folder: "profile_pictures",
+      public_id: `user_${req.user._id}_${Date.now()}`,
+      transformation: [
+        { width: 400, height: 400, crop: "fill", gravity: "face" },
+        { quality: "auto" },
+        { format: "jpg" },
+      ],
     });
-
-    // Delete the temporary file
-    fs.unlinkSync(req.file.path);
 
     res.json({
       url: result.secure_url,
       public_id: result.public_id,
-      filename: path.basename(result.secure_url),
     });
   } catch (error) {
     console.error("Error uploading image:", error);
-    // Clean up temporary file if it exists
-    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
-    res.status(500).json({ message: "Failed to upload image" });
+    res.status(500).json({
+      message: "Failed to upload image",
+      error: error.message,
+    });
   }
 });
 

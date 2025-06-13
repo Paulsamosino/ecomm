@@ -9,9 +9,6 @@ require("dotenv").config();
 const app = express();
 const server = http.createServer(app);
 
-// Trust proxy - required for correct IP detection behind Render.com and Cloudflare
-app.set("trust proxy", true);
-
 // Basic middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -24,29 +21,20 @@ const allowedDomains = [
   "https://poultrymart-api.onrender.com",
   "https://chickenpoultry.shop",
   "https://www.chickenpoultry.shop",
-  "https://poultrymart.onrender.com",
-  "https://ecomm-git-main-ecomms-projects-807aa19d.vercel.app",
-  "https://chickenpoultry.netlify.app",
 ];
 
 // CORS configuration
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps, curl requests)
       if (!origin) return callback(null, true);
-
-      // Check if origin is in allowed list or matches our patterns
       if (
         allowedDomains.includes(origin) ||
-        origin.endsWith(".vercel.app") ||
         origin.endsWith(".render.com") ||
-        origin.endsWith(".chickenpoultry.shop") ||
-        origin.endsWith(".netlify.app")
+        origin.endsWith(".chickenpoultry.shop")
       ) {
-        callback(null, origin); // Note: Return the origin, not just true
+        callback(null, true);
       } else {
-        console.log(`Blocked request from disallowed origin: ${origin}`);
         callback(new Error("Not allowed by CORS"));
       }
     },
@@ -59,8 +47,6 @@ app.use(
       "Origin",
       "Accept",
     ],
-    preflightContinue: false,
-    optionsSuccessStatus: 204,
   })
 );
 
@@ -73,8 +59,7 @@ app.options("*", function (req, res) {
     allowedDomains.includes(origin) ||
     (origin && origin.endsWith(".vercel.app")) ||
     (origin && origin.endsWith(".chickenpoultry.shop")) ||
-    (origin && origin.endsWith(".render.com")) ||
-    (origin && origin.endsWith(".netlify.app"))
+    (origin && origin.endsWith(".render.com"))
   ) {
     res.header("Access-Control-Allow-Origin", origin);
     res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
@@ -85,8 +70,7 @@ app.options("*", function (req, res) {
     res.header("Access-Control-Allow-Credentials", "true");
     res.sendStatus(204);
   } else {
-    console.log(`Blocked general preflight from disallowed origin: ${origin}`);
-    res.status(403).json({ error: "CORS not allowed for this origin" }).end();
+    res.sendStatus(403);
   }
 });
 
@@ -94,13 +78,11 @@ app.options("*", function (req, res) {
 app.options("/api/auth/*", (req, res) => {
   const origin = req.headers.origin;
 
-  // Check if the origin is allowed
   if (
     allowedDomains.includes(origin) ||
     (origin && origin.endsWith(".vercel.app")) ||
     (origin && origin.endsWith(".chickenpoultry.shop")) ||
-    (origin && origin.endsWith(".render.com")) ||
-    (origin && origin.endsWith(".netlify.app"))
+    (origin && origin.endsWith(".render.com"))
   ) {
     res
       .status(204)
@@ -114,30 +96,34 @@ app.options("/api/auth/*", (req, res) => {
       })
       .end();
   } else {
-    console.log(`Blocked auth preflight from disallowed origin: ${origin}`);
-    res.status(403).json({ error: "CORS not allowed for this origin" }).end();
+    // Make sure we respond with 204 for OPTIONS requests, not 403
+    res.status(204).end();
   }
 });
 
-// Log all requests for debugging - with safe logging (no credentials)
+// Log all requests for debugging
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-  // Log origin safely
-  console.log("Request origin:", req.headers.origin || "none");
-
-  // Don't log headers or body content for security and performance
-  // Especially important for auth routes that contain credentials
-  if (req.url.includes("/auth/")) {
-    console.log("Auth route detected - body logging skipped for security");
-  } else if (req.method !== "GET") {
-    // For non-GET requests, log that a body exists but not its contents
-    console.log("Request has body:", !!req.body);
-  }
-
+  console.log("Request origin:", req.headers.origin);
+  console.log("Request headers:", req.headers);
+  console.log("Request body:", req.body);
   next();
 });
 
-// Check for required dependencies
+// Check for required dependencies and setup uploads directory
+const fs = require("fs");
+const uploadDir = path.join(__dirname, "uploads");
+const productUploadsDir = path.join(uploadDir, "products");
+
+// Ensure upload directories exist
+[uploadDir, productUploadsDir].forEach((dir) => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+    console.log(`Created directory: ${dir}`);
+  }
+});
+
+// Verify critical dependencies
 ["multer", "cloudinary", "mongoose"].forEach((dep) => {
   try {
     require.resolve(dep);
@@ -150,78 +136,78 @@ app.use((req, res, next) => {
   }
 });
 
-// Configure Cloudinary
-const cloudinary = require("cloudinary").v2;
-const cloudinaryConfig = {
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-};
+// Serve uploaded files
+app.use("/uploads", express.static(uploadDir));
 
-console.log("Initializing Cloudinary with config:", {
-  cloud_name: cloudinaryConfig.cloud_name,
-  api_key: cloudinaryConfig.api_key,
-  api_secret: "***",
-});
-
-cloudinary.config(cloudinaryConfig);
-
-// Only attempt to create upload directories in development
-if (process.env.NODE_ENV !== "production") {
-  const fs = require("fs");
-  const uploadDir = path.join(__dirname, "uploads");
-  const productUploadsDir = path.join(uploadDir, "products");
-
-  [uploadDir, productUploadsDir].forEach((dir) => {
-    try {
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-        console.log(`Created directory: ${dir}`);
-      }
-    } catch (err) {
-      console.warn(`Warning: Could not create directory ${dir}:`, err.message);
-      // Don't exit - this is not critical in production
-    }
-  });
-}
-
-// Serve uploaded files - only if the directory exists
-const uploadDir = path.join(__dirname, "uploads");
-if (process.env.NODE_ENV !== "production") {
-  app.use("/uploads", express.static(uploadDir));
-}
-
-// Connect to MongoDB with better error handling
-const connectDB = async () => {
+// Connect to MongoDB with improved configuration
+const connectWithRetry = async () => {
   try {
-    if (!process.env.MONGODB_URI) {
-      throw new Error("MONGODB_URI environment variable is not set");
-    }
+    console.log("Attempting to connect to MongoDB...");
+    console.log(
+      "Connection URI:",
+      process.env.MONGODB_URI?.replace(/\/\/([^:]+):([^@]+)@/, "//***:***@")
+    );
 
     await mongoose.connect(process.env.MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 45000,
-      family: 4,
+      serverSelectionTimeoutMS: 30000, // Increased timeout
+      socketTimeoutMS: 60000, // Increased socket timeout
+      connectTimeoutMS: 30000, // Connection timeout
+      maxPoolSize: 10, // Maximum number of connections
+      retryWrites: true,
+      w: "majority",
+      family: 4, // Force IPv4
     });
 
-    console.log("Connected to MongoDB");
+    console.log("✅ Connected to MongoDB successfully");
     console.log("Database:", mongoose.connection.db.databaseName);
     console.log("Host:", mongoose.connection.host);
+    console.log("Connection state:", mongoose.connection.readyState);
+
+    // Import and register all models after successful connection
+    require("./src/models/User");
+    require("./src/models/Product");
+    require("./src/models/Order");
+    require("./src/models/Chat");
+    require("./src/models/Message");
+    require("./src/models/BlogPost");
+    require("./src/models/Report");
+
+    console.log("All models registered successfully");
   } catch (err) {
-    console.error("MongoDB connection error:");
+    console.error("❌ MongoDB connection error details:");
     console.error("Error name:", err.name);
     console.error("Error message:", err.message);
-    if (err.code) console.error("Error code:", err.code);
-    // Exit only in production, allow retries in development
-    if (process.env.NODE_ENV === "production") {
-      process.exit(1);
-    }
+    console.error("Error code:", err.code);
+    console.error("Full error:", err);
+
+    // Retry connection after 5 seconds
+    console.log("Retrying connection in 5 seconds...");
+    setTimeout(connectWithRetry, 5000);
   }
 };
 
-connectDB();
+// Add connection event listeners
+mongoose.connection.on("connected", () => {
+  console.log("🟢 Mongoose connected to MongoDB");
+});
+
+mongoose.connection.on("error", (err) => {
+  console.error("🔴 Mongoose connection error:", err);
+});
+
+mongoose.connection.on("disconnected", () => {
+  console.log("🟡 Mongoose disconnected from MongoDB");
+});
+
+// Handle application termination
+process.on("SIGINT", async () => {
+  await mongoose.connection.close();
+  console.log("MongoDB connection closed through app termination");
+  process.exit(0);
+});
+
+// Start the connection
+connectWithRetry();
 
 // Initialize Socket.IO
 setupSocketServer(server);
@@ -232,8 +218,14 @@ const productRoutes = require("./src/routes/products");
 const chatRoutes = require("./src/routes/chat");
 const sellerRoutes = require("./src/routes/seller");
 const blogRoutes = require("./src/routes/blog");
+const uploadRoutes = require("./src/routes/upload");
 const adminRoutes = require("./src/routes/admin");
-const breedingRoutes = require("./src/routes/breeding");
+const userRoutes = require("./src/routes/user");
+
+// Serve static files from the React app
+if (process.env.NODE_ENV === "production") {
+  app.use(express.static(path.join(__dirname, "../client/dist")));
+}
 
 // Register routes with proper error handling
 app.use("/api/auth", authRoutes);
@@ -242,17 +234,98 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/seller", sellerRoutes);
 app.use("/api/blog", blogRoutes);
 app.use("/api/orders", require("./src/routes/orders"));
+app.use("/api/upload", uploadRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api/reports", require("./src/routes/reports"));
-app.use("/api/upload", require("./src/routes/upload"));
-app.use("/api/breeding", breedingRoutes);
+app.use("/api/user", userRoutes);
 
-// Basic route for API health check
+// Basic route for testing
 app.get("/", (req, res) => {
-  res.json({
-    message: "PoultryMart API is running",
-    environment: process.env.NODE_ENV,
-    time: new Date().toISOString(),
+  res.json({ message: "Welcome to PoultryMart API" });
+});
+
+// Health check endpoint for Render.com and monitoring
+app.get("/health", async (req, res) => {
+  const healthStatus = {
+    status: "ok",
+    timestamp: new Date(),
+    services: {
+      server: "up",
+      mongodb: "unknown",
+      cloudinary: "unknown",
+    },
+    uptime: process.uptime(),
+  };
+
+  // Check MongoDB connection
+  try {
+    const mongoStatus = mongoose.connection.readyState;
+    switch (mongoStatus) {
+      case 0:
+        healthStatus.services.mongodb = "disconnected";
+        break;
+      case 1:
+        healthStatus.services.mongodb = "connected";
+        break;
+      case 2:
+        healthStatus.services.mongodb = "connecting";
+        break;
+      case 3:
+        healthStatus.services.mongodb = "disconnecting";
+        break;
+      default:
+        healthStatus.services.mongodb = "unknown";
+    }
+  } catch (error) {
+    healthStatus.services.mongodb = "error";
+    healthStatus.mongoError = error.message;
+  }
+
+  // Check Cloudinary connection
+  try {
+    const { isCloudinaryConfigured } = require("./src/config/cloudinary");
+    if (isCloudinaryConfigured) {
+      healthStatus.services.cloudinary = "configured";
+    } else {
+      healthStatus.services.cloudinary = "not_configured";
+    }
+  } catch (error) {
+    healthStatus.services.cloudinary = "error";
+    healthStatus.cloudinaryError = error.message;
+  }
+
+  // Set overall status
+  if (
+    healthStatus.services.mongodb !== "connected" ||
+    healthStatus.services.cloudinary !== "configured"
+  ) {
+    healthStatus.status = "degraded";
+  }
+
+  // Return status code based on health
+  const statusCode = healthStatus.status === "ok" ? 200 : 503;
+  res.status(statusCode).json(healthStatus);
+});
+
+// Handle React routing, return all requests to React app
+if (process.env.NODE_ENV === "production") {
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+  });
+}
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error("Error stack:", err.stack);
+  console.error("Error details:", {
+    message: err.message,
+    name: err.name,
+    code: err.code,
+  });
+
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || "Something went wrong!",
+    error: process.env.NODE_ENV === "development" ? err.stack : undefined,
   });
 });
 
@@ -265,14 +338,9 @@ app.use((req, res) => {
   });
 });
 
-// Use PORT from environment variable with strict checking
-const PORT = process.env.PORT;
-if (!PORT && process.env.NODE_ENV === "production") {
-  console.error("PORT environment variable is not set");
-  process.exit(1);
-}
-
-server.listen(PORT || 3001, "0.0.0.0", () => {
-  console.log(`Server is running on port ${PORT || 3001}`);
+// Use PORT from environment variable, defaulting to 3001 only in development
+const PORT = process.env.NODE_ENV === "production" ? process.env.PORT : 3001;
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server is running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV}`);
 });

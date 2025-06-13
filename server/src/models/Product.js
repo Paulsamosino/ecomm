@@ -78,33 +78,8 @@ const productSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["active", "inactive", "out_of_stock", "breeding"],
+      enum: ["active", "inactive", "out_of_stock"],
       default: "active",
-    },
-    gender: {
-      type: String,
-      enum: ["male", "female", "unknown"],
-      default: "unknown",
-    },
-    breedingStatus: {
-      isBreeding: {
-        type: Boolean,
-        default: false,
-      },
-      currentPair: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "BreedingPair",
-      },
-      breedingHistory: [
-        {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "BreedingPair",
-        },
-      ],
-      availableForBreeding: {
-        type: Boolean,
-        default: false,
-      },
     },
     rating: {
       type: Number,

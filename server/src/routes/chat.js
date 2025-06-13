@@ -1,11 +1,11 @@
 const express = require("express");
 const router = express.Router();
-const { auth } = require("../middleware/auth");
+const { protect } = require("../middleware/authMiddleware");
 const { validateChatAccess } = require("../middleware/chatMiddleware");
 const chatController = require("../controllers/chatController");
 
 // Apply authentication middleware to all routes
-router.use(auth);
+router.use(protect);
 
 // Debug middleware to log request details
 router.use((req, res, next) => {
@@ -27,6 +27,7 @@ router.use((req, res, next) => {
 router.get("/", chatController.getChats);
 router.post("/", chatController.createChat);
 router.post("/direct", chatController.createDirectChat);
+router.get("/search", chatController.searchMessages);
 
 // Routes that require chat access validation
 router.get("/:chatId", validateChatAccess, chatController.getChat);
@@ -36,10 +37,46 @@ router.post(
   validateChatAccess,
   chatController.sendMessage
 );
+router.post(
+  "/:chatId/messages/file",
+  validateChatAccess,
+  chatController.sendFileMessage
+);
+router.patch(
+  "/:chatId/messages/:messageId",
+  validateChatAccess,
+  chatController.editMessage
+);
+router.delete(
+  "/:chatId/messages/:messageId",
+  validateChatAccess,
+  chatController.deleteMessage
+);
+router.post(
+  "/:chatId/messages/:messageId/react",
+  validateChatAccess,
+  chatController.addReaction
+);
+router.delete(
+  "/:chatId/messages/:messageId/react",
+  validateChatAccess,
+  chatController.removeReaction
+);
 router.patch(
   "/:chatId/messages/:messageId/status",
   validateChatAccess,
   chatController.updateMessageStatus
+);
+router.patch(
+  "/:chatId/archive",
+  validateChatAccess,
+  chatController.archiveChat
+);
+router.patch("/:chatId/block", validateChatAccess, chatController.blockChat);
+router.get(
+  "/:chatId/search",
+  validateChatAccess,
+  chatController.searchChatMessages
 );
 
 module.exports = router;

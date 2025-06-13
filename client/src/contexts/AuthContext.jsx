@@ -1,17 +1,29 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { apiLogin, apiRegister, apiGetCurrentUser } from "../api/auth";
-import { useNavigate, useLocation } from "react-router-dom";
+import {
+  useNavigate,
+  useLocation,
+  UNSAFE_NavigationContext,
+} from "react-router-dom";
 import toast from "react-hot-toast";
-import axiosInstance, { AUTH_ERROR_EVENT } from "@/api/axios";
+import { axiosInstance, AUTH_ERROR_EVENT } from "./axios";
+import useCartStore from "../stores/useCartStore";
+import safeStorage from "../utils/safeStorage";
 
 const AuthContext = createContext();
 
-export const AuthProvider = ({ children }) => {
+const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
+
+  const updateUser = (updatedUserData) => {
+    if (!updatedUserData) return;
+    const normalizedUser = normalizeUserData(updatedUserData);
+    setUser(normalizedUser);
+  };
 
   // Helper function to normalize user data
   const normalizeUserData = (userData) => {
@@ -48,7 +60,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await apiLogin(credentials);
       if (response.token) {
-        localStorage.setItem("token", response.token);
+        safeStorage.setItem("token", response.token);
 
         // Normalize user data before validation
         const normalizedUser = normalizeUserData(response.user);
@@ -56,7 +68,7 @@ export const AuthProvider = ({ children }) => {
         // Validate normalized user data
         if (!normalizedUser?._id) {
           console.error("Invalid user data received:", response.user);
-          throw new Error("Invalid user data structure");
+          throw new Error("Invalid user data received");
         }
 
         setUser(normalizedUser);
@@ -71,13 +83,11 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (err) {
       console.error("Login error:", err);
-      // Use the specific error message from our enhanced API call
-      const errorMessage =
-        err.message || "Failed to login. Please try again later.";
+      const errorMessage = err.response?.data?.message || "Failed to login";
       setError(errorMessage);
       toast.error(errorMessage);
       setUser(null);
-      localStorage.removeItem("token");
+      safeStorage.removeItem("token");
     } finally {
       setIsLoading(false);
     }
@@ -89,7 +99,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await apiRegister(userData);
       if (response.token) {
-        localStorage.setItem("token", response.token);
+        safeStorage.setItem("token", response.token);
         const normalizedUser = normalizeUserData(response.user);
         setUser(normalizedUser);
         toast.success("Registration successful!");
@@ -103,7 +113,7 @@ export const AuthProvider = ({ children }) => {
       setError(errorMessage);
       toast.error(errorMessage);
       setUser(null);
-      localStorage.removeItem("token");
+      safeStorage.removeItem("token");
     } finally {
       setIsLoading(false);
     }
@@ -112,6 +122,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem("token");
     setUser(null);
+    useCartStore.getState().clearCart();
     toast.success("Logged out successfully.");
     navigate("/login");
   };
@@ -120,16 +131,17 @@ export const AuthProvider = ({ children }) => {
   const getDefaultRedirect = (user) => {
     if (user.isAdmin) return "/admin";
     if (user.isSeller) return "/seller/dashboard";
-    return "/";
+    return "/buyer-dashboard"; // Default redirect for buyers - more specific than root
   };
 
-  // Verify authentication only on mount and token changes
+  // Verify authentication on mount and route changes
   useEffect(() => {
     const verifyAuth = async () => {
       const token = localStorage.getItem("token");
       if (!token) {
         setUser(null);
         setIsLoading(false);
+        useCartStore.getState().clearCart();
         return;
       }
 
@@ -137,6 +149,13 @@ export const AuthProvider = ({ children }) => {
         console.log("Verifying auth with token...");
         const userData = await apiGetCurrentUser();
         const normalizedUser = normalizeUserData(userData);
+
+        console.log("User data structure:", {
+          id: normalizedUser?._id,
+          email: normalizedUser?.email,
+          isSeller: normalizedUser?.isSeller,
+          isAdmin: normalizedUser?.isAdmin,
+        });
 
         // Validate normalized user data
         if (!normalizedUser?._id) {
@@ -149,6 +168,7 @@ export const AuthProvider = ({ children }) => {
         console.error("Token verification error:", err);
         setUser(null);
         localStorage.removeItem("token");
+        useCartStore.getState().clearCart();
 
         if (
           err.response?.status === 401 ||
@@ -165,7 +185,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     verifyAuth();
-  }, []); // Empty dependency array - only run on mount
+  }, [navigate, location]);
 
   // Set up axios interceptor for token expiration
   useEffect(() => {
@@ -202,10 +222,10 @@ export const AuthProvider = ({ children }) => {
         logout,
         isLoading,
         error,
+        updateUser,
         isAuthenticated: !!user?._id,
         isSeller: user?.isSeller || false,
         isAdmin: user?.isAdmin || false,
-        isBuyer: user && !user.isAdmin && !user.isSeller,
       }}
     >
       {!isLoading && children}
@@ -220,3 +240,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
+export { AuthProvider };

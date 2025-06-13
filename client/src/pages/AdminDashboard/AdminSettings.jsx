@@ -148,14 +148,15 @@ const AdminSettings = () => {
 
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
-                Minimum Withdrawal Amount ($)
+                {" "}
+                Minimum Withdrawal Amount (₱)
               </label>
               <Input
                 name="minWithdrawalAmount"
                 type="number"
                 value={settings.minWithdrawalAmount}
                 onChange={handleChange}
-                placeholder="50"
+                placeholder="1000"
               />
             </div>
           </div>

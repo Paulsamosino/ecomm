@@ -78,8 +78,36 @@ const upload = multer({
   },
 });
 
+// Function to upload buffer to Cloudinary
+const uploadToCloudinary = (buffer, options = {}) => {
+  return new Promise((resolve, reject) => {
+    if (!isConfigValid) {
+      reject(new Error("Cloudinary not configured"));
+      return;
+    }
+
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        resource_type: "image",
+        ...options,
+      },
+      (error, result) => {
+        if (error) {
+          console.error("Cloudinary upload error:", error);
+          reject(error);
+        } else {
+          resolve(result);
+        }
+      }
+    );
+
+    uploadStream.end(buffer);
+  });
+};
+
 module.exports = {
   cloudinary,
   upload,
+  uploadToCloudinary,
   isCloudinaryConfigured: isConfigValid,
 };

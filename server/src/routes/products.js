@@ -7,7 +7,7 @@ const { upload } = require("../config/cloudinary");
 const mongoose = require("mongoose");
 
 // Get seller's products
-router.get("/seller", auth.auth, async (req, res) => {
+router.get("/seller", auth, async (req, res) => {
   try {
     if (!req.user || !req.user.id) {
       return res
@@ -37,7 +37,7 @@ router.get("/seller", auth.auth, async (req, res) => {
 });
 
 // Create a new product
-router.post("/", auth.auth, upload.array("images", 5), async (req, res) => {
+router.post("/", auth, upload.array("images", 5), async (req, res) => {
   try {
     console.log("Request body:", req.body);
     console.log("Request files:", req.files);
@@ -121,6 +121,8 @@ router.post("/", auth.auth, upload.array("images", 5), async (req, res) => {
 // Get all products
 router.get("/", async (req, res) => {
   try {
+    console.log("Received request with query:", req.query);
+
     const {
       category,
       search,
@@ -136,17 +138,27 @@ router.get("/", async (req, res) => {
 
     const query = {};
 
+    // Validate page and limit
+    const pageInt = Math.max(parseInt(page) || 1, 1);
+    const limitInt = Math.min(parseInt(limit) || 9, 50);
+    const skip = (pageInt - 1) * limitInt;
+
     // Build query based on filters
     if (category && category !== "all") query.category = category;
-    if (seller) query.seller = seller;
+    if (seller) {
+      // Ensure seller is a valid ObjectId
+      if (mongoose.Types.ObjectId.isValid(seller)) {
+        query.seller = new mongoose.Types.ObjectId(seller);
+      }
+    }
     if (location && location !== "All Locations") query.location = location;
     if (inStock === "true") query.quantity = { $gt: 0 };
 
     // Price filter
     if (minPrice || maxPrice) {
       query.price = {};
-      if (minPrice) query.price.$gte = parseFloat(minPrice);
-      if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+      if (minPrice) query.price.$gte = parseFloat(minPrice) || 0;
+      if (maxPrice) query.price.$lte = parseFloat(maxPrice) || 1000;
     }
 
     // Search filter
@@ -158,32 +170,42 @@ router.get("/", async (req, res) => {
       ];
     }
 
-    // Count total products matching the query
-    const totalProducts = await Product.countDocuments(query);
-
-    // Calculate pagination values
-    const pageInt = parseInt(page);
-    const limitInt = parseInt(limit);
-    const totalPages = Math.ceil(totalProducts / limitInt);
-    const skip = (pageInt - 1) * limitInt;
-
-    // Get sortBy option
+    // Get sort option
     let sortOption = { createdAt: -1 }; // Default sort by newest
     if (sort) {
       switch (sort) {
         case "price":
-          sortOption = { price: 1 }; // Low to high
+          sortOption = { price: 1 };
           break;
         case "-price":
-          sortOption = { price: -1 }; // High to low
+          sortOption = { price: -1 };
           break;
         case "-rating":
-          sortOption = { rating: -1 }; // By rating
+          // Ensure products without ratings appear last
+          sortOption = {
+            averageRating: -1,
+            createdAt: -1, // Secondary sort by newest
+          };
+          // Only include products with valid ratings
+          query.averageRating = { $gte: 0 };
+          break;
+        case "-createdAt":
+          sortOption = { createdAt: -1 };
           break;
         default:
-          sortOption = { createdAt: -1 }; // Default newest first
+          sortOption = { createdAt: -1 };
       }
     }
+
+    console.log("Built query:", JSON.stringify(query, null, 2));
+    console.log("Sort option:", sortOption);
+
+    // Count total products matching the query
+    const totalProducts = await Product.countDocuments(query);
+    const totalPages = Math.ceil(totalProducts / limitInt);
+
+    console.log(`Found ${totalProducts} products matching query`);
+    console.log(`Pagination: page=${pageInt}, limit=${limitInt}, skip=${skip}`);
 
     // Execute query with pagination and sorting
     const products = await Product.find(query)
@@ -191,20 +213,20 @@ router.get("/", async (req, res) => {
         "seller",
         "name email sellerProfile.businessName sellerProfile.rating"
       )
-      .populate({
-        path: "breedingStatus.currentPair",
-        select: "status events startDate",
-        populate: {
-          path: "sire dam",
-          select: "name breed gender",
-        },
-      })
       .sort(sortOption)
       .skip(skip)
-      .limit(limitInt);
+      .limit(limitInt)
+      .lean() // Use lean() for better performance
+      .catch((err) => {
+        console.error("Error in Product.find():", err);
+        throw new Error(`Database query failed: ${err.message}`);
+      });
+
+    console.log(`Returning ${products.length} products`);
 
     // Return structured response
     res.json({
+      success: true,
       products,
       totalProducts,
       totalPages,
@@ -212,7 +234,28 @@ router.get("/", async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching products:", error);
-    res.status(500).json({ message: "Error fetching products" });
+    console.error("Error stack:", error.stack);
+
+    // More detailed error response
+    res.status(500).json({
+      success: false,
+      message: "Error fetching products",
+      error: {
+        message: error.message,
+        ...(process.env.NODE_ENV === "development" && {
+          stack: error.stack,
+          code: error.code,
+          name: error.name,
+        }),
+      },
+      timestamp: new Date().toISOString(),
+      request: {
+        url: req.originalUrl,
+        method: req.method,
+        query: req.query,
+        params: req.params,
+      },
+    });
   }
 });
 
@@ -236,7 +279,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // Update a product
-router.put("/:id", auth.auth, upload.array("images", 5), async (req, res) => {
+router.put("/:id", auth, upload.array("images", 5), async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
 
@@ -271,7 +314,7 @@ router.put("/:id", auth.auth, upload.array("images", 5), async (req, res) => {
 });
 
 // Delete a product
-router.delete("/:id", auth.auth, async (req, res) => {
+router.delete("/:id", auth, async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
 

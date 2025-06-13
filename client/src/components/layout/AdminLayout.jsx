@@ -15,6 +15,11 @@ import {
   AlertCircle,
   LogOut,
   Flag,
+  Egg,
+  Wheat,
+  Sun,
+  Tractor,
+  Home,
 } from "lucide-react";
 
 const AdminLayout = () => {
@@ -92,19 +97,32 @@ const AdminLayout = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white">
+      {/* Farm-themed background elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div
+          className="absolute inset-0 bg-repeat opacity-5"
+          style={{
+            backgroundImage:
+              "url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48ZyBmaWxsPSIjZmM5ODMwIiBmaWxsLW9wYWNpdHk9IjAuNCIgZmlsbC1ydWxlPSJldmVub2RkIj48cGF0aCBkPSJNMCAwaDIwdjIwSDB6Ii8+PHBhdGggZD0iTTIwIDBoMjB2MjBIMjB6Ii8+PHBhdGggZD0iTTAgMjBoMjB2MjBIMHoiLz48cGF0aCBkPSJNMjAgMjBoMjB2MjBIMjB6Ii8+PC9nPjwvc3ZnPg==')",
+          }}
+        />
+        <div className="absolute top-20 -right-20 w-64 h-64 bg-orange-400/10 rounded-full blur-[80px] animate-pulse-slow" />
+        <div className="absolute bottom-40 -left-20 w-80 h-80 bg-yellow-400/10 rounded-full blur-[100px] animate-pulse-slow" />
+      </div>
+
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-40 w-64 h-screen transition-transform ${
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } bg-white border-r border-gray-200`}
+        className={`fixed top-0 left-0 z-40 w-64 h-screen transition-transform duration-300 ease-in-out ${
+          !isSidebarOpen ? "-translate-x-full" : "translate-x-0"
+        } md:translate-x-0 bg-white border-r border-orange-100 shadow-lg md:shadow-none`}
       >
         <div className="h-full px-3 py-4 overflow-y-auto">
           {/* Admin Header */}
           <div className="mb-6 p-2">
             <div className="flex items-center gap-2 px-2">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Shield className="h-6 w-6 text-primary" />
+              <div className="p-2 rounded-lg bg-gradient-to-br from-orange-400 to-orange-600 text-white">
+                <Shield className="h-6 w-6" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
@@ -121,7 +139,7 @@ const AdminLayout = () => {
           <nav className="space-y-4">
             {navigation.map((group) => (
               <div key={group.group}>
-                <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                <p className="px-3 text-xs font-semibold text-orange-800/70 uppercase tracking-wider">
                   {group.label}
                 </p>
                 <div className="mt-2 space-y-1">
@@ -134,15 +152,19 @@ const AdminLayout = () => {
                         to={item.path}
                         className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${
                           isActive
-                            ? "bg-primary/10 text-primary font-medium"
-                            : "text-gray-700 hover:bg-gray-100"
+                            ? "bg-gradient-to-r from-orange-50 to-orange-100 text-orange-700 font-medium border-l-2 border-orange-500"
+                            : "text-gray-700 hover:bg-orange-50 hover:text-orange-600"
                         }`}
                         onClick={() => setActiveGroup(group.group)}
                       >
-                        <Icon className="h-5 w-5" />
+                        <Icon
+                          className={`h-5 w-5 ${
+                            isActive ? "text-orange-500" : "text-gray-400"
+                          }`}
+                        />
                         {item.name}
                         {isActive && (
-                          <ChevronRight className="h-4 w-4 ml-auto" />
+                          <ChevronRight className="h-4 w-4 ml-auto text-orange-500" />
                         )}
                       </Link>
                     );
@@ -153,7 +175,7 @@ const AdminLayout = () => {
           </nav>
 
           {/* Logout Button */}
-          <div className="mt-auto pt-4 border-t border-gray-200">
+          <div className="mt-auto pt-4 border-t border-orange-100">
             <button
               onClick={logout}
               className="flex items-center gap-3 px-3 py-2 w-full text-sm text-red-600 hover:bg-red-50 rounded-lg"
@@ -162,23 +184,35 @@ const AdminLayout = () => {
               Sign Out
             </button>
           </div>
+
+          {/* Footer with Farm Theme */}
+          <div className="mt-4 text-center pt-4">
+            <div className="flex items-center justify-center gap-2 text-orange-400">
+              <Egg className="h-4 w-4" />
+              <Wheat className="h-4 w-4" />
+              <Tractor className="h-4 w-4" />
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              C&P Poultry Admin © {new Date().getFullYear()}
+            </p>
+          </div>
         </div>
       </aside>
 
       {/* Main Content */}
       <div
-        className={`pt-4 ${
+        className={`pt-4 transition-all duration-300 ease-in-out ${
           isSidebarOpen ? "md:pl-64" : ""
-        } transition-all duration-200`}
+        } w-full relative`}
       >
-        <div className="p-6">
+        <div className="p-4 sm:p-6 lg:p-8">
           <Outlet />
         </div>
       </div>
 
       {/* Mobile Sidebar Toggle */}
       <button
-        className="fixed bottom-4 right-4 md:hidden z-30 p-3 bg-primary text-white rounded-full shadow-lg"
+        className="fixed bottom-4 right-4 md:hidden z-50 p-3 bg-gradient-to-r from-orange-400 to-orange-600 text-white rounded-full shadow-lg hover:from-orange-500 hover:to-orange-700 transition-all"
         onClick={() => setSidebarOpen(!isSidebarOpen)}
       >
         {isSidebarOpen ? (

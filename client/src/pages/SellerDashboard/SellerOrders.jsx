@@ -130,14 +130,14 @@ const SellerOrders = () => {
         )
       );
 
-      toast.success(`Order status updated to ${newStatus}`);
-
-      // Status-specific actions
+      // Show different toast messages based on status
       if (newStatus === "completed") {
-        toast("Don't forget to follow up on customer satisfaction!", {
+        toast.success(`Order status updated to ${newStatus}`, {
           description: "A review request has been sent to the customer.",
           duration: 5000,
         });
+      } else {
+        toast.success(`Order status updated to ${newStatus}`);
       }
     } catch (error) {
       console.error("Error updating order status:", error);
