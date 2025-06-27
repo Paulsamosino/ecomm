@@ -58,11 +58,6 @@ const navItems = [
     label: "Analytics",
     icon: <BarChart2 className="h-4 w-4" />,
   },
-  {
-    path: "/seller-dashboard/breeding-management",
-    label: "Breeding",
-    icon: <Egg className="h-4 w-4" />,
-  },
 ];
 
 const SellerDashboardPage = () => {

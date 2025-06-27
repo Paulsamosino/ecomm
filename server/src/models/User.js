@@ -1,92 +1,121 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const Schema = mongoose.Schema;
 
-const userSchema = new Schema(
+const addressSchema = new mongoose.Schema({
+  street: {
+    type: String,
+    required: true,
+  },
+  city: {
+    type: String,
+    required: true,
+  },
+  state: {
+    type: String,
+    required: true,
+  },
+  zipCode: {
+    type: String,
+    required: true,
+  },
+  country: {
+    type: String,
+    required: true,
+    default: "Philippines",
+  },
+});
+
+const userSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, "Please add a name"],
-      trim: true,
+      required: true,
     },
     email: {
       type: String,
-      required: [true, "Please add an email"],
+      required: true,
       unique: true,
-      match: [
-        /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
-        "Please add a valid email",
-      ],
     },
     password: {
       type: String,
-      required: [true, "Please add a password"],
-      minlength: [6, "Password must be at least 6 characters"],
-      select: false,
+      required: true,
+    },
+    phone: {
+      type: String,
+      required: true,
     },
     role: {
       type: String,
-      enum: ["user", "seller", "admin"],
-      default: "user",
+      enum: ["buyer", "seller", "admin"],
+      default: "buyer",
     },
-    isAdmin: {
-      type: Boolean,
-      default: false,
-    },
-    isSeller: {
-      type: Boolean,
-      default: false,
-    },
-    phone: String,
-    profilePicture: {
-      type: String,
-      default: null,
-    },
-    address: {
-      street: String,
-      city: String,
-      state: String,
-      zipCode: String,
-      country: String,
-    },
-    addresses: [
-      {
-        street: {
-          type: String,
-          required: true,
+    address: addressSchema,
+    sellerProfile: {
+      businessName: String,
+      description: String,
+      logo: String,
+      totalSales: {
+        type: Number,
+        default: 0,
+      },
+      completedOrders: {
+        type: Number,
+        default: 0,
+      },
+      ratings: {
+        average: {
+          type: Number,
+          default: 0,
         },
-        city: {
-          type: String,
-          required: true,
-        },
-        state: {
-          type: String,
-          required: true,
-        },
-        zipCode: {
-          type: String,
-          required: true,
-        },
-        country: {
-          type: String,
-          required: true,
-        },
-        phone: {
-          type: String,
-          required: true,
-        },
-        isDefault: {
-          type: Boolean,
-          default: false,
-        },
-        createdAt: {
-          type: Date,
-          default: Date.now,
+        count: {
+          type: Number,
+          default: 0,
         },
       },
+      reviews: [
+        {
+          user: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+          },
+          rating: Number,
+          comment: String,
+          createdAt: Date,
+        },
+      ],
+      statistics: {
+        totalOrders: {
+          type: Number,
+          default: 0,
+        },
+        totalRevenue: {
+          type: Number,
+          default: 0,
+        },
+        lastOrderDate: Date,
+        averageOrderValue: {
+          type: Number,
+          default: 0,
+        },
+        conversionRate: {
+          type: Number,
+          default: 0,
+        },
+      },
+    },
+    orderHistory: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Order",
+      },
     ],
-    preferences: {
+    wishlist: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Product",
+      },
+    ],
+    notifications: {
       emailNotifications: {
         type: Boolean,
         default: true,
@@ -100,40 +129,6 @@ const userSchema = new Schema(
         default: true,
       },
     },
-    isOnline: { type: Boolean, default: false },
-    lastSeen: { type: Date },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now },
-    sellerProfile: {
-      businessName: String,
-      description: String,
-      address: {
-        street: String,
-        city: String,
-        state: String,
-        zipCode: String,
-        country: String,
-      },
-      phone: String,
-      rating: {
-        type: Number,
-        default: 0,
-      },
-      reviews: [
-        {
-          user: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-          },
-          rating: Number,
-          comment: String,
-          createdAt: {
-            type: Date,
-            default: Date.now,
-          },
-        },
-      ],
-    },
     resetPasswordToken: String,
     resetPasswordExpire: Date,
   },
@@ -142,23 +137,7 @@ const userSchema = new Schema(
   }
 );
 
-// Set isAdmin based on role
-userSchema.pre("save", function (next) {
-  if (this.isModified("role")) {
-    this.isAdmin = this.role === "admin";
-  }
-  next();
-});
-
-// Set isSeller based on role
-userSchema.pre("save", function (next) {
-  if (this.isModified("role")) {
-    this.isSeller = this.role === "seller";
-  }
-  next();
-});
-
-// Encrypt password using bcrypt
+// Hash password before saving
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) {
     next();
@@ -166,39 +145,55 @@ userSchema.pre("save", async function (next) {
 
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
-
-  this.updatedAt = new Date();
-  next();
 });
 
-// Sign JWT and return
-userSchema.methods.getSignedJwtToken = function () {
-  return jwt.sign({ id: this._id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE,
-  });
-};
-
-// Match user entered password to hashed password in database
+// Match passwords
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Calculate average rating
-userSchema.methods.getAverageRating = function () {
-  if (this.sellerProfile.reviews.length === 0) return 0;
+// Get rating
+userSchema.methods.getRating = function () {
+  if (!this.sellerProfile?.reviews?.length) {
+    return 0;
+  }
 
-  const sum = this.sellerProfile.reviews.reduce(
-    (acc, review) => acc + review.rating,
+  const totalRating = this.sellerProfile.reviews.reduce(
+    (sum, review) => sum + review.rating,
     0
   );
-  return sum / this.sellerProfile.reviews.length;
+  return totalRating / this.sellerProfile.reviews.length;
 };
 
-// Add indexes
-userSchema.index({ email: 1 });
-userSchema.index({ isSeller: 1 });
-userSchema.index({ isAdmin: 1 });
-userSchema.index({ role: 1 });
+// Update seller statistics
+userSchema.methods.updateStatistics = async function () {
+  if (this.role !== "seller") return;
+
+  const Order = mongoose.model("Order");
+
+  const completedOrders = await Order.find({
+    seller: this._id,
+    status: "completed",
+  });
+
+  this.sellerProfile.statistics = {
+    totalOrders: completedOrders.length,
+    totalRevenue: completedOrders.reduce(
+      (sum, order) => sum + order.totalAmount,
+      0
+    ),
+    lastOrderDate: completedOrders.length
+      ? completedOrders[completedOrders.length - 1].createdAt
+      : null,
+    averageOrderValue:
+      completedOrders.length > 0
+        ? completedOrders.reduce((sum, order) => sum + order.totalAmount, 0) /
+          completedOrders.length
+        : 0,
+  };
+
+  await this.save();
+};
 
 const User = mongoose.model("User", userSchema);
 

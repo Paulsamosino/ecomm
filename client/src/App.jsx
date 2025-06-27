@@ -43,7 +43,6 @@ import SellerCartManagement from "@/pages/SellerDashboard/SellerCartManagement";
 import SellerPayments from "@/pages/SellerDashboard/SellerPayments";
 import BuyerDashboardPage from "@/pages/BuyerDashboardPage";
 import ChatPage from "@/pages/ChatPage";
-import BreedingManagementPage from "@/pages/BreedingManagementPage";
 
 // Import Admin Dashboard Components
 import AdminDashboardPage from "@/pages/AdminDashboard/AdminDashboardPage";
@@ -127,7 +126,6 @@ const AppContent = () => {
             <Route index element={<BuyerMyPurchase />} />
             <Route path="purchases" element={<BuyerMyPurchase />} />
             <Route path="profile" element={<BuyerManageProfile />} />
-            <Route path="breeding" element={<BreedingManagementPage />} />
             <Route path="chat" element={<EnhancedChatPage />} />
             <Route path="chat/:chatId" element={<EnhancedChatPage />} />
           </Route>
@@ -152,10 +150,6 @@ const AppContent = () => {
             <Route path="account" element={<SellerSettings />} />
             <Route path="settings" element={<SellerSettings />} />
             <Route path="help" element={<SellerHelp />} />
-            <Route
-              path="breeding-management"
-              element={<BreedingManagementPage />}
-            />
           </Route>
         </Route>
 

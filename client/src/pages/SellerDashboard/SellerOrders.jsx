@@ -106,54 +106,6 @@ const SellerOrders = () => {
     }
   };
 
-  const updateOrderStatus = async (orderId, newStatus) => {
-    try {
-      let trackingNumber;
-      if (newStatus === "shipped") {
-        trackingNumber = await showTrackingNumberDialog();
-        if (!trackingNumber) return;
-      }
-
-      const response = await axiosInstance.put(
-        `/seller/orders/${orderId}/status`,
-        {
-          status: newStatus,
-          trackingNumber,
-        }
-      );
-
-      const updatedOrder = response.data;
-
-      setOrders((prevOrders) =>
-        prevOrders.map((order) =>
-          order._id === orderId ? { ...order, ...updatedOrder } : order
-        )
-      );
-
-      // Show different toast messages based on status
-      if (newStatus === "completed") {
-        toast.success(`Order status updated to ${newStatus}`, {
-          description: "A review request has been sent to the customer.",
-          duration: 5000,
-        });
-      } else {
-        toast.success(`Order status updated to ${newStatus}`);
-      }
-    } catch (error) {
-      console.error("Error updating order status:", error);
-      toast.error(
-        error.response?.data?.message || "Failed to update order status"
-      );
-    }
-  };
-
-  const showTrackingNumberDialog = () => {
-    return new Promise((resolve) => {
-      const trackingNumber = prompt("Enter tracking number:");
-      resolve(trackingNumber);
-    });
-  };
-
   const filteredOrders = orders
     .filter((order) => {
       const matchesSearch =
@@ -329,7 +281,6 @@ const SellerOrders = () => {
                 <th className="text-left py-4 px-4">Date</th>
                 <th className="text-left py-4 px-4">Amount</th>
                 <th className="text-left py-4 px-4">Status</th>
-                <th className="text-left py-4 px-4">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -375,22 +326,6 @@ const SellerOrders = () => {
                   <td className="py-4 px-4">₱{order.totalAmount.toFixed(2)}</td>
                   <td className="py-4 px-4">
                     <OrderStatusBadge status={order.status} />
-                  </td>
-                  <td className="py-4 px-4">
-                    <select
-                      className="px-3 py-1 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
-                      value={order.status}
-                      onChange={(e) =>
-                        updateOrderStatus(order._id, e.target.value)
-                      }
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="processing">Processing</option>
-                      <option value="shipped">Shipped</option>
-                      <option value="delivered">Delivered</option>
-                      <option value="completed">Completed</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
                   </td>
                 </tr>
               ))}

@@ -4,6 +4,7 @@ const { protect } = require("../middleware/authMiddleware");
 const Order = require("../models/Order");
 const Product = require("../models/Product");
 const User = require("../models/User");
+const deliveryController = require("../controllers/deliveryController");
 const {
   sendOrderConfirmationEmail,
   sendSellerOrderNotification,
@@ -64,6 +65,12 @@ router.post("/", protect, async (req, res) => {
         .json({ message: "Seller information is required" });
     }
 
+    // Load seller details for delivery
+    const seller = await User.findById(sellerId).populate("address");
+    if (!seller) {
+      return res.status(404).json({ message: "Seller not found" });
+    }
+
     const order = new Order({
       buyer: req.user._id,
       seller: sellerId,
@@ -87,8 +94,7 @@ router.post("/", protect, async (req, res) => {
     await order.save();
 
     // Update seller's total sales and stats
-    const seller = await User.findById(sellerId);
-    if (seller && seller.sellerProfile) {
+    if (seller.sellerProfile) {
       seller.sellerProfile.totalSales =
         (seller.sellerProfile.totalSales || 0) + totalAmount;
       await seller.save();
@@ -109,6 +115,20 @@ router.post("/", protect, async (req, res) => {
     } catch (emailError) {
       console.error("Error sending confirmation email:", emailError);
       // Don't fail the order if email fails
+    }
+
+    // Automatically create delivery order
+    try {
+      const populatedOrder = await Order.findById(order._id)
+        .populate("buyer", "name phone email")
+        .populate("seller", "name phone email address")
+        .populate("items.product");
+
+      await deliveryController.autoCreateDelivery(populatedOrder);
+    } catch (deliveryError) {
+      console.error("Error creating delivery:", deliveryError);
+      // Don't fail the order if delivery creation fails
+      // It can be retried manually if needed
     }
 
     res.status(201).json({
@@ -173,7 +193,7 @@ router.get("/:id", protect, async (req, res) => {
 // Update order status (seller only)
 router.put("/:id/status", protect, async (req, res) => {
   try {
-    const { status, trackingNumber, notes } = req.body;
+    const { status, notes } = req.body;
     const order = await Order.findById(req.params.id)
       .populate("buyer", "name email")
       .populate("seller", "name email")
@@ -192,7 +212,6 @@ router.put("/:id/status", protect, async (req, res) => {
 
     // Update order details
     order.status = status;
-    if (trackingNumber) order.trackingNumber = trackingNumber;
     if (notes) order.notes = notes;
 
     try {
@@ -206,7 +225,7 @@ router.put("/:id/status", protect, async (req, res) => {
 
     // Send status update email to buyer
     try {
-      await sendOrderStatusUpdate(order, { trackingNumber });
+      await sendOrderStatusUpdate(order);
     } catch (emailError) {
       console.error("Error sending status update email:", emailError);
       // Don't fail the update if email fails
@@ -237,6 +256,15 @@ router.post("/:id/refund", protect, async (req, res) => {
     }
 
     await order.refund(refundId);
+
+    // Cancel delivery if exists
+    if (order.delivery?.lalamoveOrderId) {
+      try {
+        await deliveryController.cancelDelivery(order._id);
+      } catch (deliveryError) {
+        console.error("Error cancelling delivery:", deliveryError);
+      }
+    }
 
     // Add refund reason to notes
     order.notes = `Refunded: ${reason}`;

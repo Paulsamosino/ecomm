@@ -169,7 +169,6 @@ const connectWithRetry = async () => {
     require("./src/models/Order");
     require("./src/models/Chat");
     require("./src/models/Message");
-    require("./src/models/BlogPost");
     require("./src/models/Report");
 
     console.log("All models registered successfully");
@@ -217,7 +216,6 @@ const authRoutes = require("./src/routes/auth");
 const productRoutes = require("./src/routes/products");
 const chatRoutes = require("./src/routes/chat");
 const sellerRoutes = require("./src/routes/seller");
-const blogRoutes = require("./src/routes/blog");
 const uploadRoutes = require("./src/routes/upload");
 const adminRoutes = require("./src/routes/admin");
 const userRoutes = require("./src/routes/user");
@@ -232,7 +230,6 @@ app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/seller", sellerRoutes);
-app.use("/api/blog", blogRoutes);
 app.use("/api/orders", require("./src/routes/orders"));
 app.use("/api/upload", uploadRoutes);
 app.use("/api/admin", adminRoutes);

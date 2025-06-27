@@ -1,177 +1,158 @@
-import React from 'react';
-import { X, Package, User, Calendar, CreditCard, Truck, MapPin } from 'lucide-react';
+import React, { useEffect, useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { Package, Truck } from "lucide-react";
+import DeliveryTracking from "../delivery/DeliveryTracking";
+import CreateDelivery from "../delivery/CreateDelivery";
 
-export default function OrderDetailsModal({ order, onClose, onStatusUpdate }) {
-  if (!order) return null;
+const OrderDetailsModal = ({ isOpen, onClose, order }) => {
+  const [isDeliverySetup, setIsDeliverySetup] = useState(false);
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const isSeller = user?._id === order?.seller?._id;
 
-  const formatDate = (dateString) => {
-    const options = { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    };
-    return new Date(dateString).toLocaleDateString('en-US', options);
+  const statusColors = {
+    pending: "bg-yellow-500",
+    processing: "bg-blue-500",
+    shipped: "bg-purple-500",
+    delivered: "bg-green-500",
+    cancelled: "bg-red-500",
+    completed: "bg-green-500",
+    refunded: "bg-gray-500",
   };
 
+  const handleStatusUpdate = (status) => {
+    // Update local order status if needed
+    toast({
+      title: "Delivery Status Updated",
+      description: `Order delivery status is now ${status}`,
+    });
+  };
+
+  const handleDeliveryCreated = (deliveryOrder) => {
+    setIsDeliverySetup(true);
+    toast({
+      title: "Delivery Created",
+      description: "Delivery has been set up successfully",
+    });
+  };
+
+  if (!order) return null;
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div className="fixed inset-0 transition-opacity" onClick={onClose}>
-          <div className="absolute inset-0 bg-gray-900/80 backdrop-blur-sm"></div>
-        </div>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Order Details
+          </DialogTitle>
+        </DialogHeader>
 
-        <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-        
-        <div className="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-          <div className="bg-white px-6 py-4 border-b flex justify-between items-center">
-            <h3 className="text-xl font-semibold text-gray-900">Order #{order._id.slice(-8).toUpperCase()}</h3>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-500 focus:outline-none"
-            >
-              <X className="h-6 w-6" />
-            </button>
-          </div>
-          
-          <div className="px-6 py-4 space-y-6">
-            {/* Order Summary */}
-            <div className="bg-gray-50 rounded-xl p-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    <span>Order Date</span>
-                  </div>
-                  <p className="font-medium">{formatDate(order.createdAt)}</p>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center text-sm text-gray-600">
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    <span>Total Amount</span>
-                  </div>
-                  <p className="font-medium text-lg">₱{order.totalAmount?.toFixed(2)}</p>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Truck className="h-4 w-4 mr-2" />
-                    <span>Status</span>
-                  </div>
-                  <select
-                    className="px-3 py-1 border rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    value={order.status}
-                    onChange={(e) => onStatusUpdate(order._id, e.target.value)}
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="processing">Processing</option>
-                    <option value="shipped">Shipped</option>
-                    <option value="delivered">Delivered</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </div>
-              </div>
+        <div className="space-y-6">
+          {/* Order Status */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="font-medium">Status:</span>
+              <Badge className={statusColors[order.status]}>
+                {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+              </Badge>
             </div>
+            <div className="text-sm text-gray-500">Order #{order._id}</div>
+          </div>
 
-            {/* Customer & Shipping */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
-                <h4 className="font-medium text-gray-900 mb-3 flex items-center">
-                  <User className="h-4 w-4 mr-2 text-primary" />
-                  Customer
-                </h4>
-                <div className="space-y-2 text-sm">
-                  <p className="font-medium">{order.buyer?.name}</p>
-                  <p className="text-gray-600">{order.buyer?.email}</p>
-                  <p className="text-gray-600">{order.shippingAddress?.phone}</p>
-                </div>
-              </div>
-              
-              <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
-                <h4 className="font-medium text-gray-900 mb-3 flex items-center">
-                  <MapPin className="h-4 w-4 mr-2 text-primary" />
-                  Shipping Address
-                </h4>
-                <div className="space-y-1 text-sm">
-                  <p className="font-medium">{order.shippingAddress?.name}</p>
-                  <p className="text-gray-600">{order.shippingAddress?.street}</p>
-                  <p className="text-gray-600">
-                    {order.shippingAddress?.city}, {order.shippingAddress?.state} {order.shippingAddress?.postalCode}
+          {/* Order Items */}
+          <div className="space-y-4">
+            <h3 className="font-medium">Items</h3>
+            <div className="space-y-2">
+              {order.items.map((item) => (
+                <div
+                  key={item._id}
+                  className="flex items-center justify-between border-b pb-2"
+                >
+                  <div>
+                    <p className="font-medium">{item.product.name}</p>
+                    <p className="text-sm text-gray-500">
+                      Quantity: {item.quantity}
+                    </p>
+                  </div>
+                  <p className="font-medium">
+                    ₱{(item.price * item.quantity).toFixed(2)}
                   </p>
-                  <p className="text-gray-600">{order.shippingAddress?.country}</p>
                 </div>
-              </div>
+              ))}
             </div>
+          </div>
 
-            {/* Order Items */}
-            <div className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
-              <div className="px-4 py-3 border-b bg-gray-50">
-                <h4 className="font-medium text-gray-900">Order Items</h4>
-              </div>
-              <div className="divide-y">
-                {order.items?.map((item, index) => (
-                  <div key={index} className="p-4">
-                    <div className="flex">
-                      <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-gray-100">
-                        {item.product?.images?.[0] ? (
-                          <img
-                            src={item.product.images[0]}
-                            alt={item.product.name}
-                            className="h-full w-full object-cover object-center"
-                          />
-                        ) : (
-                          <div className="h-full w-full flex items-center justify-center bg-gray-200">
-                            <Package className="h-8 w-8 text-gray-400" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="ml-4 flex-1">
-                        <div className="flex justify-between">
-                          <h5 className="font-medium text-gray-900">
-                            {item.product?.name || 'Product not found'}
-                          </h5>
-                          <p className="ml-4 font-medium">₱{item.price?.toFixed(2)}</p>
-                        </div>
-                        <p className="mt-1 text-sm text-gray-600">Qty: {item.quantity}</p>
-                        <p className="mt-1 text-sm text-gray-600">
-                          Subtotal: ₱{(item.price * item.quantity).toFixed(2)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="border-t bg-gray-50 px-4 py-3">
-                <div className="flex justify-between text-sm font-medium text-gray-900">
-                  <p>Total</p>
-                  <p>₱{order.totalAmount?.toFixed(2)}</p>
-                </div>
-              </div>
+          {/* Order Summary */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span>Subtotal:</span>
+              <span>₱{order.totalAmount.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span>Platform Fee:</span>
+              <span>₱{order.paymentInfo.platformFee.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-medium border-t pt-2">
+              <span>Total:</span>
+              <span>
+                ₱
+                {(order.totalAmount + order.paymentInfo.platformFee).toFixed(2)}
+              </span>
             </div>
           </div>
-          
-          <div className="bg-gray-50 px-6 py-4 flex justify-end space-x-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-            >
-              Close
-            </button>
-            <button
-              onClick={() => {
-                // Handle print or other actions
-                window.print();
-              }}
-              className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-            >
-              Print Order
-            </button>
+
+          {/* Shipping Information */}
+          <div className="space-y-2">
+            <h3 className="font-medium">Shipping Address</h3>
+            <div className="text-sm">
+              <p>{order.shippingAddress.street}</p>
+              <p>
+                {order.shippingAddress.city}, {order.shippingAddress.state}{" "}
+                {order.shippingAddress.zipCode}
+              </p>
+              <p>{order.shippingAddress.country}</p>
+              <p>Phone: {order.shippingAddress.phone}</p>
+            </div>
           </div>
+
+          {/* Delivery Section */}
+          {order.status !== "cancelled" && (
+            <div className="space-y-4 border-t pt-4">
+              <div className="flex items-center gap-2">
+                <Truck className="h-5 w-5" />
+                <h3 className="font-medium">Delivery</h3>
+              </div>
+
+              {order.delivery?.lalamoveOrderId ? (
+                <DeliveryTracking
+                  orderId={order._id}
+                  onStatusUpdate={handleStatusUpdate}
+                />
+              ) : (
+                isSeller &&
+                !isDeliverySetup && (
+                  <CreateDelivery
+                    order={order}
+                    onDeliveryCreated={handleDeliveryCreated}
+                  />
+                )
+              )}
+            </div>
+          )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
-}
+};
+
+export default OrderDetailsModal;

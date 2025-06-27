@@ -16,7 +16,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
-import BreedSelect from "@/components/ui/breed-select";
 
 const EditProduct = () => {
   const navigate = useNavigate();
@@ -261,14 +260,71 @@ const EditProduct = () => {
 
               <div className="space-y-2">
                 <Label>Breed</Label>
-                <BreedSelect
-                  category={formData.category}
+                <Select
                   value={formData.breed}
                   onValueChange={(value) =>
                     setFormData((prev) => ({ ...prev, breed: value }))
                   }
-                  className={errors.breed ? "border-red-500" : ""}
-                />
+                >
+                  <SelectTrigger
+                    className={errors.breed ? "border-red-500" : ""}
+                  >
+                    <SelectValue placeholder="Select breed" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {formData.category === "chicken" && (
+                      <>
+                        <SelectItem value="Rhode Island Red">
+                          Rhode Island Red
+                        </SelectItem>
+                        <SelectItem value="Plymouth Rock">
+                          Plymouth Rock
+                        </SelectItem>
+                        <SelectItem value="Leghorn">Leghorn</SelectItem>
+                        <SelectItem value="Orpington">Orpington</SelectItem>
+                        <SelectItem value="Wyandotte">Wyandotte</SelectItem>
+                        <SelectItem value="Australorp">Australorp</SelectItem>
+                        <SelectItem value="Sussex">Sussex</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </>
+                    )}
+                    {formData.category === "duck" && (
+                      <>
+                        <SelectItem value="Pekin">Pekin</SelectItem>
+                        <SelectItem value="Muscovy">Muscovy</SelectItem>
+                        <SelectItem value="Runner">Runner</SelectItem>
+                        <SelectItem value="Khaki Campbell">
+                          Khaki Campbell
+                        </SelectItem>
+                        <SelectItem value="Welsh Harlequin">
+                          Welsh Harlequin
+                        </SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </>
+                    )}
+                    {formData.category === "turkey" && (
+                      <>
+                        <SelectItem value="Bourbon Red">Bourbon Red</SelectItem>
+                        <SelectItem value="Bronze">Bronze</SelectItem>
+                        <SelectItem value="White Holland">
+                          White Holland
+                        </SelectItem>
+                        <SelectItem value="Narragansett">
+                          Narragansett
+                        </SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </>
+                    )}
+                    {formData.category === "other" && (
+                      <>
+                        <SelectItem value="Feed">Feed</SelectItem>
+                        <SelectItem value="Equipment">Equipment</SelectItem>
+                        <SelectItem value="Supplies">Supplies</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
                 {errors.breed && (
                   <p className="mt-1 text-xs text-red-500">{errors.breed}</p>
                 )}

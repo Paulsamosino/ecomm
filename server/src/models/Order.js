@@ -85,6 +85,31 @@ const orderSchema = new mongoose.Schema(
         default: 0,
       },
     },
+    delivery: {
+      lalamoveOrderId: String,
+      status: {
+        type: String,
+        enum: [
+          "pending",
+          "assigned",
+          "picked_up",
+          "in_progress",
+          "completed",
+          "cancelled",
+        ],
+        default: "pending",
+      },
+      price: {
+        amount: Number,
+        currency: String,
+      },
+      driver: {
+        name: String,
+        phone: String,
+        plate: String,
+        photo: String,
+      },
+    },
     status: {
       type: String,
       required: true,
@@ -105,12 +130,6 @@ const orderSchema = new mongoose.Schema(
       min: 0,
     },
     notes: String,
-    trackingNumber: String,
-    review: {
-      rating: Number,
-      comment: String,
-      createdAt: Date,
-    },
   },
   {
     timestamps: true,
@@ -145,19 +164,6 @@ orderSchema.pre("save", function (next) {
           `Invalid status transition from ${oldStatus} to ${this.status}`
         )
       );
-    }
-
-    // Add timestamp for status change
-    this.statusHistory = this.statusHistory || [];
-    this.statusHistory.push({
-      status: this.status,
-      timestamp: new Date(),
-      note: this.notes,
-    });
-
-    // Status-specific validations
-    if (this.status === "shipped" && !this.trackingNumber) {
-      return next(new Error("Tracking number is required for shipped status"));
     }
   }
   next();
@@ -261,230 +267,6 @@ orderSchema.methods.refund = async function (refundId) {
   }
 
   return this.save();
-};
-
-// Get seller revenue (excluding platform fee)
-orderSchema.methods.getSellerRevenue = function () {
-  return this.totalAmount - this.paymentInfo.platformFee;
-};
-
-// Get orders for a specific seller
-orderSchema.statics.getSellerOrders = function (sellerId) {
-  return this.find({
-    "items.seller": sellerId,
-  }).populate("buyer", "name email");
-};
-
-// Get orders for a specific buyer
-orderSchema.statics.getBuyerOrders = function (buyerId) {
-  return this.find({
-    buyer: buyerId,
-  }).populate("items.seller", "name email sellerProfile");
-};
-
-// Calculate revenue for a seller within a date range
-orderSchema.statics.calculateSellerRevenue = async function (
-  sellerId,
-  startDate,
-  endDate
-) {
-  const orders = await this.find({
-    "items.seller": sellerId,
-    status: "completed",
-    createdAt: {
-      $gte: startDate,
-      $lte: endDate,
-    },
-  });
-
-  return orders.reduce((total, order) => {
-    const sellerItems = order.items.filter(
-      (item) => item.seller.toString() === sellerId.toString()
-    );
-    return (
-      total +
-      sellerItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
-    );
-  }, 0);
-};
-
-// Add method to check if order is reviewable
-orderSchema.methods.isReviewable = function () {
-  return this.status === "completed" && !this.review;
-};
-
-// Add method to create review
-orderSchema.methods.createReview = async function (reviewData) {
-  if (!this.isReviewable()) {
-    throw new Error("Order is not eligible for review");
-  }
-
-  const Product = mongoose.model("Product");
-  const User = mongoose.model("User");
-
-  // Add review to each product in the order
-  for (const item of this.items) {
-    const product = await Product.findById(item.product);
-    if (product) {
-      product.reviews.push({
-        user: this.buyer,
-        rating: reviewData.rating,
-        comment: reviewData.comment,
-        order: this._id,
-      });
-      await product.save();
-    }
-  }
-
-  // Update seller's rating
-  const seller = await User.findById(this.seller);
-  if (seller && seller.sellerProfile) {
-    seller.sellerProfile.reviews.push({
-      user: this.buyer,
-      rating: reviewData.rating,
-      comment: reviewData.comment,
-      order: this._id,
-    });
-    await seller.save();
-  }
-
-  this.review = {
-    rating: reviewData.rating,
-    comment: reviewData.comment,
-    createdAt: new Date(),
-  };
-
-  return this.save();
-};
-
-// Add method to update shop statistics
-orderSchema.methods.updateShopStatistics = async function () {
-  const User = mongoose.model("User");
-  const seller = await User.findById(this.seller);
-
-  if (seller?.sellerProfile) {
-    if (this.status === "completed") {
-      seller.sellerProfile.statistics = seller.sellerProfile.statistics || {};
-      seller.sellerProfile.statistics.totalOrders =
-        (seller.sellerProfile.statistics.totalOrders || 0) + 1;
-      seller.sellerProfile.statistics.totalRevenue =
-        (seller.sellerProfile.statistics.totalRevenue || 0) +
-        this.getSellerRevenue();
-      seller.sellerProfile.statistics.lastOrderDate = new Date();
-
-      // Calculate average order value
-      const completedOrders = await this.constructor.find({
-        seller: this.seller,
-        status: "completed",
-      });
-
-      const totalValue = completedOrders.reduce(
-        (sum, order) => sum + order.getSellerRevenue(),
-        0
-      );
-      seller.sellerProfile.statistics.averageOrderValue =
-        totalValue / completedOrders.length;
-    }
-
-    // Update conversion rate
-    const allOrders = await this.constructor.countDocuments({
-      seller: this.seller,
-    });
-    const completedOrders = await this.constructor.countDocuments({
-      seller: this.seller,
-      status: "completed",
-    });
-
-    seller.sellerProfile.statistics.conversionRate =
-      (completedOrders / allOrders) * 100;
-
-    await seller.save();
-  }
-};
-
-// Update order hooks to include statistics
-orderSchema.pre("save", async function (next) {
-  if (this.isModified("status")) {
-    try {
-      await this.updateShopStatistics();
-    } catch (error) {
-      console.error("Error updating shop statistics:", error);
-      // Don't fail the order update if statistics fail
-    }
-  }
-  next();
-});
-
-// Add method to check stock levels and notify seller
-orderSchema.methods.checkStockLevels = async function () {
-  const Product = mongoose.model("Product");
-  const lowStockThreshold = 5; // Configure this as needed
-
-  for (const item of this.items) {
-    const product = await Product.findById(item.product);
-    if (product && product.quantity <= lowStockThreshold) {
-      // Send low stock notification
-      try {
-        await sendEmail({
-          to: this.seller.email,
-          subject: "Low Stock Alert",
-          text: `Product "${product.name}" is running low on stock (${product.quantity} remaining).`,
-        });
-      } catch (error) {
-        console.error("Error sending low stock notification:", error);
-      }
-    }
-  }
-};
-
-// Add helper method for order metrics
-orderSchema.statics.getSellerMetrics = async function (
-  sellerId,
-  timeframe = 30
-) {
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - timeframe);
-
-  const metrics = await this.aggregate([
-    {
-      $match: {
-        seller: new mongoose.Types.ObjectId(sellerId),
-        createdAt: { $gte: startDate },
-      },
-    },
-    {
-      $group: {
-        _id: null,
-        totalOrders: { $sum: 1 },
-        completedOrders: {
-          $sum: {
-            $cond: [{ $eq: ["$status", "completed"] }, 1, 0],
-          },
-        },
-        cancelledOrders: {
-          $sum: {
-            $cond: [{ $eq: ["$status", "cancelled"] }, 1, 0],
-          },
-        },
-        totalRevenue: {
-          $sum: {
-            $cond: [{ $eq: ["$status", "completed"] }, "$totalAmount", 0],
-          },
-        },
-        averageOrderValue: { $avg: "$totalAmount" },
-      },
-    },
-  ]);
-
-  return (
-    metrics[0] || {
-      totalOrders: 0,
-      completedOrders: 0,
-      cancelledOrders: 0,
-      totalRevenue: 0,
-      averageOrderValue: 0,
-    }
-  );
 };
 
 const Order = mongoose.model("Order", orderSchema);

@@ -103,7 +103,7 @@ const users = [
       name: `Buyer ${i + 1}`,
       email: `buyer${i + 1}@gmail.com`,
       password: "password",
-      role: "user",
+      role: "buyer",
       phone: `+1${Math.floor(Math.random() * 900 + 100)}${Math.floor(
         Math.random() * 9000000 + 1000000
       )}`,
@@ -672,6 +672,14 @@ const generateReports = (users, products) => {
 // Seed function
 async function seedDatabase() {
   try {
+    // Safety check: prevent running on production
+    if (
+      process.env.NODE_ENV === "production" ||
+      (process.env.MONGODB_URI &&
+        /prod|production/i.test(process.env.MONGODB_URI))
+    ) {
+      throw new Error("Seeding is disabled on production environments.");
+    }
     // Connect to MongoDB
     await mongoose.connect(process.env.MONGODB_URI);
     console.log("Connected to MongoDB");
@@ -696,10 +704,15 @@ async function seedDatabase() {
     console.log("Users created");
 
     // Get sellers and buyers
-    const sellers = createdUsers.filter((user) => user.isSeller);
-    const buyers = createdUsers.filter((user) => user.role === "user");
+    const sellers = createdUsers.filter((user) => user.role === "seller");
+    const buyers = createdUsers.filter((user) => user.role === "buyer");
 
     // Create products with sellers and reviews
+    if (!sellers.length || !buyers.length) {
+      throw new Error(
+        "No sellers or buyers available for product/review creation."
+      );
+    }
     const createdProducts = await Promise.all(
       products.map(async (product, index) => {
         const seller = sellers[index % sellers.length];
@@ -712,6 +725,7 @@ async function seedDatabase() {
           const reviewTemplate =
             reviewTemplates[Math.floor(Math.random() * reviewTemplates.length)];
           const buyer = buyers[Math.floor(Math.random() * buyers.length)];
+          if (!buyer) continue;
 
           productReviews.push({
             rating: reviewTemplate.rating,
@@ -738,84 +752,7 @@ async function seedDatabase() {
     await Report.insertMany(reports);
     console.log("Reports created");
 
-    // Create orders
-    const orders = [];
-    for (let i = 0; i < 15; i++) {
-      const buyer = buyers[i % buyers.length];
-      const product = createdProducts[i % createdProducts.length];
-      const seller = await User.findById(product.seller);
-
-      // Random order date within the last 3 months
-      const orderDate = new Date();
-      orderDate.setMonth(orderDate.getMonth() - Math.floor(Math.random() * 3));
-      orderDate.setDate(orderDate.getDate() - Math.floor(Math.random() * 30));
-
-      // Create more realistic orders with multiple items sometimes
-      const numItems =
-        Math.random() > 0.7 ? Math.floor(Math.random() * 2) + 2 : 1; // 70% single item, 30% 2-3 items
-      const items = [];
-      let totalAmount = 0;
-
-      for (let j = 0; j < numItems; j++) {
-        const orderProduct = createdProducts[(i + j) % createdProducts.length];
-        const orderProductSeller = await User.findById(orderProduct.seller);
-        const quantity = Math.floor(Math.random() * 3) + 1;
-        const price =
-          orderProduct.discount > 0
-            ? orderProduct.price -
-              (orderProduct.price * orderProduct.discount) / 100
-            : orderProduct.price;
-
-        items.push({
-          product: orderProduct._id,
-          name: orderProduct.name,
-          seller: orderProductSeller._id,
-          quantity: quantity,
-          price: price,
-        });
-
-        totalAmount += price * quantity;
-      }
-
-      // Create order with calculated total and include phone in shipping address
-      const paymentMethods = ["credit_card", "debit_card", "bank_transfer"];
-      const orderStatuses = ["pending", "processing", "shipped", "delivered"];
-      const weightedStatuses = [
-        ...Array(1).fill("pending"),
-        ...Array(2).fill("processing"),
-        ...Array(3).fill("shipped"),
-        ...Array(5).fill("delivered"),
-      ]; // More orders in delivered status
-
-      orders.push({
-        buyer: buyer._id,
-        seller: seller._id,
-        items: items,
-        shippingAddress: {
-          ...buyer.address,
-          phone:
-            buyer.phone ||
-            `+1${Math.floor(Math.random() * 900 + 100)}${Math.floor(
-              Math.random() * 9000000 + 1000000
-            )}`,
-        },
-        paymentInfo: {
-          method:
-            paymentMethods[Math.floor(Math.random() * paymentMethods.length)],
-          status: "completed",
-          transactionId: `mock_transaction_${Math.random()
-            .toString(36)
-            .substring(2, 9)}`,
-        },
-        status:
-          weightedStatuses[Math.floor(Math.random() * weightedStatuses.length)],
-        totalAmount: totalAmount,
-        createdAt: orderDate,
-        updatedAt: orderDate,
-      });
-    }
-    await Order.insertMany(orders);
-    console.log("Orders created");
+    // Orders are not seeded by default.
 
     // Create chats with more realistic conversation flows
     const chats = [];
@@ -832,6 +769,9 @@ async function seedDatabase() {
       const buyer = buyers[i % buyers.length];
       const product = createdProducts[i % createdProducts.length];
       const seller = await User.findById(product.seller);
+
+      // Skip if buyer or seller is undefined/null
+      if (!buyer || !seller) continue;
 
       // Select a random conversation template
       const conversation = conversations[i % conversations.length];

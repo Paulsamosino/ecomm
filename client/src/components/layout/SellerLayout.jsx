@@ -74,11 +74,6 @@ const SellerLayout = () => {
           path: "/seller/orders",
           icon: ShoppingCart,
         },
-        {
-          name: "Breeding Management",
-          path: "/seller/breeding-management",
-          icon: Egg,
-        },
       ],
     },
     {
@@ -285,23 +280,6 @@ const SellerLayout = () => {
                     }`}
                   />
                   <span className="text-[10px] font-medium mt-1">Orders</span>
-                </Link>
-                <Link
-                  to="/seller/breeding-management"
-                  className={`flex flex-col items-center justify-center min-w-0 p-1 rounded-lg transition-colors ${
-                    location.pathname.startsWith("/seller/breeding")
-                      ? "text-orange-500"
-                      : "text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  <Egg
-                    className={`h-6 w-6 ${
-                      location.pathname.startsWith("/seller/breeding")
-                        ? "text-orange-500"
-                        : ""
-                    }`}
-                  />
-                  <span className="text-[10px] font-medium mt-1">Breeding</span>
                 </Link>
               </div>
             </nav>

@@ -1,19 +1,11 @@
 import React from "react";
 import { Outlet, Link } from "react-router-dom";
-import {
-  ShoppingBag,
-  Egg,
-  Wheat,
-  User,
-  Clock,
-  Heart,
-  Home,
-} from "lucide-react";
+import { ShoppingBag, Egg, User, Clock, Heart, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const BuyerDashboardPage = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white">
+    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white pt-16">
       {/* Farm-themed background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
@@ -78,13 +70,6 @@ const BuyerDashboardPage = () => {
             <User className="h-4 w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
             <span className="truncate">My Profile</span>
           </Link>
-          <Link
-            to="/buyer-dashboard/breeding"
-            className="col-span-2 sm:col-span-1 inline-flex items-center justify-center px-3 sm:px-4 py-2 rounded-lg bg-white text-orange-600 border border-orange-200 shadow-sm hover:shadow hover:bg-orange-50 transition-all duration-200 text-sm"
-          >
-            <Wheat className="h-4 w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
-            <span className="truncate">Breeding Management</span>
-          </Link>
         </div>
 
         {/* Main Content Area with Farm-themed Border */}
@@ -117,7 +102,6 @@ const BuyerDashboardPage = () => {
         <div className="mt-4 sm:mt-6 text-center pb-6">
           <div className="flex items-center justify-center gap-2 text-orange-600">
             <Egg className="h-4 w-4" />
-            <Wheat className="h-4 w-4" />
             <ShoppingBag className="h-4 w-4" />
           </div>
           <p className="text-[0.65rem] sm:text-xs text-gray-500 mt-2">

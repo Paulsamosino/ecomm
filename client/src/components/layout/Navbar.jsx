@@ -15,8 +15,6 @@ import {
   ChevronDown,
   Bell,
   HelpCircle,
-  Egg,
-  Wheat,
   Sun,
 } from "lucide-react";
 import {
