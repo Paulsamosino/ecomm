@@ -84,7 +84,7 @@ router.post("/register", async (req, res) => {
         name: user.name,
         email: user.email,
         profilePicture: user.profilePicture,
-        isSeller: user.isSeller,
+        isSeller: user.role === "seller",
         sellerProfile: user.sellerProfile,
       },
     });
@@ -176,8 +176,8 @@ router.post("/login", async (req, res) => {
         email: user.email,
         profilePicture: user.profilePicture,
         role: user.role,
-        isSeller: user.isSeller,
-        isAdmin: user.role === "admin", // Explicitly check role
+        isSeller: user.role === "seller",
+        isAdmin: user.role === "admin",
         sellerProfile: user.sellerProfile,
       },
     });
@@ -202,7 +202,7 @@ router.get("/me", auth, async (req, res) => {
       email: user.email,
       profilePicture: user.profilePicture,
       role: user.role,
-      isSeller: user.isSeller,
+      isSeller: user.role === "seller",
       isAdmin: user.role === "admin",
       sellerProfile: user.sellerProfile,
     });
@@ -236,7 +236,7 @@ router.put("/profile", auth, async (req, res) => {
       name: user.name,
       email: user.email,
       profilePicture: user.profilePicture,
-      isSeller: user.isSeller,
+      isSeller: user.role === "seller",
       sellerProfile: user.sellerProfile,
     });
   } catch (err) {
@@ -266,7 +266,7 @@ router.put("/seller-profile", auth, async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        isSeller: user.isSeller,
+        isSeller: user.role === "seller",
         sellerProfile: user.sellerProfile,
       },
     });
