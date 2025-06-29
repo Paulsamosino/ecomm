@@ -42,6 +42,7 @@ const CheckoutPage = () => {
   const [selectedAddressId, setSelectedAddressId] = useState("");
   const [useNewAddress, setUseNewAddress] = useState(false);
   const [saveNewAddress, setSaveNewAddress] = useState(false);
+  const [phoneError, setPhoneError] = useState('');
   const [shippingDetails, setShippingDetails] = useState({
     street: "",
     city: "",
@@ -230,16 +231,46 @@ const CheckoutPage = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setShippingDetails((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+
+    if (name === 'phone') {
+      // The input value is only the part after +63
+      const digitsOnly = value.replace(/\D/g, '');
+      setShippingDetails((prev) => ({ ...prev, phone: `+63${digitsOnly}` }));
+
+      // Validate phone number format
+      if (digitsOnly.length !== 10) {
+        setPhoneError('Phone number must have exactly 10 digits.');
+      } else {
+        setPhoneError('');
+      }
+    } else {
+      setShippingDetails((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const isFormValid = () => {
-    return Object.values(shippingDetails).every(
-      (value) => typeof value === "string" && value.trim() !== ""
-    );
+    if (savedAddresses.length > 0 && !useNewAddress) {
+      const isValid = !!selectedAddressId;
+      return isValid;
+    }
+
+    const { street, city, state, zipCode, country, phone } = shippingDetails;
+    const allTextFieldsFilled =
+      street?.trim() !== '' &&
+      city?.trim() !== '' &&
+      state?.trim() !== '' &&
+      zipCode?.trim() !== '' &&
+      country?.trim() !== '';
+
+    const isPhoneValid = !phoneError && phone.length > 3;
+
+    console.log('--- isFormValid Check ---');
+    console.log('Data:', { ...shippingDetails, useNewAddress, phoneError });
+    console.log('Text fields filled?', allTextFieldsFilled);
+    console.log('Phone valid?', isPhoneValid);
+    console.log('Overall valid?', allTextFieldsFilled && isPhoneValid);
+
+    return allTextFieldsFilled && isPhoneValid;
   };
 
   const calculateTotalWithFees = () => {
@@ -528,14 +559,21 @@ const CheckoutPage = () => {
             </div>
             <div>
               <Label htmlFor="phone">Phone Number</Label>
-              <Input
-                id="phone"
-                name="phone"
-                value={shippingDetails.phone}
-                onChange={handleInputChange}
-                placeholder="Phone Number"
-                required
-              />
+              <div className={`flex items-center rounded-md border ${phoneError ? 'border-red-500' : 'border-input'} bg-white`}>
+                <span className="pl-3 text-sm text-muted-foreground">+63</span>
+                <Input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  placeholder="9123456789"
+                  value={shippingDetails.phone.startsWith('+63') ? shippingDetails.phone.substring(3) : shippingDetails.phone}
+                  onChange={handleInputChange}
+                  className="w-full border-0 bg-transparent p-2 focus-visible:ring-0 focus-visible:ring-offset-0"
+                  required
+                  maxLength="10"
+                />
+              </div>
+              {phoneError && <p className="text-sm text-red-600 mt-1">{phoneError}</p>}
             </div>
           </div>
         </div>
