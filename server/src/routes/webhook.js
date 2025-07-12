@@ -1,13 +1,21 @@
 const express = require("express");
 const router = express.Router();
 const webhookController = require("../controllers/webhookController");
+const { validateLalamoveWebhook, captureRawBody } = require("../middleware/webhookValidation");
 
-// Middleware to verify Lalamove webhook signatures
-const verifyLalamoveWebhook = (req, res, next) => {
-  const signature = req.headers["x-lalamove-signature"];
-  // TODO: Implement proper signature verification using HMAC
-  if (!signature) {
-    return res.status(401).json({ message: "Missing signature" });
+// IP allowlist middleware (additional security layer)
+const allowedIPs = process.env.LALAMOVE_WEBHOOK_IPS ? 
+  process.env.LALAMOVE_WEBHOOK_IPS.split(',') : [];
+
+const validateWebhookIP = (req, res, next) => {
+  if (allowedIPs.length === 0) {
+    return next(); // Skip IP validation if no allowlist configured
+  }
+  
+  const clientIP = req.ip || req.connection.remoteAddress;
+  if (!allowedIPs.includes(clientIP)) {
+    console.error(`Webhook rejected: Invalid IP ${clientIP}`);
+    return res.status(403).json({ error: 'Forbidden' });
   }
   next();
 };
@@ -15,21 +23,27 @@ const verifyLalamoveWebhook = (req, res, next) => {
 // Lalamove delivery status webhook
 router.post(
   "/lalamove/delivery",
-  verifyLalamoveWebhook,
+  validateWebhookIP,
+  captureRawBody,
+  validateLalamoveWebhook,
   webhookController.handleDeliveryUpdate
 );
 
 // Lalamove delivery cancellation webhook
 router.post(
   "/lalamove/cancellation",
-  verifyLalamoveWebhook,
+  validateWebhookIP,
+  captureRawBody,
+  validateLalamoveWebhook,
   webhookController.handleDeliveryCancellation
 );
 
 // Lalamove driver assignment webhook
 router.post(
   "/lalamove/driver",
-  verifyLalamoveWebhook,
+  validateWebhookIP,
+  captureRawBody,
+  validateLalamoveWebhook,
   webhookController.handleDriverAssignment
 );
 

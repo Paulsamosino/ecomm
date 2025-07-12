@@ -29,20 +29,10 @@ const SellerOrders = () => {
   const [sortBy, setSortBy] = useState("date");
   const [sortOrder, setSortOrder] = useState("desc");
   const [selectedOrders, setSelectedOrders] = useState([]);
-  const [metrics, setMetrics] = useState({
-    totalOrders: 0,
-    completedOrders: 0,
-    cancelledOrders: 0,
-    totalRevenue: 0,
-    averageOrderValue: 0,
-    conversionRate: 0,
-  });
-  const [timeframe, setTimeframe] = useState(30);
 
   useEffect(() => {
     fetchOrders();
-    fetchMetrics();
-  }, [timeframe]);
+  }, []);
 
   const fetchOrders = async () => {
     try {
@@ -63,46 +53,6 @@ const SellerOrders = () => {
       toast.error("Failed to fetch orders");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchMetrics = async () => {
-    try {
-      const response = await fetch(
-        `${API_URL}/api/seller/orders/metrics?timeframe=${timeframe}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      // Set metrics with default values for any missing fields
-      setMetrics({
-        totalOrders: data.totalOrders || 0,
-        completedOrders: data.completedOrders || 0,
-        cancelledOrders: data.cancelledOrders || 0,
-        totalRevenue: data.totalRevenue || 0,
-        averageOrderValue: data.averageOrderValue || 0,
-        conversionRate: data.conversionRate || 0,
-      });
-    } catch (error) {
-      console.error("Error fetching metrics:", error);
-      toast.error("Failed to fetch metrics");
-      // Reset metrics to defaults on error
-      setMetrics({
-        totalOrders: 0,
-        completedOrders: 0,
-        cancelledOrders: 0,
-        totalRevenue: 0,
-        averageOrderValue: 0,
-        conversionRate: 0,
-      });
     }
   };
 
@@ -131,15 +81,6 @@ const SellerOrders = () => {
       return 0;
     });
 
-  const formattedMetrics = {
-    totalRevenue: metrics?.totalRevenue?.toFixed(2) || "0.00",
-    averageOrderValue: metrics?.averageOrderValue?.toFixed(2) || "0.00",
-    conversionRate: metrics?.conversionRate?.toFixed(1) || "0.0",
-    totalOrders: metrics?.totalOrders || 0,
-    completedOrders: metrics?.completedOrders || 0,
-    cancelledOrders: metrics?.cancelledOrders || 0,
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -153,69 +94,6 @@ const SellerOrders = () => {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Orders</h1>
         <p className="text-gray-600">Manage and track your orders</p>
-      </div>
-
-      {/* Metrics Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-2">Order Summary</h3>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Total Orders:</span>
-              <span className="font-medium">{metrics?.totalOrders || 0}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Completed:</span>
-              <span className="text-green-600 font-medium">
-                {metrics?.completedOrders || 0}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Cancelled:</span>
-              <span className="text-red-600 font-medium">
-                {metrics?.cancelledOrders || 0}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-2">Revenue</h3>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Total Revenue:</span>
-              <span className="font-medium">
-                ₱{(metrics?.totalRevenue || 0).toFixed(2)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Average Order:</span>
-              <span className="font-medium">
-                ₱{(metrics?.averageOrderValue || 0).toFixed(2)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Conversion Rate:</span>
-              <span className="font-medium">
-                {(metrics?.conversionRate || 0).toFixed(1)}%
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-2">Time Period</h3>
-          <select
-            className="w-full border rounded-lg p-2"
-            value={timeframe}
-            onChange={(e) => setTimeframe(Number(e.target.value))}
-          >
-            <option value={7}>Last 7 days</option>
-            <option value={30}>Last 30 days</option>
-            <option value={90}>Last 90 days</option>
-            <option value={365}>Last year</option>
-          </select>
-        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow-md p-6">
@@ -278,6 +156,7 @@ const SellerOrders = () => {
                 <th className="text-left py-4 px-4">Order ID</th>
                 <th className="text-left py-4 px-4">Customer</th>
                 <th className="text-left py-4 px-4">Products</th>
+                <th className="text-left py-4 px-4">Shipping Address</th>
                 <th className="text-left py-4 px-4">Date</th>
                 <th className="text-left py-4 px-4">Amount</th>
                 <th className="text-left py-4 px-4">Status</th>
@@ -313,6 +192,20 @@ const SellerOrders = () => {
                           </p>
                         </div>
                       ))}
+                    </div>
+                  </td>
+                  <td className="py-4 px-4">
+                    <div>
+                      <p>
+                        {order.shippingAddress?.street},{" "}
+                        {order.shippingAddress?.city},{" "}
+                        {order.shippingAddress?.state},{" "}
+                        {order.shippingAddress?.zipCode},{" "}
+                        {order.shippingAddress?.country}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {order.shippingAddress?.phone}
+                      </p>
                     </div>
                   </td>
                   <td className="py-4 px-4">

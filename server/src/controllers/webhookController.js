@@ -1,28 +1,57 @@
 const Order = require("../models/Order");
 const io = require("../socket");
+const lalamoveService = require("../services/lalamoveService");
+const crypto = require('crypto');
+
+// Event ordering cache (prevent duplicate/out-of-order processing)
+const processedEvents = new Map();
+const EVENT_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
 const webhookController = {
-  // Handle Lalamove delivery status updates
+  // Secure webhook handler with early response
   async handleDeliveryUpdate(req, res) {
+    // CRITICAL: Send 200 response immediately (webhook best practice)
+    res.status(200).json({ received: true });
+    
     try {
-      // Verify webhook signature
-      const signature = req.headers["x-lalamove-signature"];
-      // TODO: Implement signature verification
-
+      // Validate signature was already checked by middleware
       const { data } = req.body;
       const { orderId, status, driver, location } = data;
+      const eventTimestamp = req.webhookTimestamp;
+      
+      // Event deduplication and ordering
+      const eventKey = `${orderId}-${status}-${eventTimestamp}`;
+      if (processedEvents.has(eventKey)) {
+        console.log(`Duplicate webhook event ignored: ${eventKey}`);
+        return;
+      }
+      
+      // Check if this is an older event than already processed
+      const existingOrder = await Order.findOne({
+        "delivery.lalamoveOrderId": orderId,
+      });
+      
+      if (existingOrder?.delivery?.lastWebhookTimestamp && 
+          eventTimestamp < existingOrder.delivery.lastWebhookTimestamp) {
+        console.log(`Out-of-order webhook ignored: ${eventKey}`);
+        return;
+      }
 
-      // Find order with this delivery
-      const order = await Order.findOne({
+      // Process webhook (rest of existing logic...)
+      let order = await Order.findOne({
         "delivery.lalamoveOrderId": orderId,
       }).populate("buyer", "email");
 
       if (!order) {
-        return res.status(404).json({ message: "Order not found" });
+        console.error(`Webhook order not found: ${orderId}`);
+        return;
       }
 
-      // Update order delivery status
+      // Update with timestamp tracking
       order.delivery.status = status;
+      order.delivery.lastWebhookTimestamp = eventTimestamp;
+      order.delivery.lastUpdated = new Date();
+      
       if (driver) {
         order.delivery.driver = {
           name: driver.name,
@@ -33,6 +62,7 @@ const webhookController = {
       }
 
       if (location) {
+        order.delivery.tracking = order.delivery.tracking || {};
         order.delivery.tracking.currentLocation = {
           lat: location.lat,
           lng: location.lng,
@@ -40,13 +70,19 @@ const webhookController = {
       }
 
       await order.save();
+      
+      // Mark event as processed
+      processedEvents.set(eventKey, Date.now());
+      
+      // Clean old events periodically
+      this._cleanProcessedEvents();
 
       // Emit status update through socket
       io.to(`order:${order._id}`).emit("deliveryUpdate", {
         orderId: order._id,
         deliveryStatus: status,
         driver: order.delivery.driver,
-        currentLocation: order.delivery.tracking.currentLocation,
+        currentLocation: order.delivery.tracking?.currentLocation,
       });
 
       // Special handling for completed deliveries
@@ -61,11 +97,19 @@ const webhookController = {
           status: "delivered",
         });
       }
-
-      res.status(200).json({ message: "Webhook processed successfully" });
     } catch (error) {
       console.error("Webhook processing error:", error);
-      res.status(500).json({ message: "Webhook processing failed" });
+      // Note: Don't change response status here, already sent 200
+    }
+  },
+
+  // Clean processed events cache
+  _cleanProcessedEvents() {
+    const now = Date.now();
+    for (const [key, timestamp] of processedEvents.entries()) {
+      if (now - timestamp > EVENT_CACHE_TTL) {
+        processedEvents.delete(key);
+      }
     }
   },
 

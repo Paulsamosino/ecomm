@@ -267,33 +267,12 @@ router.put("/orders/:id/status", protect, async (req, res) => {
   }
 });
 
-// Get order metrics
-router.get("/orders/metrics", protect, async (req, res) => {
-  try {
-    const timeframe = parseInt(req.query.timeframe) || 30;
-    const metrics = await Order.getSellerMetrics(req.user._id, timeframe);
-
-    // Get seller profile for additional statistics
-    const seller = await User.findById(req.user._id);
-
-    if (seller?.sellerProfile?.statistics) {
-      metrics.conversionRate =
-        seller.sellerProfile.statistics.conversionRate || 0;
-    }
-
-    res.json(metrics);
-  } catch (error) {
-    console.error("Error fetching order metrics:", error);
-    res.status(500).json({ message: "Error fetching order metrics" });
-  }
-});
-
 // Get seller customers
 router.get("/customers", protect, async (req, res) => {
   try {
     const orders = await Order.find({ seller: req.user.id }).populate(
       "buyer",
-      "name email phone city state"
+      "name email phone address"
     );
 
     const customers = orders.reduce((acc, order) => {
@@ -304,8 +283,17 @@ router.get("/customers", protect, async (req, res) => {
           name: buyer.name,
           email: buyer.email,
           phone: buyer.phone,
-          city: buyer.city,
-          state: buyer.state,
+          location: buyer.address
+            ? [
+                buyer.address.street,
+                buyer.address.city,
+                buyer.address.state,
+                buyer.address.zipCode,
+                buyer.address.country,
+              ]
+                .filter(Boolean)
+                .join(", ")
+            : "",
           totalOrders: 0,
           totalSpent: 0,
           lastPurchase: null,
@@ -314,7 +302,7 @@ router.get("/customers", protect, async (req, res) => {
         };
       }
       acc[buyer._id].totalOrders++;
-      acc[buyer._id].totalSpent += order.totalAmount; // Fix: changed from order.total to order.totalAmount
+      acc[buyer._id].totalSpent += order.totalAmount;
       if (
         !acc[buyer._id].lastPurchase ||
         new Date(order.createdAt) > new Date(acc[buyer._id].lastPurchase)
@@ -572,5 +560,30 @@ router.post("/payments/:orderId/refund", protect, async (req, res) => {
     res.status(500).json({ message: "Error processing refund" });
   }
 });
+
+// Seller pickup location (GET/POST)
+router
+  .route("/location")
+  .get(protect, async (req, res) => {
+    try {
+      const seller = await User.findById(req.user._id);
+      if (!seller) return res.status(404).json({ message: "Seller not found" });
+      res.json(seller.sellerProfile?.location || {});
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch location" });
+    }
+  })
+  .post(protect, async (req, res) => {
+    try {
+      const seller = await User.findById(req.user._id);
+      if (!seller) return res.status(404).json({ message: "Seller not found" });
+      seller.sellerProfile = seller.sellerProfile || {};
+      seller.sellerProfile.location = req.body;
+      await seller.save();
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to save location" });
+    }
+  });
 
 module.exports = router;

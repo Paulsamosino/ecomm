@@ -49,6 +49,10 @@ const userSchema = new mongoose.Schema(
       enum: ["buyer", "seller", "admin"],
       default: "buyer",
     },
+    isSeller: {
+      type: Boolean,
+      default: false,
+    },
     address: addressSchema,
     sellerProfile: {
       businessName: String,

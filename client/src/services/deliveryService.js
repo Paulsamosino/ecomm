@@ -5,7 +5,12 @@ const deliveryService = {
   async getQuotation(data) {
     try {
       const response = await axiosInstance.post("/api/delivery/quote", data);
-      return response.data;
+      return {
+        ...response.data,
+        // Ensure we have a fee field
+        fee: response.data.fee || response.data.price || 0,
+        currency: response.data.currency || "PHP"
+      };
     } catch (error) {
       console.error("Error getting delivery quotation:", error);
       throw error;

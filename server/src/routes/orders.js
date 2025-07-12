@@ -14,7 +14,7 @@ const {
 // Create a new order
 router.post("/", protect, async (req, res) => {
   try {
-    const { items, paymentInfo, totalAmount, shippingAddress } = req.body;
+    const { items, paymentInfo, totalAmount, shippingAddress, delivery } = req.body;
 
     // Validate required fields
     if (!items?.length) {
@@ -82,10 +82,17 @@ router.post("/", protect, async (req, res) => {
       })),
       paymentInfo: {
         method: paymentInfo.method || "paypal",
-        status: "completed",
+        status: paymentInfo.status || "completed", // Allow pending for COD
         transactionId: paymentInfo.transactionId,
         platformFee: totalAmount * 0.02, // 2% platform fee
       },
+      delivery: delivery ? {
+        status: "pending",
+        price: {
+          amount: delivery.shippingFee || 0,
+          currency: "PHP"
+        }
+      } : undefined,
       status: "pending",
       totalAmount,
       shippingAddress,

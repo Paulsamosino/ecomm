@@ -59,6 +59,7 @@ import AddProduct from "@/pages/SellerDashboard/AddProduct";
 import EditProduct from "@/pages/SellerDashboard/EditProduct";
 import EnhancedChatPage from "@/pages/EnhancedChatPage";
 import SellerMessages from "@/pages/SellerDashboard/SellerMessages";
+import SellerLocation from "@/pages/SellerDashboard/SellerLocation";
 
 // Import Buyer Dashboard Components
 import BuyerMyPurchase from "@/pages/BuyerDashboard/BuyerMyPurchase";
@@ -150,6 +151,7 @@ const AppContent = () => {
             <Route path="account" element={<SellerSettings />} />
             <Route path="settings" element={<SellerSettings />} />
             <Route path="help" element={<SellerHelp />} />
+            <Route path="location" element={<SellerLocation />} />
           </Route>
         </Route>
 

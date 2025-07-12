@@ -42,24 +42,47 @@ const SellerStorePage = () => {
 
   useEffect(() => {
     fetchSellerData();
+    // eslint-disable-next-line
   }, [sellerId]);
+
   const fetchSellerData = async () => {
     try {
       setLoading(true);
       setError(null);
-
-      // Fetch seller profile and products using the API functions
-      const [sellerData, productsData] = await Promise.all([
-        apiGetSellerProfile(sellerId),
-        apiGetSellerProducts(sellerId),
-      ]);
-
+      let sellerData = null;
+      let productsData = [];
+      let notFound = false;
+      try {
+        [sellerData, productsData] = await Promise.all([
+          apiGetSellerProfile(sellerId),
+          apiGetSellerProducts(sellerId),
+        ]);
+      } catch (err) {
+        // Only show 'Store Not Found' if backend returns 404
+        if (err?.response?.status === 404) {
+          notFound = true;
+        } else {
+          // If seller exists but has no profile/products, use minimal fallback
+          sellerData = {
+            _id: sellerId,
+            name: "Seller",
+            sellerProfile: null,
+            createdAt: new Date(),
+          };
+          productsData = [];
+        }
+      }
+      if (notFound) {
+        setError("notfound");
+        setSeller(null);
+        setProducts([]);
+        return;
+      }
       setSeller(sellerData);
       setProducts(productsData || []);
     } catch (err) {
       console.error("Error fetching seller data:", err);
       setError("Failed to load store information");
-      toast.error("Failed to load store information");
     } finally {
       setLoading(false);
     }
@@ -141,7 +164,7 @@ const SellerStorePage = () => {
     );
   }
 
-  if (error || !seller) {
+  if (error === "notfound") {
     return (
       <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -167,274 +190,169 @@ const SellerStorePage = () => {
     );
   }
 
+  // Default cover image and layout for every seller
   const sellerName =
-    seller.sellerProfile?.businessName || seller.name || "Unknown Store";
-  const avgRating = seller.sellerProfile?.rating || 0;
-  const totalReviews = seller.sellerProfile?.reviewCount || 0;
+    seller?.sellerProfile?.businessName || seller?.name || `Seller`;
+  const avgRating = seller?.sellerProfile?.rating || 0;
+  const totalReviews = seller?.sellerProfile?.reviewCount || 0;
+  const description =
+    seller?.sellerProfile?.description || "No description yet.";
+  const address = seller?.sellerProfile?.address
+    ? typeof seller.sellerProfile.address === "string"
+      ? seller.sellerProfile.address
+      : `${seller.sellerProfile.address.city || ""}, ${
+          seller.sellerProfile.address.state || ""
+        }, ${seller.sellerProfile.address.country || ""}`
+          .replace(/^,\s*|,\s*$/g, "")
+          .replace(/,\s*,/g, ",") || "Location not specified"
+    : "Location not specified";
+  const memberSince = seller?.createdAt
+    ? new Date(seller.createdAt).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+      })
+    : "N/A";
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white">
-      {/* Farm-themed background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 -right-20 w-64 h-64 bg-orange-400/10 rounded-full blur-[80px] animate-pulse-slow" />
-        <div className="absolute bottom-40 -left-20 w-80 h-80 bg-yellow-400/10 rounded-full blur-[100px] animate-pulse-slow" />
+      {/* Default Cover */}
+      <div className="w-full h-48 bg-gradient-to-r from-orange-400 to-yellow-300 flex items-end">
+        <div className="max-w-7xl mx-auto w-full px-4 pb-4">
+          <div className="flex items-end gap-4">
+            <div className="p-4 rounded-full bg-white shadow-lg border-4 border-orange-400">
+              <Store className="h-16 w-16 text-orange-500" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-white drop-shadow-lg">
+                {sellerName}
+              </h1>
+              <div className="flex items-center gap-3 mt-1">
+                <span className="bg-white/80 text-orange-700 px-3 py-1 rounded-full text-xs font-semibold">
+                  Member since {memberSince}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative">
-        {/* Breadcrumbs */}
-        <div className="flex items-center text-sm text-gray-500 mb-6">
-          <Link to="/" className="hover:text-orange-600">
-            Home
-          </Link>
-          <span className="mx-2 text-orange-300">•</span>
-          <Link to="/products" className="hover:text-orange-600">
-            Products
-          </Link>
-          <span className="mx-2 text-orange-300">•</span>
-          <span className="text-gray-900">{sellerName}</span>
-        </div>
-
-        {/* Store Header */}
-        <Card className="mb-8 border-orange-100 shadow-lg">
-          <CardContent className="p-8">
-            <div className="flex flex-col lg:flex-row gap-8">
-              {/* Store Info */}
-              <div className="flex-1">
-                <div className="flex items-start gap-6">
-                  <div className="p-4 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-lg">
-                    <Store className="h-12 w-12" />
-                  </div>
-
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h1 className="text-3xl font-bold text-gray-900">
-                        {sellerName}
-                      </h1>
-                      {seller.verified && (
-                        <CheckCircle className="h-6 w-6 text-green-500 fill-green-500" />
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
-                      {" "}
-                      <div className="flex items-center">
-                        <MapPin className="h-4 w-4 mr-1 text-orange-500" />
-                        <span>
-                          {seller.sellerProfile?.address
-                            ? typeof seller.sellerProfile.address === "string"
-                              ? seller.sellerProfile.address
-                              : `${seller.sellerProfile.address.city || ""}, ${
-                                  seller.sellerProfile.address.state || ""
-                                }, ${
-                                  seller.sellerProfile.address.country || ""
-                                }`
-                                  .replace(/^,\s*|,\s*$/g, "")
-                                  .replace(/,\s*,/g, ",") ||
-                                "Location not specified"
-                            : "Location not specified"}
-                        </span>
-                      </div>
-                      <div className="flex items-center">
-                        <Clock className="h-4 w-4 mr-1 text-orange-500" />
-                        <span>
-                          Member since{" "}
-                          {new Date(seller.createdAt).toLocaleDateString(
-                            "en-US",
-                            {
-                              year: "numeric",
-                              month: "short",
-                            }
-                          )}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Rating */}
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="flex items-center">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <Star
-                            key={star}
-                            className={`h-5 w-5 ${
-                              star <= avgRating
-                                ? "text-yellow-400 fill-yellow-400"
-                                : "text-gray-300"
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <span className="text-gray-600 text-sm">
-                        {avgRating.toFixed(1)} ({totalReviews} reviews)
-                      </span>
-                    </div>
-
-                    {/* Description */}
-                    {seller.sellerProfile?.description && (
-                      <p className="text-gray-700 leading-relaxed">
-                        {seller.sellerProfile.description}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Store Stats & Actions */}
-              <div className="lg:w-80">
-                <div className="bg-orange-50 rounded-xl p-6 border border-orange-100">
-                  <h3 className="font-semibold text-gray-900 mb-4">
-                    Store Stats
-                  </h3>
-
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-orange-600">
-                        {products.length}
-                      </div>
-                      <div className="text-xs text-gray-600">Products</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-orange-600">
-                        {totalReviews}
-                      </div>
-                      <div className="text-xs text-gray-600">Reviews</div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <Button
-                      onClick={handleContactSeller}
-                      className="w-full bg-orange-600 hover:bg-orange-700 text-white"
-                    >
-                      <MessageCircle className="h-4 w-4 mr-2" />
-                      Contact Seller
-                    </Button>
-
-                    <div className="flex items-center justify-center text-xs text-gray-500">
-                      <Shield className="h-3 w-3 mr-1" />
-                      <span>Secure transactions guaranteed</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Seller Profile Sidebar */}
+          <aside className="w-full lg:w-80 bg-white rounded-xl border border-orange-100 shadow-lg p-6 flex flex-col items-center mb-8 lg:mb-0">
+            <div className="p-4 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-lg mb-4">
+              <Store className="h-12 w-12" />
             </div>
-          </CardContent>
-        </Card>
+            <h2 className="text-xl font-bold text-gray-900 mb-1">
+              {sellerName}
+            </h2>
+            <div className="flex items-center gap-2 mb-2">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  className={`h-5 w-5 ${
+                    star <= avgRating
+                      ? "text-yellow-400 fill-yellow-400"
+                      : "text-gray-300"
+                  }`}
+                />
+              ))}
+              <span className="text-gray-600 text-sm">
+                {avgRating.toFixed(1)} ({totalReviews} reviews)
+              </span>
+            </div>
+            <div className="flex items-center text-sm text-gray-600 mb-2">
+              <MapPin className="h-4 w-4 mr-1 text-orange-500" />
+              <span>{address}</span>
+            </div>
+            <p className="text-gray-700 text-center mb-4">{description}</p>
+            <Button className="w-full bg-orange-600 hover:bg-orange-700 text-white mb-2">
+              <MessageCircle className="h-4 w-4 mr-2" />
+              Contact Seller
+            </Button>
+            <div className="flex items-center justify-center text-xs text-gray-500">
+              <Shield className="h-3 w-3 mr-1" />
+              <span>Secure transactions guaranteed</span>
+            </div>
+          </aside>
 
-        {/* Products Section */}
-        <div className="bg-white rounded-xl border border-orange-100 shadow-sm">
-          {/* Products Header */}
-          <div className="p-6 border-b border-orange-100">
-            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-              <div>
+          {/* Products Section */}
+          <main className="flex-1">
+            <div className="bg-white rounded-xl border border-orange-100 shadow-sm">
+              <div className="p-6 border-b border-orange-100">
                 <h2 className="text-xl font-bold text-gray-900 mb-1">
                   Products
                 </h2>
-                <p className="text-gray-600 text-sm">
-                  {filteredProducts.length} products available
+                <p className="text-gray-600 text-sm mb-4">
+                  {products.length} product{products.length !== 1 ? "s" : ""}{" "}
+                  available
                 </p>
               </div>
-
-              <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-                {/* Search */}
-                <div className="relative flex-1 lg:w-64">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search products..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-orange-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/20 text-sm"
-                  />
-                </div>
-
-                {/* Filters */}
-                <div className="flex gap-2">
-                  <select
-                    value={categoryFilter}
-                    onChange={(e) => setCategoryFilter(e.target.value)}
-                    className="px-3 py-2 border border-orange-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/20 text-sm"
-                  >
-                    <option value="all">All Categories</option>
-                    <option value="chicken">Chicken</option>
-                    <option value="duck">Duck</option>
-                    <option value="turkey">Turkey</option>
-                    <option value="other">Other</option>
-                  </select>
-
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="px-3 py-2 border border-orange-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/20 text-sm"
-                  >
-                    <option value="newest">Newest</option>
-                    <option value="oldest">Oldest</option>
-                    <option value="price-low">Price: Low to High</option>
-                    <option value="price-high">Price: High to Low</option>
-                    <option value="popular">Most Popular</option>
-                  </select>
-
-                  <div className="flex border border-orange-200 rounded-lg overflow-hidden">
-                    <button
-                      onClick={() => setViewMode("grid")}
-                      className={`p-2 ${
-                        viewMode === "grid"
-                          ? "bg-orange-100 text-orange-600"
-                          : "text-gray-500 hover:bg-gray-50"
-                      }`}
-                    >
-                      <Grid className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => setViewMode("list")}
-                      className={`p-2 ${
-                        viewMode === "list"
-                          ? "bg-orange-100 text-orange-600"
-                          : "text-gray-500 hover:bg-gray-50"
-                      }`}
-                    >
-                      <List className="h-4 w-4" />
-                    </button>
+              <div className="p-6">
+                {products.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {products.map((product) => (
+                      <div
+                        key={product._id}
+                        className="group rounded-lg overflow-hidden border border-orange-100 bg-white shadow-sm hover:shadow-md transition-all"
+                      >
+                        <Link to={`/products/${product._id}`} className="block">
+                          <div className="aspect-square bg-orange-50 relative overflow-hidden">
+                            <img
+                              src={product.images?.[0] || "/1f425.png"}
+                              alt={product.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              onError={(e) => {
+                                e.target.src = "/1f425.png";
+                              }}
+                            />
+                            {product.quantity === 0 && (
+                              <div className="absolute top-2 left-2 bg-red-100 text-red-700 text-xs font-medium px-2 py-1 rounded">
+                                Sold Out
+                              </div>
+                            )}
+                          </div>
+                        </Link>
+                        <div className="p-4">
+                          <Link to={`/products/${product._id}`}>
+                            <h3 className="font-medium text-gray-900 group-hover:text-orange-600 transition-colors mb-1 line-clamp-1">
+                              {product.name}
+                            </h3>
+                          </Link>
+                          {product.breed && (
+                            <p className="text-sm text-gray-500 mb-2">
+                              Breed: {product.breed}
+                            </p>
+                          )}
+                          <div className="flex items-center justify-between">
+                            <div className="font-bold text-orange-600">
+                              ₱{product.price.toFixed(2)}
+                            </div>
+                            <Button
+                              size="sm"
+                              className="bg-orange-600 hover:bg-orange-700 text-white"
+                            >
+                              Add to Cart
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
+                ) : (
+                  <div className="text-center py-16">
+                    <Package className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      No products found
+                    </h3>
+                    <p className="text-gray-600">
+                      This store hasn't added any products yet.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-
-          {/* Products Grid/List */}
-          <div className="p-6">
-            {filteredProducts.length > 0 ? (
-              <div
-                className={
-                  viewMode === "grid"
-                    ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-                    : "space-y-4"
-                }
-              >
-                {filteredProducts.map((product) => (
-                  <ProductCard
-                    key={product._id}
-                    product={product}
-                    viewMode={viewMode}
-                    onAddToCart={() => handleAddToCart(product)}
-                    onToggleWishlist={() => handleToggleWishlist(product)}
-                    isInWishlist={isInWishlist(product._id)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-16">
-                <Package className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  No products found
-                </h3>
-                <p className="text-gray-600">
-                  {searchTerm || categoryFilter !== "all"
-                    ? "Try adjusting your search or filters"
-                    : "This store hasn't added any products yet"}
-                </p>
-              </div>
-            )}
-          </div>
+          </main>
         </div>
       </div>
     </div>

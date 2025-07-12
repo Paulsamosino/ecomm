@@ -66,7 +66,7 @@ const orderSchema = new mongoose.Schema(
       method: {
         type: String,
         required: true,
-        enum: ["credit_card", "debit_card", "bank_transfer", "paypal"],
+        enum: ["credit_card", "debit_card", "bank_transfer", "paypal", "cod"],
       },
       status: {
         type: String,
@@ -99,7 +99,7 @@ const orderSchema = new mongoose.Schema(
           "EXPIRED",
           "REJECTED",
           "DRIVER_CANCELLED",
-          "SYSTEM_CANCELLED"
+          "SYSTEM_CANCELLED",
         ],
         default: "pending",
       },
@@ -271,6 +271,80 @@ orderSchema.methods.refund = async function (refundId) {
   }
 
   return this.save();
+};
+
+// Static method to get seller metrics
+orderSchema.statics.getSellerMetrics = async function (
+  sellerId,
+  timeframe = 30
+) {
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - timeframe);
+
+  // Total orders in timeframe
+  const totalOrders = await this.countDocuments({
+    seller: sellerId,
+    createdAt: { $gte: startDate },
+  });
+
+  // Completed orders in timeframe
+  const completedOrders = await this.countDocuments({
+    seller: sellerId,
+    status: "completed",
+    createdAt: { $gte: startDate },
+  });
+
+  // Total revenue in timeframe
+  const revenueAgg = await this.aggregate([
+    {
+      $match: {
+        seller: mongoose.Types.ObjectId(sellerId),
+        status: "completed",
+        createdAt: { $gte: startDate },
+      },
+    },
+    { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+  ]);
+  const totalRevenue = revenueAgg.length > 0 ? revenueAgg[0].total : 0;
+
+  // Conversion rate: completed/total (avoid div by zero)
+  const conversionRate =
+    totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0;
+
+  // Recent orders (last 5)
+  const recentOrders = await this.find({
+    seller: sellerId,
+    createdAt: { $gte: startDate },
+  })
+    .sort({ createdAt: -1 })
+    .limit(5)
+    .populate("buyer", "name email");
+
+  // Top products (by quantity sold)
+  const topProducts = await this.aggregate([
+    {
+      $match: {
+        seller: mongoose.Types.ObjectId(sellerId),
+        status: "completed",
+        createdAt: { $gte: startDate },
+      },
+    },
+    { $unwind: "$items" },
+    {
+      $group: { _id: "$items.product", totalSold: { $sum: "$items.quantity" } },
+    },
+    { $sort: { totalSold: -1 } },
+    { $limit: 5 },
+  ]);
+
+  return {
+    totalOrders,
+    completedOrders,
+    totalRevenue,
+    conversionRate,
+    recentOrders,
+    topProducts,
+  };
 };
 
 const Order = mongoose.model("Order", orderSchema);

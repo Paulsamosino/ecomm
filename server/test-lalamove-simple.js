@@ -28,7 +28,7 @@ async function testSimpleLalamove() {
     const time = Date.now().toString();
     const method = "GET";
     const path = "/v3/orders";
-    const rawSignature = `${time}${method}${path}`;
+    const rawSignature = `${time}\r\n${method}\r\n${path}\r\n\r\n`;
 
     const signature = crypto
       .createHmac("sha256", secret)
