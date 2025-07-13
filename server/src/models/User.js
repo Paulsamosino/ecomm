@@ -58,6 +58,14 @@ const userSchema = new mongoose.Schema(
       businessName: String,
       description: String,
       logo: String,
+      location: {
+        street: String,
+        city: String,
+        state: String,
+        zipCode: String,
+        country: String,
+        phone: String,
+      },
       totalSales: {
         type: Number,
         default: 0,
@@ -117,6 +125,38 @@ const userSchema = new mongoose.Schema(
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Product",
+      },
+    ],
+    addresses: [
+      {
+        street: {
+          type: String,
+          required: true,
+        },
+        city: {
+          type: String,
+          required: true,
+        },
+        state: {
+          type: String,
+          required: true,
+        },
+        zipCode: {
+          type: String,
+          required: true,
+        },
+        country: {
+          type: String,
+          required: true,
+          default: "Philippines",
+        },
+        phone: {
+          type: String,
+        },
+        isDefault: {
+          type: Boolean,
+          default: false,
+        },
       },
     ],
     notifications: {

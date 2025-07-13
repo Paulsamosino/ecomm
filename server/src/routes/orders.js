@@ -128,7 +128,7 @@ router.post("/", protect, async (req, res) => {
     try {
       const populatedOrder = await Order.findById(order._id)
         .populate("buyer", "name phone email")
-        .populate("seller", "name phone email address")
+        .populate("seller", "name phone email address sellerProfile")
         .populate("items.product");
 
       await deliveryController.autoCreateDelivery(populatedOrder);

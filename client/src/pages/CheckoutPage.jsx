@@ -18,13 +18,6 @@ import {
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 // Constants
-const VEHICLE_TYPES = [
-  { value: "MOTORCYCLE", label: "Motorcycle", description: "Small items, fastest delivery", icon: "🏍️" },
-  { value: "MPV", label: "MPV", description: "Medium items, good for multiple products", icon: "🚗" },
-  { value: "VAN", label: "Van", description: "Large items, bulk orders", icon: "🚐" },
-  { value: "TRUCK330", label: "Small Truck", description: "Very large items", icon: "🚚" }
-];
-
 const PAYMENT_METHODS = [
   { value: "paypal", label: "PayPal", icon: CreditCard, color: "#0070ba" },
   { value: "cod", label: "Cash on Delivery", icon: Banknote, color: "#16a34a" }
@@ -156,40 +149,13 @@ const useOrderCalculations = (displayTotal, shippingFee) => {
 };
 
 // Components
-const VehicleTypeSelector = ({ vehicleType, onVehicleTypeChange }) => (
-  <div className="mb-6">
-    <Label>Delivery Vehicle Type</Label>
-    <Select value={vehicleType} onValueChange={onVehicleTypeChange}>
-      <SelectTrigger>
-        <SelectValue placeholder="Select delivery vehicle" />
-      </SelectTrigger>
-      <SelectContent>
-        {VEHICLE_TYPES.map((vehicle) => (
-          <SelectItem key={vehicle.value} value={vehicle.value}>
-            <div className="flex items-center gap-3">
-              <span className="text-lg">{vehicle.icon}</span>
-              <div>
-                <div className="font-medium">{vehicle.label}</div>
-                <div className="text-sm text-gray-500">{vehicle.description}</div>
-              </div>
-            </div>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-    <p className="text-sm text-gray-500 mt-1">Choose based on your order size and urgency</p>
-  </div>
-);
-
 const AddressSelector = ({ savedAddresses, selectedAddressId, onAddressChange }) => {
-  if (savedAddresses.length === 0) return null;
-
   return (
     <div className="mb-6">
-      <Label>Choose Address</Label>
+      <Label>Choose Delivery Address</Label>
       <Select value={selectedAddressId || "new"} onValueChange={onAddressChange}>
         <SelectTrigger>
-          <SelectValue placeholder="Select a saved address" />
+          <SelectValue placeholder={savedAddresses.length > 0 ? "Select a saved address" : "Add new address"} />
         </SelectTrigger>
         <SelectContent>
           {savedAddresses.map((address) => (
@@ -211,6 +177,11 @@ const AddressSelector = ({ savedAddresses, selectedAddressId, onAddressChange })
           </SelectItem>
         </SelectContent>
       </Select>
+      {savedAddresses.length === 0 && (
+        <p className="text-sm text-gray-500 mt-1">
+          You don't have any saved addresses yet. Add your first address below.
+        </p>
+      )}
     </div>
   );
 };
@@ -417,12 +388,9 @@ const OrderSummary = ({
   platformFee, 
   shippingFee, 
   total, 
-  vehicleType, 
   isFetchingShipping, 
   shippingError 
 }) => {
-  const vehicleLabel = VEHICLE_TYPES.find(v => v.value === vehicleType)?.label;
-
   return (
     <div className="space-y-3 mb-6">
       <div className="flex justify-between text-gray-600">
@@ -434,7 +402,7 @@ const OrderSummary = ({
         <span>{formatPrice(platformFee)}</span>
       </div>
       <div className="flex justify-between text-gray-600">
-        <span>Shipping ({vehicleLabel})</span>
+        <span>Shipping</span>
         {isFetchingShipping ? (
           <span className="text-blue-500">Calculating...</span>
         ) : shippingError ? (
@@ -508,7 +476,7 @@ const CheckoutPage = () => {
   const [paymentMethod, setPaymentMethod] = useState("paypal");
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState("");
-  const [useNewAddress, setUseNewAddress] = useState(false);
+  const [useNewAddress, setUseNewAddress] = useState(true);
   const [saveNewAddress, setSaveNewAddress] = useState(false);
   const [phoneError, setPhoneError] = useState("");
   const [shippingDetails, setShippingDetails] = useState({
@@ -517,7 +485,6 @@ const CheckoutPage = () => {
   const [shippingFee, setShippingFee] = useState(null);
   const [isFetchingShipping, setIsFetchingShipping] = useState(false);
   const [shippingError, setShippingError] = useState(null);
-  const [vehicleType, setVehicleType] = useState("MOTORCYCLE");
 
   // Custom hooks
   const isFormValid = useFormValidation(shippingDetails, phoneError, selectedAddressId, useNewAddress, savedAddresses);
@@ -562,7 +529,9 @@ const CheckoutPage = () => {
           phone: selectedAddress.phone,
         });
         // Validate the phone number from saved address
-        const digits = selectedAddress.phone?.replace(/\D/g, "") || "";
+        const digits = selectedAddress.phone?.startsWith("+63") 
+          ? selectedAddress.phone.substring(3).replace(/\D/g, "")
+          : selectedAddress.phone?.replace(/\D/g, "") || "";
         setPhoneError(validatePhone(digits));
       }
     }
@@ -585,6 +554,7 @@ const CheckoutPage = () => {
         const defaultAddress = addresses.find(addr => addr.isDefault);
         if (defaultAddress && !selectedAddressId) {
           setSelectedAddressId(defaultAddress._id);
+          setUseNewAddress(false); // Use saved address instead of new address form
           setShippingDetails({
             street: defaultAddress.street,
             city: defaultAddress.city,
@@ -594,7 +564,9 @@ const CheckoutPage = () => {
             phone: defaultAddress.phone,
           });
           // Validate the phone number from default address
-          const digits = defaultAddress.phone?.replace(/\D/g, "") || "";
+          const digits = defaultAddress.phone?.startsWith("+63")
+            ? defaultAddress.phone.substring(3).replace(/\D/g, "")
+            : defaultAddress.phone?.replace(/\D/g, "") || "";
           setPhoneError(validatePhone(digits));
         }
       }
@@ -647,6 +619,9 @@ const CheckoutPage = () => {
     setShippingError(null);
     
     try {
+      // Get seller ID from the first item (assuming all items are from the same seller)
+      const sellerId = displayProducts[0]?.seller?._id;
+      
       const response = await fetch(`${API_URL}/api/delivery/quote`, {
         method: "POST",
         headers: { 
@@ -654,7 +629,8 @@ const CheckoutPage = () => {
           "Authorization": `Bearer ${localStorage.getItem("token")}`
         },
         body: JSON.stringify({
-          vehicleType,
+          vehicleType: "MOTORCYCLE", // Default vehicle type
+          sellerId, // Include seller ID for pickup location
           dropoff: {
             ...shippingDetails,
             fullAddress: `${shippingDetails.street}, ${shippingDetails.city}, ${shippingDetails.state} ${shippingDetails.zipCode}, ${shippingDetails.country}`
@@ -677,7 +653,7 @@ const CheckoutPage = () => {
     } finally {
       setIsFetchingShipping(false);
     }
-  }, [shippingDetails, vehicleType]);
+  }, [shippingDetails, displayProducts]);
 
   const saveAddressToProfile = useCallback(async (addressData) => {
     try {
@@ -727,7 +703,7 @@ const CheckoutPage = () => {
         })),
         totalAmount: total,
         shippingAddress: shippingDetails,
-        delivery: { vehicleType, shippingFee: shippingFee || 0 },
+        delivery: { vehicleType: "MOTORCYCLE", shippingFee: shippingFee || 0 },
         ...orderData,
       }),
     });
@@ -744,7 +720,7 @@ const CheckoutPage = () => {
     toast.success("Order placed successfully!");
     if (!isBuyNow) clearCart();
     navigate("/success-payment");
-  }, [displayProducts, total, shippingDetails, vehicleType, shippingFee, saveNewAddress, useNewAddress, savedAddresses, saveAddressToProfile, isBuyNow, clearCart, navigate]);
+  }, [displayProducts, total, shippingDetails, shippingFee, saveNewAddress, useNewAddress, savedAddresses, saveAddressToProfile, isBuyNow, clearCart, navigate]);
 
   const handlePaymentSuccess = useCallback(async (order) => {
     try {
@@ -828,11 +804,6 @@ const CheckoutPage = () => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
           <h2 className="text-xl font-semibold mb-4">Shipping Information</h2>
 
-          <VehicleTypeSelector 
-            vehicleType={vehicleType} 
-            onVehicleTypeChange={setVehicleType} 
-          />
-
           <AddressSelector 
             savedAddresses={savedAddresses}
             selectedAddressId={selectedAddressId}
@@ -850,17 +821,14 @@ const CheckoutPage = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-          <h2 className="text-xl font-semibold mb-4">Order Summary</h2>
-          
-          <OrderSummary 
-            displayTotal={displayTotal}
-            platformFee={platformFee}
-            shippingFee={shippingFee}
-            total={total}
-            vehicleType={vehicleType}
-            isFetchingShipping={isFetchingShipping}
-            shippingError={shippingError}
-          />
+          <h2 className="text-xl font-semibold mb-4">Order Summary</h2>            <OrderSummary
+              displayTotal={displayTotal}
+              platformFee={platformFee}
+              shippingFee={shippingFee}
+              total={total}
+              isFetchingShipping={isFetchingShipping}
+              shippingError={shippingError}
+            />
 
           {isProcessing ? (
             <div className="flex items-center justify-center p-4 border rounded-lg bg-gray-50">

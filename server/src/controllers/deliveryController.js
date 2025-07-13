@@ -125,18 +125,40 @@ const deliveryController = {
     try {
       console.log("Creating delivery for order:", order._id);
 
-      // 1. Define pickup location using a known-good Lalamove sandbox address.
-      const pickupLocation = {
-        lat: 14.5838,
-        lng: 121.0565,
-        address: "SM Megamall, Mandaluyong, Metro Manila",
-        contact: {
-          name: order.seller?.name || "Store Manager",
-          phone: this._formatPhoneNumber(
-            process.env.LALAMOVE_API_USER || "+639171234567"
-          ),
-        },
-      };
+      // 1. Get seller's location from their profile
+      let pickupLocation;
+      
+      if (order.seller?.sellerProfile?.location) {
+        const sellerLocation = order.seller.sellerProfile.location;
+        const sellerFullAddress = `${sellerLocation.street}, ${sellerLocation.city}, ${sellerLocation.state} ${sellerLocation.zipCode}, ${sellerLocation.country}`;
+        const pickupCoords = await this._geocodeAddress(sellerFullAddress);
+        
+        pickupLocation = {
+          lat: pickupCoords.lat,
+          lng: pickupCoords.lng,
+          address: sellerFullAddress,
+          contact: {
+            name: order.seller?.name || "Store Manager",
+            phone: this._formatPhoneNumber(
+              sellerLocation.phone || order.seller?.phone || process.env.LALAMOVE_API_USER || "+639171234567"
+            ),
+          },
+        };
+      } else {
+        // Fallback to default location if seller hasn't set their location
+        console.warn(`Seller ${order.seller?._id} has no location set, using default pickup location`);
+        pickupLocation = {
+          lat: 14.5838,
+          lng: 121.0565,
+          address: "SM Megamall, Mandaluyong, Metro Manila (Default Store Location)",
+          contact: {
+            name: order.seller?.name || "Store Manager",
+            phone: this._formatPhoneNumber(
+              order.seller?.phone || process.env.LALAMOVE_API_USER || "+639171234567"
+            ),
+          },
+        };
+      }
 
       // 2. Get real coordinates for customer's delivery address
       const customerFullAddress = order.shippingAddress ? 
@@ -420,20 +442,48 @@ const deliveryController = {
   // Get delivery quotation (for shipping fee calculation)
   async getQuotation(req, res) {
     try {
-      const { vehicleType = "MOTORCYCLE", dropoff } = req.body;
+      const { vehicleType = "MOTORCYCLE", dropoff, sellerId } = req.body;
       
-      // For demo, use a fixed pickup location (store address)
-      const pickupLocation = {
-        lat: 14.5838,
-        lng: 121.0565,
-        address: "SM Megamall, Mandaluyong, Metro Manila",
-        contact: {
-          name: "Store Manager",
-          phone: this._formatPhoneNumber(
-            process.env.LALAMOVE_API_USER || "+639171234567"
-          ),
-        },
-      };
+      // Get seller's location from their profile
+      let pickupLocation;
+      
+      if (sellerId) {
+        const User = require("../models/User");
+        const seller = await User.findById(sellerId);
+        
+        if (seller?.sellerProfile?.location) {
+          const sellerLocation = seller.sellerProfile.location;
+          const sellerFullAddress = `${sellerLocation.street}, ${sellerLocation.city}, ${sellerLocation.state} ${sellerLocation.zipCode}, ${sellerLocation.country}`;
+          const pickupCoords = await this._geocodeAddress(sellerFullAddress);
+          
+          pickupLocation = {
+            lat: pickupCoords.lat,
+            lng: pickupCoords.lng,
+            address: sellerFullAddress,
+            contact: {
+              name: seller.name || "Store Manager",
+              phone: this._formatPhoneNumber(
+                sellerLocation.phone || seller.phone || process.env.LALAMOVE_API_USER || "+639171234567"
+              ),
+            },
+          };
+        }
+      }
+      
+      // Fallback to default location if no seller specified or seller has no location
+      if (!pickupLocation) {
+        pickupLocation = {
+          lat: 14.5838,
+          lng: 121.0565,
+          address: "SM Megamall, Mandaluyong, Metro Manila (Default Store Location)",
+          contact: {
+            name: "Store Manager",
+            phone: this._formatPhoneNumber(
+              process.env.LALAMOVE_API_USER || "+639171234567"
+            ),
+          },
+        };
+      }
       
       // Use provided dropoff address (customer)
       if (
