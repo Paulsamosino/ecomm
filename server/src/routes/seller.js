@@ -19,7 +19,8 @@ router.get("/:sellerId/profile", async (req, res) => {
       return res.status(400).json({ message: "Invalid seller ID" });
     }
 
-    const seller = await User.findOne({
+    // First try to find seller with isSeller flag
+    let seller = await User.findOne({
       _id: sellerId,
       isSeller: true,
     })
@@ -28,6 +29,20 @@ router.get("/:sellerId/profile", async (req, res) => {
         "sellerProfile",
         "businessName description storeType rating contactInfo"
       );
+
+    // If not found as seller, check if user has any products (making them a de-facto seller)
+    if (!seller) {
+      const hasProducts = await Product.findOne({ seller: sellerId });
+      if (hasProducts) {
+        // User has products, so treat them as a seller
+        seller = await User.findById(sellerId)
+          .select("name email sellerProfile isOnline lastActive")
+          .populate(
+            "sellerProfile",
+            "businessName description storeType rating contactInfo"
+          );
+      }
+    }
 
     if (!seller) {
       return res.status(404).json({ message: "Seller not found" });
@@ -50,16 +65,13 @@ router.get("/:sellerId/products", async (req, res) => {
       return res.status(400).json({ message: "Invalid seller ID" });
     }
 
-    // Check if seller exists
-    const seller = await User.findOne({
-      _id: sellerId,
-      isSeller: true,
-    });
-
-    if (!seller) {
-      return res.status(404).json({ message: "Seller not found" });
+    // Check if user exists (don't require isSeller flag)
+    const user = await User.findById(sellerId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
 
+    // Get products for this seller
     const products = await Product.find({
       seller: sellerId,
       isActive: { $ne: false }, // Only show active products

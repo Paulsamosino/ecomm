@@ -3,7 +3,7 @@ const router = express.Router();
 const Report = require("../models/Report");
 const User = require("../models/User");
 const { protect } = require("../middleware/authMiddleware");
-const { checkRole } = require("../middleware/checkRole");
+const checkRole = require("../middleware/checkRole");
 
 // Submit a report
 router.post("/", protect, async (req, res) => {
@@ -119,7 +119,7 @@ router.get("/my-reports", protect, async (req, res) => {
 });
 
 // Admin: Get all reports
-router.get("/", protect, checkRole(["admin"]), async (req, res) => {
+router.get("/", protect, checkRole("admin"), async (req, res) => {
   try {
     const reports = await Report.find()
       .populate("reporter", "name email")
@@ -168,7 +168,7 @@ router.get("/", protect, checkRole(["admin"]), async (req, res) => {
 });
 
 // Admin: Update report status
-router.put("/:id/status", protect, checkRole(["admin"]), async (req, res) => {
+router.put("/:id/status", protect, checkRole("admin"), async (req, res) => {
   try {
     const { status, resolution } = req.body;
 

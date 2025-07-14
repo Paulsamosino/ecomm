@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { axiosInstance } from "@/contexts/axios";
-import { apiGetProduct } from "@/api/products";
+import { apiGetProduct, apiCanReviewProduct } from "@/api/products";
 import {
   Star,
   MessageSquare,
@@ -34,6 +34,7 @@ import {
 import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
 import ReportModal from "@/components/common/ReportModal";
+import ReviewModal from "@/components/common/ReviewModal";
 
 const ProductDetailPage = () => {
   const { id } = useParams();
@@ -48,11 +49,24 @@ const ProductDetailPage = () => {
   const [activeTab, setActiveTab] = useState("description");
   const [similarProducts, setSimilarProducts] = useState([]);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [canReview, setCanReview] = useState(false);
+  const [reviewEligibility, setReviewEligibility] = useState({ 
+    canReview: false, 
+    hasPurchased: false, 
+    hasReviewed: false 
+  });
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchProduct();
   }, [id]);
+
+  useEffect(() => {
+    if (user && product) {
+      checkReviewEligibility();
+    }
+  }, [user, product]);
 
   const fetchProduct = async () => {
     try {
@@ -65,6 +79,22 @@ const ProductDetailPage = () => {
       if (!data) throw new Error("Product not found");
 
       setProduct(data);
+
+      // Check review eligibility
+      if (user) {
+        const hasPurchased = data.buyers?.some(
+          (buyer) => buyer.userId === user._id
+        );
+        const hasReviewed = data.reviews?.some(
+          (review) => review.userId === user._id
+        );
+
+        setReviewEligibility({
+          canReview: hasPurchased && !hasReviewed,
+          hasPurchased,
+          hasReviewed,
+        });
+      }
 
       // Fetch similar products
       try {
@@ -119,6 +149,57 @@ const ProductDetailPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const checkReviewEligibility = async () => {
+    if (!user || !product) return;
+    
+    try {
+      const response = await apiCanReviewProduct(id);
+      setReviewEligibility(response);
+    } catch (error) {
+      console.error("Error checking review eligibility:", error);
+      setReviewEligibility({ canReview: false, hasPurchased: false, hasReviewed: false });
+    }
+  };
+
+  const handleReviewAdded = (reviewData) => {
+    // Update the product with the new review and ratings
+    setProduct(prev => ({
+      ...prev,
+      reviews: [...(prev.reviews || []), reviewData.review],
+      averageRating: reviewData.product.averageRating,
+      numReviews: reviewData.product.numReviews
+    }));
+
+    // Update review eligibility
+    setReviewEligibility(prev => ({
+      ...prev,
+      canReview: false,
+      hasReviewed: true
+    }));
+
+    toast.success("Review submitted successfully!");
+  };
+
+  const handleWriteReview = () => {
+    if (!user) {
+      toast.error("Please login to write a review");
+      navigate("/login");
+      return;
+    }
+
+    if (!reviewEligibility.hasPurchased) {
+      toast.error("You can only review products you have purchased");
+      return;
+    }
+
+    if (reviewEligibility.hasReviewed) {
+      toast.error("You have already reviewed this product");
+      return;
+    }
+
+    setIsReviewModalOpen(true);
   };
 
   const handlePreviousImage = () => {
@@ -247,6 +328,48 @@ const ProductDetailPage = () => {
     }
   };
 
+  const handleReportSeller = () => {
+    if (!user) {
+      toast.error("Please login to report this seller");
+      navigate("/login", { state: { from: `/products/${id}` } });
+      return;
+    }
+
+    if (user._id === product.seller._id) {
+      toast.error("You cannot report yourself");
+      return;
+    }
+
+    setIsReportModalOpen(true);
+  };
+
+  const handleOpenReviewModal = () => {
+    if (!user) {
+      toast.error("Please login to write a review");
+      navigate("/login");
+      return;
+    }
+
+    if (!reviewEligibility.hasPurchased) {
+      toast.error("You can only review products you have purchased");
+      return;
+    }
+
+    if (reviewEligibility.hasReviewed) {
+      toast.error("You have already reviewed this product");
+      return;
+    }
+
+    setIsReviewModalOpen(true);
+  };
+
+  const handleReviewSubmitted = () => {
+    setIsReviewModalOpen(false);
+    toast.success("Thank you for your review!");
+    // Refetch product data to update reviews
+    fetchProduct();
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
@@ -310,7 +433,7 @@ const ProductDetailPage = () => {
           className="absolute inset-0 bg-repeat opacity-5"
           style={{
             backgroundImage:
-              "url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48ZyBmaWxsPSIjZmM5ODMwIiBmaWxsLW9wYWNpdHk9IjAuNCIgZmlsbC1ydWxlPSJldmVub2RkIj48cGF0aCBkPSJNMCAwaDIwdjIwSDB6Ii8+PHBhdGggZD0iTTIwIDBoMjB2MjBIMjB6Ii8+PHBhdGggZD0iTTAgMjBoMjB2MjBIMHoiLz48cGF0aCBkPSJNMjAgMjBoMjB2MjBIMjB6Ii8+PC9nPjwvc3ZnPg==')",
+              "url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48ZyBmaWxsPSIjZmM5ODMwIiBmaWxsLW9wYWNpdHk9IjAuNCIgZmlsbC1ydWxlPSJldmVub2RkIj48cGF0aCBkPSJNMCAwaDIwdjIwSDB6Ii8+PHBhdGggZD0iTTIwIDBoMjB2MjBIMjB6Ii8+PHBhdGggZD0iTTAgMjBoMjB2MjBIMjB6Ii8+PC9nPjwvc3ZnPg==')",
           }}
         />
         <div className="absolute top-20 -right-20 w-64 h-64 bg-orange-400/10 rounded-full blur-[80px] animate-pulse-slow" />
@@ -898,9 +1021,33 @@ const ProductDetailPage = () => {
               <div>
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-semibold">Customer Reviews</h3>
-                  <button className="text-sm font-medium text-white bg-primary px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">
-                    Write a Review
-                  </button>
+                  {user ? (
+                    <button
+                      onClick={handleOpenReviewModal}
+                      disabled={!reviewEligibility.canReview}
+                      className={`text-sm font-medium px-4 py-2 rounded-md transition-colors ${
+                        reviewEligibility.canReview
+                          ? 'text-white bg-orange-600 hover:bg-orange-700'
+                          : 'text-gray-500 bg-gray-200 cursor-not-allowed'
+                      }`}
+                      title={
+                        !reviewEligibility.hasPurchased 
+                          ? "You must purchase this product to write a review"
+                          : reviewEligibility.hasReviewed 
+                          ? "You have already reviewed this product"
+                          : "Write a review"
+                      }
+                    >
+                      {reviewEligibility.hasReviewed ? "Already Reviewed" : "Write a Review"}
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => navigate("/login")}
+                      className="text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-md transition-colors"
+                    >
+                      Login to Review
+                    </button>
+                  )}
                 </div>
 
                 <div className="bg-gray-50 rounded-lg p-6 mb-6">
@@ -964,16 +1111,16 @@ const ProductDetailPage = () => {
                   <div className="space-y-6">
                     {product.reviews.map((review, index) => (
                       <div
-                        key={index}
+                        key={review._id || index}
                         className="border-b border-gray-200 pb-6 last:border-b-0"
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center">
-                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                              {review.userName?.charAt(0) || "U"}
+                            <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
+                              {review.userName?.charAt(0) || review.user?.name?.charAt(0) || "U"}
                             </div>
                             <h4 className="font-medium ml-2">
-                              {review.userName || "Anonymous"}
+                              {review.userName || review.user?.name || "Anonymous"}
                             </h4>
                           </div>
                           <div className="flex">
@@ -990,7 +1137,7 @@ const ProductDetailPage = () => {
                           </div>
                         </div>
                         <p className="text-sm text-gray-600 mb-1">
-                          {new Date(review.date).toLocaleDateString(undefined, {
+                          {new Date(review.createdAt || review.date).toLocaleDateString(undefined, {
                             year: "numeric",
                             month: "long",
                             day: "numeric",
@@ -1080,8 +1227,24 @@ const ProductDetailPage = () => {
       <ReportModal
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
-        productId={product._id}
-        productName={product.name}
+        reportedUserId={product?.seller?._id}
+        reporterRole={user?.isSeller ? "seller" : "buyer"}
+      />
+
+      {/* Add the Review Modal */}
+      <ReviewModal
+        isOpen={isReviewModalOpen}
+        onClose={() => setIsReviewModalOpen(false)}
+        productId={product?._id}
+        onReviewSubmitted={handleReviewSubmitted}
+      />
+      
+      {/* Review Modal */}
+      <ReviewModal
+        isOpen={isReviewModalOpen}
+        onClose={() => setIsReviewModalOpen(false)}
+        productId={id}
+        onReviewAdded={handleReviewAdded}
       />
     </div>
   );

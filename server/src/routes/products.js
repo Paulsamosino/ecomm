@@ -3,6 +3,7 @@ const router = express.Router();
 const path = require("path");
 const auth = require("../middleware/auth");
 const Product = require("../models/Product");
+const Order = require("../models/Order");
 const { upload } = require("../config/cloudinary");
 const mongoose = require("mongoose");
 
@@ -332,6 +333,173 @@ router.delete("/:id", auth, async (req, res) => {
   } catch (error) {
     console.error("Error deleting product:", error);
     res.status(500).json({ message: "Error deleting product" });
+  }
+});
+
+// Add a review to a product
+router.post("/:productId/reviews", auth, async (req, res) => {
+  try {
+    const { rating, comment } = req.body;
+    const productId = req.params.productId;
+    const userId = req.user._id;
+
+    // Validate input
+    if (!rating || !comment) {
+      return res.status(400).json({
+        message: "Rating and comment are required",
+      });
+    }
+
+    if (rating < 1 || rating > 5) {
+      return res.status(400).json({
+        message: "Rating must be between 1 and 5",
+      });
+    }
+
+    // Check if product exists
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    // Check if user has purchased this product
+    const hasPurchased = await Order.findOne({
+      buyer: userId,
+      "items.product": productId,
+      "paymentInfo.status": "completed",
+    });
+
+    if (!hasPurchased) {
+      return res.status(403).json({
+        message: "You can only review products you have purchased",
+      });
+    }
+
+    // Check if user has already reviewed this product
+    const existingReview = product.reviews.find(
+      (review) => review.user.toString() === userId.toString()
+    );
+
+    if (existingReview) {
+      return res.status(400).json({
+        message: "You have already reviewed this product",
+      });
+    }
+
+    // Add the review
+    const newReview = {
+      user: userId,
+      rating: Number(rating),
+      comment: comment.trim(),
+      createdAt: new Date(),
+    };
+
+    product.reviews.push(newReview);
+    await product.save(); // This will trigger the pre-save hook to update averageRating
+
+    // Populate the user data for the response
+    await product.populate({
+      path: "reviews.user",
+      select: "name",
+    });
+
+    // Get the added review with user data
+    const addedReview = product.reviews[product.reviews.length - 1];
+
+    res.status(201).json({
+      message: "Review added successfully",
+      review: {
+        _id: addedReview._id,
+        rating: addedReview.rating,
+        comment: addedReview.comment,
+        createdAt: addedReview.createdAt,
+        userName: addedReview.user.name,
+      },
+      product: {
+        averageRating: product.averageRating,
+        numReviews: product.numReviews,
+      },
+    });
+  } catch (error) {
+    console.error("Error adding review:", error);
+    res.status(500).json({
+      message: "Failed to add review",
+      error: error.message,
+    });
+  }
+});
+
+// Get reviews for a product
+router.get("/:productId/reviews", async (req, res) => {
+  try {
+    const productId = req.params.productId;
+
+    const product = await Product.findById(productId).populate({
+      path: "reviews.user",
+      select: "name",
+    });
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    const reviews = product.reviews.map((review) => ({
+      _id: review._id,
+      rating: review.rating,
+      comment: review.comment,
+      createdAt: review.createdAt,
+      userName: review.user.name,
+    }));
+
+    res.json({
+      reviews,
+      averageRating: product.averageRating,
+      numReviews: product.numReviews,
+    });
+  } catch (error) {
+    console.error("Error fetching reviews:", error);
+    res.status(500).json({
+      message: "Failed to fetch reviews",
+      error: error.message,
+    });
+  }
+});
+
+// Check if user can review a product (has purchased it)
+router.get("/:productId/can-review", auth, async (req, res) => {
+  try {
+    const productId = req.params.productId;
+    const userId = req.user._id;
+
+    // Check if product exists
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    // Check if user has purchased this product
+    const hasPurchased = await Order.findOne({
+      buyer: userId,
+      "items.product": productId,
+      "paymentInfo.status": "completed",
+    });
+
+    // Check if user has already reviewed this product
+    const hasReviewed = product.reviews.some(
+      (review) => review.user.toString() === userId.toString()
+    );
+
+    res.json({
+      canReview: hasPurchased && !hasReviewed,
+      hasPurchased: !!hasPurchased,
+      hasReviewed,
+    });
+  } catch (error) {
+    console.error("Error checking review eligibility:", error);
+    res.status(500).json({
+      message: "Failed to check review eligibility",
+      error: error.message,
+    });
   }
 });
 

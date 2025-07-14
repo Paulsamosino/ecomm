@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiGetProducts } from "@/api/products";
 import { useCart } from "@/contexts/CartContext";
+import TestAd from "@/components/ads/TestAd";
 import {
   Search,
   Filter,
@@ -441,6 +442,9 @@ const ProductListPage = () => {
           {/* Sidebar Filters */}
           <div className="hidden lg:block w-72 flex-shrink-0">
             <div className="sticky top-24">
+              {/* Test Ad - Sidebar Top */}
+              <TestAd type="square" className="mb-6" />
+              
               <div className="bg-white rounded-xl shadow-sm p-6 mb-6 border border-[#ffecd4]">
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-2">
@@ -540,6 +544,9 @@ const ProductListPage = () => {
 
                 {/* Other filters ... */}
               </div>
+              
+              {/* Test Ad - Sidebar Bottom */}
+              <TestAd type="small" className="mt-6" />
             </div>
           </div>
 
@@ -763,6 +770,9 @@ const ProductListPage = () => {
                   </div>
                 </div>
 
+                {/* Test Ad - Before Products */}
+                <TestAd type="banner" className="mb-6" />
+
                 <div
                   className={
                     view === "grid"
@@ -770,8 +780,8 @@ const ProductListPage = () => {
                       : "space-y-4 sm:space-y-6"
                   }
                 >
-                  {products.map((product) =>
-                    view === "grid" ? (
+                  {products.map((product, index) => {
+                    const productCard = view === "grid" ? (
                       <FarmProductCard
                         key={product._id}
                         product={product}
@@ -792,9 +802,26 @@ const ProductListPage = () => {
                         onAddToCart={() => handleAddToCart(product)}
                         onAddToWishlist={() => handleAddToWishlist(product)}
                       />
-                    )
-                  )}
+                    );
+
+                    // Add test ad every 6 products in grid view
+                    if (view === "grid" && (index + 1) % 6 === 0 && index < products.length - 1) {
+                      return (
+                        <React.Fragment key={`product-${product._id}`}>
+                          {productCard}
+                          <div className="col-span-full">
+                            <TestAd type="banner" />
+                          </div>
+                        </React.Fragment>
+                      );
+                    }
+
+                    return productCard;
+                  })}
                 </div>
+
+                {/* Test Ad - After Products */}
+                <TestAd type="banner" className="mt-8 mb-4" />
 
                 {/* Pagination */}
                 {totalPages > 1 && (

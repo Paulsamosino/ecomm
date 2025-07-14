@@ -559,26 +559,6 @@ const chatMessages = [
   },
 ];
 
-// Helper function to generate review templates
-const reviewTemplates = [
-  {
-    comment: "Excellent quality birds, very healthy and exactly as described.",
-    rating: 5,
-  },
-  { comment: "Great seller, fast shipping and good communication.", rating: 5 },
-  { comment: "Birds arrived in perfect condition. Very satisfied!", rating: 5 },
-  {
-    comment: "Healthy birds but shipping took longer than expected.",
-    rating: 4,
-  },
-  { comment: "Good quality but prices are a bit high.", rating: 4 },
-  { comment: "Nice birds but would have liked more variety.", rating: 4 },
-  { comment: "Decent experience overall.", rating: 3 },
-  { comment: "Communication could have been better.", rating: 3 },
-  { comment: "Product was okay but not what I expected.", rating: 3 },
-  { comment: "Had some issues but seller resolved them.", rating: 3 },
-];
-
 // Helper function for generating prices
 function generatePrice(min, max) {
   return Number((Math.random() * (max - min) + min).toFixed(2));
@@ -707,45 +687,24 @@ async function seedDatabase() {
     const sellers = createdUsers.filter((user) => user.role === "seller");
     const buyers = createdUsers.filter((user) => user.role === "buyer");
 
-    // Create products with sellers and reviews
+    // Create products with sellers (no fake reviews)
     if (!sellers.length || !buyers.length) {
       throw new Error(
-        "No sellers or buyers available for product/review creation."
+        "No sellers or buyers available for product creation."
       );
     }
     const createdProducts = await Promise.all(
       products.map(async (product, index) => {
         const seller = sellers[index % sellers.length];
 
-        // Assign 2-3 random reviews to each product
-        const numReviews = Math.floor(Math.random() * 2) + 2; // 2-3 reviews
-        const productReviews = [];
-
-        for (let i = 0; i < numReviews; i++) {
-          const reviewTemplate =
-            reviewTemplates[Math.floor(Math.random() * reviewTemplates.length)];
-          const buyer = buyers[Math.floor(Math.random() * buyers.length)];
-          if (!buyer) continue;
-
-          productReviews.push({
-            rating: reviewTemplate.rating,
-            comment: reviewTemplate.comment,
-            user: buyer._id,
-            userName: buyer.name,
-            date: new Date(
-              Date.now() - Math.floor(Math.random() * 90 * 24 * 60 * 60 * 1000)
-            ), // Random date in last 90 days
-          });
-        }
-
         return await Product.create({
           ...product,
           seller: seller._id,
-          reviews: productReviews,
+          reviews: [], // Start with empty reviews - only real reviews from actual purchases
         });
       })
     );
-    console.log("Products created with reviews");
+    console.log("Products created without fake reviews");
 
     // Create reports
     const reports = generateReports(createdUsers, createdProducts);

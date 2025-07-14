@@ -20,6 +20,7 @@ import {
   Sun,
   Tractor,
   Home,
+  Monitor,
 } from "lucide-react";
 
 const AdminLayout = () => {
