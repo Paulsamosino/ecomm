@@ -4,6 +4,7 @@ const adminController = require("../controllers/adminController");
 const auth = require("../middleware/auth");
 const checkRole = require("../middleware/checkRole");
 const { uploadAds } = require("../config/cloudinary");
+const deliveryStatusSyncService = require("../services/deliveryStatusSyncService");
 
 // Middleware to check if user is admin
 const isAdmin = checkRole("admin");
@@ -53,5 +54,72 @@ router.put("/ads/:id/status", auth, isAdmin, adminController.updateAdStatus);
 router.get("/ads/:id/stats", auth, isAdmin, adminController.getAdStats);
 router.get("/ads/:id/analytics", auth, isAdmin, adminController.getAdAnalytics);
 router.post("/ads/upload", auth, isAdmin, uploadAds.single('image'), adminController.uploadAdImage);
+
+// Delivery Sync Service Management Routes
+router.get("/delivery-sync/status", auth, isAdmin, async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      isRunning: deliveryStatusSyncService.isRunning,
+      message: deliveryStatusSyncService.isRunning ? "Sync service is running" : "Sync service is stopped"
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to get sync service status",
+      error: error.message
+    });
+  }
+});
+
+router.post("/delivery-sync/start", auth, isAdmin, async (req, res) => {
+  try {
+    deliveryStatusSyncService.start();
+    res.json({
+      success: true,
+      message: "Delivery sync service started successfully",
+      isRunning: deliveryStatusSyncService.isRunning
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to start sync service",
+      error: error.message
+    });
+  }
+});
+
+router.post("/delivery-sync/stop", auth, isAdmin, async (req, res) => {
+  try {
+    deliveryStatusSyncService.stop();
+    res.json({
+      success: true,
+      message: "Delivery sync service stopped successfully",
+      isRunning: deliveryStatusSyncService.isRunning
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to stop sync service",
+      error: error.message
+    });
+  }
+});
+
+router.post("/delivery-sync/manual", auth, isAdmin, async (req, res) => {
+  try {
+    await deliveryStatusSyncService.syncAllActiveDeliveries();
+    res.json({
+      success: true,
+      message: "Manual sync completed successfully"
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Manual sync failed",
+      error: error.message
+    });
+  }
+});
 
 module.exports = router;

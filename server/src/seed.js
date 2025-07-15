@@ -10,28 +10,74 @@ const Chat = require("./models/Chat");
 const Message = require("./models/Message");
 const Report = require("./models/Report");
 
-// Helper Functions
-function standardAddress(city) {
-  const streets = [
-    "Main St",
-    "Oak Avenue",
-    "Maple Lane",
-    "Cedar Road",
-    "Pine Street",
-    "Farm Road",
-    "Valley View",
-    "Hill Street",
-  ];
-  const states = ["CA", "NY", "TX", "FL", "IL", "PA", "OH", "GA", "NC", "MI"];
+// Import delivery locations
+const { DELIVERY_LOCATIONS, getCityCoordinates } = require("../../shared/constants/deliveryLocations");
 
+// Helper Functions for Philippine Data
+function getRandomPhilippineCity() {
+  const provinces = Object.keys(DELIVERY_LOCATIONS);
+  const randomProvince = provinces[Math.floor(Math.random() * provinces.length)];
+  const cities = DELIVERY_LOCATIONS[randomProvince];
+  const randomCity = cities[Math.floor(Math.random() * cities.length)];
+  return { city: randomCity.label, province: randomProvince };
+}
+
+function getRandomPhilippinePhone() {
+  // Valid Philippine mobile numbers: +63 9xx xxx xxxx
+  const prefixes = ['917', '918', '919', '920', '921', '922', '923', '924', '925', '926', '927', '928', '929', '939', '947', '948', '949', '950', '951', '952', '953', '954', '955', '956', '975', '977', '978', '979', '994', '995', '996', '997', '998', '999'];
+  const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+  const number = Math.floor(Math.random() * 9000000 + 1000000); // 7-digit number
+  return `+63${prefix}${number}`;
+}
+
+function getRandomPhilippineName() {
+  const firstNames = [
+    // Male names
+    "Juan", "Jose", "Antonio", "Pedro", "Miguel", "Carlos", "Eduardo", "Fernando", "Rafael", "Ricardo",
+    "Roberto", "Daniel", "Manuel", "Francisco", "Gabriel", "Angelo", "Christian", "Mark", "John", "Ryan",
+    "Joshua", "Michael", "David", "James", "Christopher", "Paolo", "Marco", "Vincent", "Francis", "Alexander",
+    // Female names
+    "Maria", "Ana", "Carmen", "Josefa", "Luz", "Teresa", "Elena", "Rosa", "Patricia", "Cristina",
+    "Jennifer", "Michelle", "Angela", "Sarah", "Karen", "Nicole", "Stephanie", "Catherine", "Mary", "Grace",
+    "Joy", "Faith", "Hope", "Angel", "Princess", "Divine", "Precious", "Lovely", "Cherry", "Rose"
+  ];
+  
+  const lastNames = [
+    "Santos", "Reyes", "Cruz", "Bautista", "Ocampo", "Garcia", "Mendoza", "Torres", "Tomas", "Andres",
+    "Marquez", "Robles", "Castillo", "Iglesias", "Herrera", "Morales", "Ramos", "Romero", "Gutierrez", "Gonzales",
+    "Rivera", "Flores", "Gomez", "Pascual", "Valdez", "Soriano", "Aquino", "Fernandez", "Aguilar", "Villareal",
+    "Cabrera", "Santiago", "Mercado", "Dela Cruz", "Villanueva", "Navarro", "Perez", "Manalo", "Luna", "Diaz",
+    "Lopez", "Rodriguez", "Evangelista", "Francisco", "Salazar", "Espinosa", "Domingo", "Castro", "Tolentino", "Lim"
+  ];
+  
+  const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+  const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+  return `${firstName} ${lastName}`;
+}
+
+function getRandomPhilippineStreet() {
+  const streetNames = [
+    "Rizal Street", "Bonifacio Avenue", "Aguinaldo Road", "Mabini Street", "Del Pilar Avenue",
+    "Luna Street", "Quezon Boulevard", "Roxas Avenue", "Magsaysay Street", "Burgos Road",
+    "Gomez Street", "Zamora Avenue", "Escolta Street", "Taft Avenue", "EDSA", "Katipunan Avenue",
+    "Commonwealth Avenue", "España Boulevard", "Ortigas Avenue", "Shaw Boulevard", "Pioneer Street",
+    "Industrial Road", "Commercial Street", "Market Avenue", "Church Street", "School Road",
+    "Barangay Road", "Sitio Street", "Purok Avenue", "Main Street", "Central Avenue",
+    "National Highway", "Provincial Road", "Maharlika Highway", "Pan-Philippine Highway"
+  ];
+  
+  const houseNumber = Math.floor(Math.random() * 999) + 1;
+  const streetName = streetNames[Math.floor(Math.random() * streetNames.length)];
+  return `${houseNumber} ${streetName}`;
+}
+
+function standardAddress(cityName, provinceName) {
   return {
-    street: `${Math.floor(Math.random() * 9999) + 1} ${
-      streets[Math.floor(Math.random() * streets.length)]
-    }`,
-    city: city,
-    state: states[Math.floor(Math.random() * states.length)],
-    zipCode: Math.floor(Math.random() * 89999 + 10000).toString(),
-    country: "USA",
+    street: getRandomPhilippineStreet(),
+    city: cityName,
+    state: provinceName,
+    zipCode: Math.floor(Math.random() * 8999 + 1000).toString(), // Philippine postal codes: 1000-9999
+    country: "Philippines",
   };
 }
 
@@ -40,80 +86,84 @@ const users = [
   // Admin accounts
   ...Array(5)
     .fill()
-    .map((_, i) => ({
-      name: `Admin ${i + 1}`,
-      email: `admin${i + 1}@gmail.com`,
-      password: "password",
-      role: "admin",
-      isAdmin: true,
-      phone: `+1${Math.floor(Math.random() * 900 + 100)}${Math.floor(
-        Math.random() * 9000000 + 1000000
-      )}`,
-      address: standardAddress("Admin City"),
-    })),
+    .map((_, i) => {
+      const location = getRandomPhilippineCity();
+      return {
+        name: getRandomPhilippineName(),
+        email: `admin${i + 1}@gmail.com`,
+        password: "password",
+        role: "admin",
+        isAdmin: true,
+        phone: getRandomPhilippinePhone(),
+        address: standardAddress(location.city, location.province),
+      };
+    }),
 
   // Seller accounts - 30 sellers
   ...Array(30)
     .fill()
-    .map((_, i) => ({
-      name: `Seller ${i + 1}`,
-      email: `seller${i + 1}@gmail.com`,
-      password: "password",
-      role: "seller",
-      isSeller: true,
-      phone: `+1${Math.floor(Math.random() * 900 + 100)}${Math.floor(
-        Math.random() * 9000000 + 1000000
-      )}`,
-      address: standardAddress(`Seller City ${i + 1}`),
-      sellerProfile: {
-        businessName: `${
-          ["Premium", "Quality", "Family", "Heritage", "Organic"][
-            Math.floor(Math.random() * 5)
-          ]
-        } Poultry Farm ${i + 1}`,
-        description: `Established poultry farm specializing in ${
-          ["free-range", "organic", "heritage breed", "premium quality"][
-            Math.floor(Math.random() * 4)
-          ]
-        } poultry products. Serving customers since ${
-          2010 + Math.floor(Math.random() * 13)
-        }.`,
-        website: `https://seller${i + 1}.example.com`,
-        address: standardAddress(`Seller City ${i + 1}`),
-        phone: `+1${Math.floor(Math.random() * 900 + 100)}${Math.floor(
-          Math.random() * 9000000 + 1000000
-        )}`,
-        rating: (4 + Math.random()).toFixed(1),
-        totalSales: Math.floor(Math.random() * 5000) + 1000,
-        responseRate: Math.floor(Math.random() * 20) + 80,
-        responseTime: ["Within 1 hour", "Within 3 hours", "Within 24 hours"][
-          Math.floor(Math.random() * 3)
-        ],
-        verified: Math.random() > 0.2,
-        memberSince: new Date(
-          Date.now() - Math.floor(Math.random() * 365 * 24 * 60 * 60 * 1000)
-        ),
-      },
-    })),
+    .map((_, i) => {
+      const location = getRandomPhilippineCity();
+      const name = getRandomPhilippineName();
+      const businessTypes = [
+        "Poultry Farm", "Livestock Farm", "Egg Production", "Broiler Farm", "Layer Farm",
+        "Duck Farm", "Quail Farm", "Turkey Farm", "Organic Farm", "Free Range Farm"
+      ];
+      const businessType = businessTypes[Math.floor(Math.random() * businessTypes.length)];
+      
+      return {
+        name: name,
+        email: `seller${i + 1}@gmail.com`,
+        password: "password",
+        role: "seller",
+        isSeller: true,
+        phone: getRandomPhilippinePhone(),
+        address: standardAddress(location.city, location.province),
+        sellerProfile: {
+          businessName: `${name.split(' ')[1]} ${businessType}`,
+          description: `Established ${businessType.toLowerCase()} specializing in ${
+            ["free-range", "organic", "heritage breed", "premium quality"][
+              Math.floor(Math.random() * 4)
+            ]
+          } poultry products. Serving customers in ${location.province} since ${
+            2010 + Math.floor(Math.random() * 13)
+          }.`,
+          website: `https://seller${i + 1}.example.com`,
+          location: standardAddress(location.city, location.province),
+          phone: getRandomPhilippinePhone(),
+          rating: (4 + Math.random()).toFixed(1),
+          totalSales: Math.floor(Math.random() * 5000) + 1000,
+          responseRate: Math.floor(Math.random() * 20) + 80,
+          responseTime: ["Within 1 hour", "Within 3 hours", "Within 24 hours"][
+            Math.floor(Math.random() * 3)
+          ],
+          verified: Math.random() > 0.2,
+          memberSince: new Date(
+            Date.now() - Math.floor(Math.random() * 365 * 24 * 60 * 60 * 1000)
+          ),
+        },
+      };
+    }),
 
   // Buyer accounts - 50 buyers
   ...Array(50)
     .fill()
-    .map((_, i) => ({
-      name: `Buyer ${i + 1}`,
-      email: `buyer${i + 1}@gmail.com`,
-      password: "password",
-      role: "buyer",
-      phone: `+1${Math.floor(Math.random() * 900 + 100)}${Math.floor(
-        Math.random() * 9000000 + 1000000
-      )}`,
-      address: standardAddress(`Buyer City ${i + 1}`),
-      wishlist: [],
-      orderHistory: [],
-      createdAt: new Date(
-        Date.now() - Math.floor(Math.random() * 365 * 24 * 60 * 60 * 1000)
-      ),
-    })),
+    .map((_, i) => {
+      const location = getRandomPhilippineCity();
+      return {
+        name: getRandomPhilippineName(),
+        email: `buyer${i + 1}@gmail.com`,
+        password: "password",
+        role: "buyer",
+        phone: getRandomPhilippinePhone(),
+        address: standardAddress(location.city, location.province),
+        wishlist: [],
+        orderHistory: [],
+        createdAt: new Date(
+          Date.now() - Math.floor(Math.random() * 365 * 24 * 60 * 60 * 1000)
+        ),
+      };
+    }),
 ];
 
 const productTemplates = [
@@ -425,7 +475,10 @@ productTemplates.forEach((template) => {
       weight: generateWeight(template.category, age),
       quantity: Math.floor(Math.random() * 50) + 10,
       images: template.images,
-      location: `City ${Math.floor(Math.random() * 10) + 1}`,
+      location: (() => {
+        const loc = getRandomPhilippineCity();
+        return `${loc.city}, ${loc.province}`;
+      })(),
       status: Math.random() < 0.1 ? "out_of_stock" : "active",
       rating: (4 + Math.random()).toFixed(1),
       reviewCount: Math.floor(Math.random() * 200) + 50,

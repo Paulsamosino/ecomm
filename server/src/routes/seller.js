@@ -284,35 +284,60 @@ router.get("/customers", protect, async (req, res) => {
   try {
     const orders = await Order.find({ seller: req.user.id }).populate(
       "buyer",
-      "name email phone address"
+      "name email phone"
     );
 
     const customers = orders.reduce((acc, order) => {
       const buyer = order.buyer;
       if (!acc[buyer._id]) {
+        // Use the shipping address from the most recent order for location display
+        const shippingAddress = order.shippingAddress;
         acc[buyer._id] = {
           _id: buyer._id,
           name: buyer.name,
           email: buyer.email,
-          phone: buyer.phone,
-          location: buyer.address
+          phone: buyer.phone || shippingAddress?.phone,
+          location: shippingAddress
             ? [
-                buyer.address.street,
-                buyer.address.city,
-                buyer.address.state,
-                buyer.address.zipCode,
-                buyer.address.country,
+                shippingAddress.street,
+                shippingAddress.city,
+                shippingAddress.state,
+                shippingAddress.zipCode,
+                shippingAddress.country,
               ]
                 .filter(Boolean)
                 .join(", ")
             : "",
+          city: shippingAddress?.city || "",
+          state: shippingAddress?.state || "",
           totalOrders: 0,
           totalSpent: 0,
           lastPurchase: null,
+          lastShippingAddress: shippingAddress,
           status: "active",
           averageRating: 4.5,
         };
       }
+      
+      // Update with the most recent shipping address
+      if (new Date(order.createdAt) > new Date(acc[buyer._id].lastPurchase || 0)) {
+        if (order.shippingAddress) {
+          acc[buyer._id].location = [
+            order.shippingAddress.street,
+            order.shippingAddress.city,
+            order.shippingAddress.state,
+            order.shippingAddress.zipCode,
+            order.shippingAddress.country,
+          ]
+            .filter(Boolean)
+            .join(", ");
+          acc[buyer._id].city = order.shippingAddress.city || "";
+          acc[buyer._id].state = order.shippingAddress.state || "";
+          acc[buyer._id].lastShippingAddress = order.shippingAddress;
+          acc[buyer._id].phone = acc[buyer._id].phone || order.shippingAddress.phone;
+        }
+      }
+      
       acc[buyer._id].totalOrders++;
       acc[buyer._id].totalSpent += order.totalAmount;
       if (

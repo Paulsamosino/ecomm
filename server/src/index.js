@@ -136,8 +136,32 @@ app.use((err, req, res, next) => {
   res.status(500).json(errorResponse);
 });
 
+// Import delivery sync service
+const deliveryStatusSyncService = require('./services/deliveryStatusSyncService');
+
+// Graceful shutdown handling
+process.on('SIGTERM', () => {
+  console.log('\n🛑 SIGTERM received. Shutting down gracefully...');
+  deliveryStatusSyncService.stop();
+  mongoose.connection.close();
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('\n🛑 SIGINT received. Shutting down gracefully...');
+  deliveryStatusSyncService.stop();
+  mongoose.connection.close();
+  process.exit(0);
+});
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
   console.log("Environment:", process.env.NODE_ENV || "development");
+  
+  // Start automatic delivery status synchronization after server starts
+  setTimeout(() => {
+    console.log('\n🚀 Starting delivery status sync service...');
+    deliveryStatusSyncService.start();
+  }, 3000); // Wait 3 seconds for database connection to stabilize
 });

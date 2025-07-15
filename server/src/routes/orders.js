@@ -57,101 +57,188 @@ router.post("/", protect, async (req, res) => {
       }
     }
 
-    // Get the seller ID from the first item (assuming single seller orders)
-    const sellerId = items[0]?.seller;
-    if (!sellerId) {
-      return res
-        .status(400)
-        .json({ message: "Seller information is required" });
+    // Group items by seller to create separate orders for each seller
+    const itemsBySeller = {};
+    
+    for (const item of items) {
+      const sellerId = item.seller;
+      if (!sellerId) {
+        return res.status(400).json({ 
+          message: "All items must have seller information" 
+        });
+      }
+      
+      if (!itemsBySeller[sellerId]) {
+        itemsBySeller[sellerId] = [];
+      }
+      itemsBySeller[sellerId].push(item);
     }
 
-    // Load seller details for delivery
-    const seller = await User.findById(sellerId).populate("address");
-    if (!seller) {
-      return res.status(404).json({ message: "Seller not found" });
-    }
+    console.log(`📦 Creating orders for ${Object.keys(itemsBySeller).length} seller(s)`);
 
-    const order = new Order({
-      buyer: req.user._id,
-      seller: sellerId,
-      items: items.map((item) => ({
-        product: item.product,
-        seller: item.seller,
-        quantity: item.quantity,
-        price: item.price,
-      })),
-      paymentInfo: {
-        method: paymentInfo.method || "paypal",
-        status: paymentInfo.status || "completed", // Allow pending for COD
-        transactionId: paymentInfo.transactionId,
-        platformFee: totalAmount * 0.02, // 2% platform fee
-      },
-      delivery: delivery ? {
-        status: "pending",
-        price: {
-          amount: delivery.shippingFee || 0,
-          currency: "PHP"
+    const createdOrders = [];
+    const orderResponses = [];
+
+    // Create separate orders for each seller
+    for (const [sellerId, sellerItems] of Object.entries(itemsBySeller)) {
+      try {
+        console.log(`👤 Processing order for seller: ${sellerId} with ${sellerItems.length} items`);
+
+        // Load seller details for delivery
+        const seller = await User.findById(sellerId)
+          .populate("address")
+          .populate("sellerProfile.location");
+        
+        if (!seller) {
+          console.error(`Seller ${sellerId} not found`);
+          return res.status(404).json({ message: `Seller ${sellerId} not found` });
         }
-      } : undefined,
-      status: "pending",
-      totalAmount,
-      shippingAddress,
-    });
 
-    await order.save();
+        // Calculate total for this seller's items
+        const sellerTotal = sellerItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        
+        // Calculate proportional platform fee based on this seller's total
+        const sellerPlatformFee = (sellerTotal / totalAmount) * (totalAmount * 0.02);
 
-    // Update seller's total sales and stats
-    if (seller.sellerProfile) {
-      seller.sellerProfile.totalSales =
-        (seller.sellerProfile.totalSales || 0) + totalAmount;
-      await seller.save();
+        const order = new Order({
+          buyer: req.user._id,
+          seller: sellerId,
+          items: sellerItems.map((item) => ({
+            product: item.product,
+            seller: item.seller,
+            quantity: item.quantity,
+            price: item.price,
+          })),
+          paymentInfo: {
+            method: paymentInfo.method || "paypal",
+            status: paymentInfo.status || "completed",
+            transactionId: paymentInfo.transactionId,
+            platformFee: sellerPlatformFee,
+          },
+          delivery: delivery ? {
+            status: "pending",
+            price: {
+              amount: delivery.shippingFee || 0,
+              currency: "PHP"
+            }
+          } : undefined,
+          status: "pending",
+          totalAmount: sellerTotal,
+          shippingAddress,
+        });
+
+        await order.save();
+        createdOrders.push(order);
+
+        // Update seller's total sales and stats
+        if (seller.sellerProfile) {
+          seller.sellerProfile.totalSales =
+            (seller.sellerProfile.totalSales || 0) + sellerTotal;
+          await seller.save();
+        }
+
+        orderResponses.push({
+          id: order._id,
+          seller: seller.name,
+          sellerId: seller._id,
+          items: sellerItems.length,
+          total: sellerTotal,
+          status: order.status
+        });
+
+        console.log(`✅ Order created for seller ${seller.name}: ${order._id}`);
+
+      } catch (sellerOrderError) {
+        console.error(`❌ Failed to create order for seller ${sellerId}:`, sellerOrderError);
+        return res.status(500).json({
+          message: `Failed to create order for seller ${sellerId}`,
+          error: sellerOrderError.message
+        });
+      }
     }
 
-    // Update buyer's order history
+    // Update buyer's order history with all created orders
     const buyer = await User.findById(req.user._id);
     if (buyer) {
       buyer.orderHistory = buyer.orderHistory || [];
-      buyer.orderHistory.push(order._id);
+      for (const order of createdOrders) {
+        buyer.orderHistory.push(order._id);
+      }
       await buyer.save();
     }
 
-    // Populate order with buyer, seller, and product information for emails and delivery
-    const populatedOrder = await Order.findById(order._id)
-      .populate("buyer", "name phone email")
-      .populate("seller", "name phone email address sellerProfile")
-      .populate("items.product");
+    // Process each order for emails and delivery
+    for (const order of createdOrders) {
+      try {
+        // Populate order with buyer, seller, and product information for emails and delivery
+        const populatedOrder = await Order.findById(order._id)
+          .populate("buyer", "name phone email")
+          .populate({
+            path: "seller", 
+            select: "name phone email address sellerProfile",
+            populate: {
+              path: "sellerProfile.location",
+              select: "street city state zipCode country phone"
+            }
+          })
+          .populate("items.product");
 
-    // Send confirmation emails
-    console.log("📧 Attempting to send confirmation emails for order:", order._id);
-    try {
-      console.log("📤 Sending buyer confirmation email...");
-      await sendOrderConfirmationEmail(populatedOrder);
-      console.log("📤 Sending seller notification email...");
-      await sendSellerOrderNotification(populatedOrder);
-      console.log("✅ Both confirmation emails sent successfully");
-    } catch (emailError) {
-      console.error("❌ Error sending confirmation email:", emailError);
-      console.error("Email error stack:", emailError.stack);
-      // Don't fail the order if email fails
-    }
+        // Debug logging for delivery creation
+        console.log(`🚚 Preparing delivery for order: ${order._id} (Seller: ${populatedOrder.seller?.name})`);
+        console.log("📦 Order details:", {
+          buyer: populatedOrder.buyer?.name,
+          seller: populatedOrder.seller?.name,
+          sellerProfile: populatedOrder.seller?.sellerProfile ? 'Present' : 'Missing',
+          sellerLocation: populatedOrder.seller?.sellerProfile?.location ? 'Present' : 'Missing',
+          shippingAddress: populatedOrder.shippingAddress ? 'Present' : 'Missing'
+        });
 
-    // Automatically create delivery order
-    try {
-      await deliveryController.autoCreateDelivery(populatedOrder);
-    } catch (deliveryError) {
-      console.error("Error creating delivery:", deliveryError);
-      // Don't fail the order if delivery creation fails
-      // It can be retried manually if needed
+        // Send confirmation emails
+        console.log(`📧 Attempting to send confirmation emails for order: ${order._id}`);
+        try {
+          console.log("📤 Sending buyer confirmation email...");
+          await sendOrderConfirmationEmail(populatedOrder);
+          console.log("📤 Sending seller notification email...");
+          await sendSellerOrderNotification(populatedOrder);
+          console.log("✅ Both confirmation emails sent successfully");
+        } catch (emailError) {
+          console.error("❌ Error sending confirmation email:", emailError);
+          console.error("Email error stack:", emailError.stack);
+          // Don't fail the order if email fails
+        }
+
+        // Automatically create delivery order with enhanced logging
+        console.log(`🚚 Starting automatic delivery creation for order ${order._id}...`);
+        try {
+          const deliveryResult = await deliveryController.autoCreateDelivery(populatedOrder);
+          if (deliveryResult) {
+            console.log(`✅ Delivery created successfully for order ${order._id}:`, deliveryResult.id);
+          } else {
+            console.warn(`⚠️ Delivery creation returned null for order ${order._id} (likely config issue)`);
+          }
+        } catch (deliveryError) {
+          console.error(`❌ Error creating delivery for order ${order._id}:`, deliveryError);
+          console.error("Delivery error details:", {
+            message: deliveryError.message,
+            stack: deliveryError.stack,
+            orderId: order._id,
+            seller: populatedOrder.seller?.name
+          });
+          // Don't fail the order if delivery creation fails
+          // It can be retried manually if needed
+        }
+
+      } catch (processingError) {
+        console.error(`❌ Error processing order ${order._id}:`, processingError);
+        // Continue processing other orders even if one fails
+      }
     }
 
     res.status(201).json({
-      message: "Order created successfully",
-      order: {
-        id: order._id,
-        status: order.status,
-        total: order.totalAmount,
-        items: order.items.length,
-      },
+      message: `Orders created successfully for ${createdOrders.length} seller(s)`,
+      orders: orderResponses,
+      totalOrders: createdOrders.length,
+      grandTotal: totalAmount,
     });
   } catch (error) {
     console.error("Order creation error:", error);

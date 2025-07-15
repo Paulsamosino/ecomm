@@ -773,6 +773,12 @@ const ProductListPage = () => {
                 {/* Test Ad - Before Products */}
                 <TestAd type="banner" className="mb-6" />
 
+                {/* Mobile-only ads to replace sidebar ads on smaller screens */}
+                <div className="lg:hidden mb-6 space-y-4">
+                  <TestAd type="square" className="w-full" />
+                  <TestAd type="small" className="w-full" />
+                </div>
+
                 <div
                   className={
                     view === "grid"
@@ -1271,7 +1277,7 @@ const MobileFiltersDrawer = ({
         className="absolute inset-0 bg-black/50"
         onClick={() => setShowFilters(false)}
       />
-      <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-lg">
+      <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-lg overflow-y-auto">
         {/* Filters content */}
         <div className="p-4">
           <div className="flex items-center justify-between mb-4">
@@ -1280,7 +1286,50 @@ const MobileFiltersDrawer = ({
               <X className="h-5 w-5" />
             </button>
           </div>
+          
+          {/* Mobile Ad - Top */}
+          <TestAd type="small" className="mb-6" />
+          
           {/* Add your filter components here */}
+          <div className="mb-6">
+            <h4 className="text-sm font-medium text-gray-900 mb-4 flex items-center gap-2">
+              <Store className="h-4 w-4 text-[#fcba6d]" />
+              Categories
+            </h4>
+            <div className="space-y-2">
+              {CATEGORIES.map((category) => {
+                const Icon = category.icon;
+                const isActive = filters.category === category.id;
+                return (
+                  <button
+                    key={category.id}
+                    onClick={() => handleFilterChange("category", category.id)}
+                    className={`w-full flex items-center gap-3 p-3 rounded-lg text-sm transition-all duration-200 ${
+                      isActive
+                        ? "bg-[#fff5e9] text-[#cd8539] shadow-sm border border-[#ffecd4]"
+                        : "hover:bg-gray-50 text-gray-700 border border-transparent"
+                    }`}
+                  >
+                    <div
+                      className={`p-2 rounded-full ${
+                        isActive ? "bg-[#fcba6d]/10" : "bg-gray-100"
+                      }`}
+                    >
+                      <Icon
+                        className={`h-4 w-4 ${
+                          isActive ? "text-[#fcba6d]" : "text-gray-400"
+                        }`}
+                      />
+                    </div>
+                    <span className="font-medium">{category.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Mobile Ad - Bottom */}
+          <TestAd type="small" className="mt-6" />
         </div>
       </div>
     </div>

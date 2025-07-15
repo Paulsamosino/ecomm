@@ -220,6 +220,7 @@ const sellerRoutes = require("./src/routes/seller");
 const uploadRoutes = require("./src/routes/upload");
 const adminRoutes = require("./src/routes/admin");
 const userRoutes = require("./src/routes/user");
+const deliveryRoutes = require("./src/routes/delivery");
 
 // Serve static files from the React app
 if (process.env.NODE_ENV === "production") {
@@ -232,6 +233,7 @@ app.use("/api/products", productRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/seller", sellerRoutes);
 app.use("/api/orders", require("./src/routes/orders"));
+app.use("/api/delivery", deliveryRoutes); // Delivery routes with sync controls
 app.use("/api/upload", uploadRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/user", userRoutes);
@@ -337,9 +339,40 @@ app.use((req, res) => {
   });
 });
 
+// Import delivery sync service
+const deliveryStatusSyncService = require("./src/services/deliveryStatusSyncService");
+
+// Graceful shutdown handling
+process.on('SIGTERM', () => {
+  console.log('\n🛑 SIGTERM received. Shutting down gracefully...');
+  deliveryStatusSyncService.stop();
+  mongoose.connection.close();
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('\n🛑 SIGINT received. Shutting down gracefully...');
+  deliveryStatusSyncService.stop();
+  mongoose.connection.close();
+  process.exit(0);
+});
+
 // Use PORT from environment variable, defaulting to 3001 only in development
 const PORT = process.env.NODE_ENV === "production" ? process.env.PORT : 3001;
-server.listen(PORT, "0.0.0.0", () => {
+server.listen(PORT, "0.0.0.0", async () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV}`);
+  
+  // Start delivery status sync service after server starts
+  if (mongoose.connection.readyState === 1) {
+    // MongoDB is already connected
+    console.log('\n🚀 Starting delivery status sync service...');
+    deliveryStatusSyncService.start();
+  } else {
+    // Wait for MongoDB connection before starting sync
+    mongoose.connection.once('connected', () => {
+      console.log('\n🚀 Starting delivery status sync service...');
+      deliveryStatusSyncService.start();
+    });
+  }
 });
