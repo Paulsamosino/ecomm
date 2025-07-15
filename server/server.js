@@ -170,6 +170,7 @@ const connectWithRetry = async () => {
     require("./src/models/Chat");
     require("./src/models/Message");
     require("./src/models/Report");
+    require("./src/models/Ad");
 
     console.log("All models registered successfully");
   } catch (err) {
@@ -234,6 +235,7 @@ app.use("/api/orders", require("./src/routes/orders"));
 app.use("/api/upload", uploadRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/user", userRoutes);
+app.use("/api/ads", require("./src/routes/ads")); // Public ads route
 
 // Basic route for testing
 app.get("/", (req, res) => {

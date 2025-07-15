@@ -88,3 +88,70 @@ export const apiGetReportStats = async () => {
   const response = await axiosInstance.get("/admin/reports/stats");
   return response.data;
 };
+
+// Advertisement Management APIs
+export const apiGetAds = async () => {
+  const response = await axiosInstance.get("/admin/ads");
+  return response.data;
+};
+
+export const apiCreateAd = async (adData) => {
+  const response = await axiosInstance.post("/admin/ads", adData);
+  return response.data;
+};
+
+export const apiUpdateAd = async (adId, adData) => {
+  const response = await axiosInstance.put(`/admin/ads/${adId}`, adData);
+  return response.data;
+};
+
+export const apiDeleteAd = async (adId) => {
+  const response = await axiosInstance.delete(`/admin/ads/${adId}`);
+  return response.data;
+};
+
+export const apiGetAdStats = async (adId) => {
+  const response = await axiosInstance.get(`/admin/ads/${adId}/stats`);
+  return response.data;
+};
+
+export const apiUpdateAdStatus = async (adId, status) => {
+  const response = await axiosInstance.put(`/admin/ads/${adId}/status`, { status });
+  return response.data;
+};
+
+// Track ad click
+export const apiTrackAdClick = async (adId) => {
+  const response = await axiosInstance.post(`/ads/${adId}/click`);
+  return response.data;
+};
+
+// Track ad impression
+export const apiTrackAdImpression = async (adId) => {
+  const response = await axiosInstance.post(`/ads/${adId}/impression`);
+  return response.data;
+};
+
+// Get active ads for display (public endpoint)
+export const apiGetActiveAds = async (type = 'banner') => {
+  const response = await axiosInstance.get(`/ads/active?type=${type}`);
+  return response.data;
+};
+
+// Get comprehensive ad analytics
+export const apiGetAdAnalytics = async (adId, period = 'week') => {
+  const response = await axiosInstance.get(`/admin/ads/${adId}/analytics?period=${period}`);
+  return response.data;
+};
+
+// Upload ad image
+export const apiUploadAdImage = async (file) => {
+  const formData = new FormData();
+  formData.append('image', file);
+  const response = await axiosInstance.post('/admin/ads/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return response.data;
+};

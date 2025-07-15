@@ -2,6 +2,7 @@ const User = require("../models/User");
 const Product = require("../models/Product");
 const Order = require("../models/Order");
 const Report = require("../models/Report");
+const Ad = require("../models/Ad");
 
 // Get all users
 exports.getAllUsers = async (req, res) => {
@@ -494,4 +495,306 @@ const generateCategoryDistribution = (products) => {
 const calculateGrowthRate = (current, previous) => {
   if (previous === 0) return current > 0 ? 100 : 0;
   return ((current - previous) / previous) * 100;
+};
+
+// Helper function to format URL
+const formatUrl = (url) => {
+  if (!url) return url;
+  
+  // Remove leading/trailing whitespace
+  url = url.trim();
+  
+  // If URL is empty after trimming, return it
+  if (!url) return url;
+  
+  // If URL already has protocol, return as is
+  if (url.match(/^https?:\/\//i)) {
+    return url;
+  }
+  
+  // Add https:// prefix
+  return `https://${url}`;
+};
+
+// ========== ADVERTISEMENT MANAGEMENT ==========
+
+// Get all ads
+exports.getAllAds = async (req, res) => {
+  try {
+    const ads = await Ad.find()
+      .populate('createdBy', 'name email')
+      .sort({ createdAt: -1 });
+    res.json(ads);
+  } catch (error) {
+    console.error("Error fetching ads:", error);
+    res.status(500).json({ message: "Error fetching ads" });
+  }
+};
+
+// Create new ad
+exports.createAd = async (req, res) => {
+  try {
+    const adData = {
+      ...req.body,
+      createdBy: req.user._id || req.user.id
+    };
+    
+    // Format URL if provided
+    if (adData.url) {
+      adData.url = formatUrl(adData.url);
+    }
+    
+    const ad = new Ad(adData);
+    await ad.save();
+    
+    const populatedAd = await Ad.findById(ad._id).populate('createdBy', 'name email');
+    res.status(201).json(populatedAd);
+  } catch (error) {
+    console.error("Error creating ad:", error);
+    res.status(500).json({ message: "Error creating ad", error: error.message });
+  }
+};
+
+// Update ad
+exports.updateAd = async (req, res) => {
+  try {
+    const updateData = { ...req.body, updatedAt: Date.now() };
+    
+    // Format URL if provided
+    if (updateData.url) {
+      updateData.url = formatUrl(updateData.url);
+    }
+    
+    const ad = await Ad.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true }
+    ).populate('createdBy', 'name email');
+    
+    if (!ad) {
+      return res.status(404).json({ message: "Ad not found" });
+    }
+    
+    res.json(ad);
+  } catch (error) {
+    console.error("Error updating ad:", error);
+    res.status(500).json({ message: "Error updating ad" });
+  }
+};
+
+// Delete ad
+exports.deleteAd = async (req, res) => {
+  try {
+    const ad = await Ad.findByIdAndDelete(req.params.id);
+    if (!ad) {
+      return res.status(404).json({ message: "Ad not found" });
+    }
+    res.json({ message: "Ad deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting ad:", error);
+    res.status(500).json({ message: "Error deleting ad" });
+  }
+};
+
+// Update ad status
+exports.updateAdStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const ad = await Ad.findByIdAndUpdate(
+      req.params.id,
+      { status, updatedAt: Date.now() },
+      { new: true }
+    );
+    
+    if (!ad) {
+      return res.status(404).json({ message: "Ad not found" });
+    }
+    
+    res.json(ad);
+  } catch (error) {
+    console.error("Error updating ad status:", error);
+    res.status(500).json({ message: "Error updating ad status" });
+  }
+};
+
+// Get ad statistics
+exports.getAdStats = async (req, res) => {
+  try {
+    const ad = await Ad.findById(req.params.id);
+    if (!ad) {
+      return res.status(404).json({ message: "Ad not found" });
+    }
+    
+    const stats = {
+      totalClicks: ad.clickCount,
+      totalImpressions: ad.impressionCount,
+      uniqueViewers: ad.uniqueViewers.length,
+      clickThroughRate: ad.impressionCount > 0 ? (ad.clickCount / ad.impressionCount * 100).toFixed(2) : 0,
+      recentClicks: ad.clicks.filter(click => 
+        new Date(click.timestamp) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      ).length,
+      recentImpressions: ad.impressions.filter(impression => 
+        new Date(impression.timestamp) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      ).length
+    };
+    
+    res.json(stats);
+  } catch (error) {
+    console.error("Error fetching ad stats:", error);
+    res.status(500).json({ message: "Error fetching ad stats" });
+  }
+};
+
+// Get ad analytics with time period
+exports.getAdAnalytics = async (req, res) => {
+  try {
+    const { period = 'week' } = req.query;
+    const ad = await Ad.findById(req.params.id);
+    
+    if (!ad) {
+      return res.status(404).json({ message: "Ad not found" });
+    }
+    
+    let startDate;
+    switch (period) {
+      case 'day':
+        startDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        break;
+      case 'week':
+        startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'month':
+        startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case 'year':
+        startDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    }
+    
+    const periodClicks = ad.clicks.filter(click => 
+      new Date(click.timestamp) >= startDate
+    );
+    
+    const periodImpressions = ad.impressions.filter(impression => 
+      new Date(impression.timestamp) >= startDate
+    );
+    
+    const analytics = {
+      totalClicks: ad.clickCount,
+      totalImpressions: ad.impressionCount,
+      periodClicks: periodClicks.length,
+      periodImpressions: periodImpressions.length,
+      uniqueViewers: ad.uniqueViewers.length,
+      clickThroughRate: ad.impressionCount > 0 ? (ad.clickCount / ad.impressionCount * 100).toFixed(2) : 0,
+      periodCTR: periodImpressions.length > 0 ? (periodClicks.length / periodImpressions.length * 100).toFixed(2) : 0
+    };
+    
+    res.json(analytics);
+  } catch (error) {
+    console.error("Error fetching ad analytics:", error);
+    res.status(500).json({ message: "Error fetching ad analytics" });
+  }
+};
+
+// Track ad click
+exports.trackAdClick = async (req, res) => {
+  try {
+    const ad = await Ad.findById(req.params.id);
+    if (!ad) {
+      return res.status(404).json({ message: "Ad not found" });
+    }
+    
+    const clickData = {
+      userId: req.user?._id || req.user?.id || 'anonymous',
+      userAgent: req.headers['user-agent'] || '',
+      ipAddress: req.ip || req.connection.remoteAddress || '',
+      timestamp: new Date()
+    };
+    
+    ad.clicks.push(clickData);
+    ad.clickCount += 1;
+    
+    // Add to unique viewers if user is logged in and not already in the array
+    const userId = req.user?._id || req.user?.id;
+    if (userId && !ad.uniqueViewers.includes(userId.toString())) {
+      ad.uniqueViewers.push(userId.toString());
+    }
+    
+    await ad.save();
+    res.json({ message: "Click tracked successfully" });
+  } catch (error) {
+    console.error("Error tracking ad click:", error);
+    res.status(500).json({ message: "Error tracking ad click" });
+  }
+};
+
+// Track ad impression
+exports.trackAdImpression = async (req, res) => {
+  try {
+    const ad = await Ad.findById(req.params.id);
+    if (!ad) {
+      return res.status(404).json({ message: "Ad not found" });
+    }
+    
+    const impressionData = {
+      userId: req.user?._id || req.user?.id || 'anonymous',
+      userAgent: req.headers['user-agent'] || '',
+      ipAddress: req.ip || req.connection.remoteAddress || '',
+      timestamp: new Date()
+    };
+    
+    ad.impressions.push(impressionData);
+    ad.impressionCount += 1;
+    
+    // Add to unique viewers if user is logged in and not already in the array
+    const userId = req.user?._id || req.user?.id;
+    if (userId && !ad.uniqueViewers.includes(userId.toString())) {
+      ad.uniqueViewers.push(userId.toString());
+    }
+    
+    await ad.save();
+    res.json({ message: "Impression tracked successfully" });
+  } catch (error) {
+    console.error("Error tracking ad impression:", error);
+    res.status(500).json({ message: "Error tracking ad impression" });
+  }
+};
+
+// Upload ad image using Cloudinary
+exports.uploadAdImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No image file provided" });
+    }
+
+    // The image is already uploaded to Cloudinary via multer middleware
+    // req.file.path contains the Cloudinary URL
+    const imageUrl = req.file.path;
+    
+    res.json({ 
+      imageUrl,
+      publicId: req.file.filename // Store public_id for potential deletion later
+    });
+  } catch (error) {
+    console.error("Error uploading ad image:", error);
+    res.status(500).json({ message: "Error uploading ad image" });
+  }
+};
+
+// Get active ads for public display
+exports.getActiveAds = async (req, res) => {
+  try {
+    const { type = 'banner' } = req.query;
+    const ads = await Ad.find({ 
+      status: 'active',
+      type: type 
+    }).sort({ createdAt: -1 });
+    
+    res.json(ads);
+  } catch (error) {
+    console.error("Error fetching active ads:", error);
+    res.status(500).json({ message: "Error fetching active ads" });
+  }
 };

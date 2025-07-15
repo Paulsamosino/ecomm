@@ -52,6 +52,7 @@ import AdminManageAnalytics from "@/pages/AdminDashboard/AdminManageAnalytics";
 import AdminSettings from "@/pages/AdminDashboard/AdminSettings";
 import AdminReports from "@/pages/AdminDashboard/AdminReports";
 import AdminHelp from "@/pages/AdminDashboard/AdminHelp";
+import AdminAdsPage from "@/pages/AdminDashboard/AdminAdsPage";
 
 // Import Seller Route and Product Management
 import SellerRoute from "@/components/routes/SellerRoute";
@@ -60,6 +61,9 @@ import EditProduct from "@/pages/SellerDashboard/EditProduct";
 import EnhancedChatPage from "@/pages/EnhancedChatPage";
 import SellerMessages from "@/pages/SellerDashboard/SellerMessages";
 import SellerLocation from "@/pages/SellerDashboard/SellerLocation";
+import SellerChangeName from "@/pages/SellerDashboard/SellerChangeName";
+import SellerChangeEmail from "@/pages/SellerDashboard/SellerChangeEmail";
+import SellerChangeProfile from "@/pages/SellerDashboard/SellerChangeProfile";
 
 // Import Buyer Dashboard Components
 import BuyerMyPurchase from "@/pages/BuyerDashboard/BuyerMyPurchase";
@@ -152,6 +156,9 @@ const AppContent = () => {
             <Route path="settings" element={<SellerSettings />} />
             <Route path="help" element={<SellerHelp />} />
             <Route path="location" element={<SellerLocation />} />
+            <Route path="profile" element={<SellerChangeProfile />} />
+            <Route path="change-name" element={<SellerChangeName />} />
+            <Route path="change-email" element={<SellerChangeEmail />} />
           </Route>
         </Route>
 
@@ -163,6 +170,7 @@ const AppContent = () => {
             <Route path="listings" element={<AdminManageListings />} />
             <Route path="analytics" element={<AdminManageAnalytics />} />
             <Route path="reports" element={<AdminReports />} />
+            <Route path="ads" element={<AdminAdsPage />} />
             <Route path="settings" element={<AdminSettings />} />
             <Route path="help" element={<AdminHelp />} />
           </Route>

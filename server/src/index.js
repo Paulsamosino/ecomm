@@ -10,6 +10,7 @@ const sellerRoutes = require("./routes/seller");
 const chatRoutes = require("./routes/chat");
 const reportRoutes = require("./routes/reports");
 const adminRoutes = require("./routes/admin");
+const adsRoutes = require("./routes/ads");
 
 const app = express();
 
@@ -98,6 +99,7 @@ app.use("/api/seller", sellerRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/ads", adsRoutes);
 
 // Connect to MongoDB with enhanced error handling
 mongoose

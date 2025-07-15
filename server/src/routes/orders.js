@@ -115,22 +115,28 @@ router.post("/", protect, async (req, res) => {
       await buyer.save();
     }
 
+    // Populate order with buyer, seller, and product information for emails and delivery
+    const populatedOrder = await Order.findById(order._id)
+      .populate("buyer", "name phone email")
+      .populate("seller", "name phone email address sellerProfile")
+      .populate("items.product");
+
     // Send confirmation emails
+    console.log("📧 Attempting to send confirmation emails for order:", order._id);
     try {
-      await sendOrderConfirmationEmail(order);
-      await sendSellerOrderNotification(order);
+      console.log("📤 Sending buyer confirmation email...");
+      await sendOrderConfirmationEmail(populatedOrder);
+      console.log("📤 Sending seller notification email...");
+      await sendSellerOrderNotification(populatedOrder);
+      console.log("✅ Both confirmation emails sent successfully");
     } catch (emailError) {
-      console.error("Error sending confirmation email:", emailError);
+      console.error("❌ Error sending confirmation email:", emailError);
+      console.error("Email error stack:", emailError.stack);
       // Don't fail the order if email fails
     }
 
     // Automatically create delivery order
     try {
-      const populatedOrder = await Order.findById(order._id)
-        .populate("buyer", "name phone email")
-        .populate("seller", "name phone email address sellerProfile")
-        .populate("items.product");
-
       await deliveryController.autoCreateDelivery(populatedOrder);
     } catch (deliveryError) {
       console.error("Error creating delivery:", deliveryError);

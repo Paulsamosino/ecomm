@@ -163,17 +163,15 @@ const Navbar = () => {
                           {user?.email || ""}
                         </p>
                       </div>
-                      <Link
-                        to={
-                          user?.isSeller
-                            ? "/seller/settings"
-                            : "/buyer-dashboard/profile"
-                        }
-                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      >
-                        <User className="h-4 w-4 mr-2 text-orange-500" />
-                        My Account
-                      </Link>
+                      {!user?.isSeller && (
+                        <Link
+                          to="/buyer-dashboard/profile"
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          <User className="h-4 w-4 mr-2 text-orange-500" />
+                          My Account
+                        </Link>
+                      )}
                       <Link
                         to={
                           user?.isSeller
@@ -216,6 +214,19 @@ const Navbar = () => {
 
           {/* Mobile menu button */}
           <div className="flex items-center gap-4 md:hidden">
+            {/* Wishlist */}
+            {isAuthenticated && (
+              <Link to="/wishlist" className="relative">
+                <Heart className="h-6 w-6 text-white" />
+                {wishlistCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-yellow-300 text-xs flex items-center justify-center font-medium text-orange-600">
+                    {wishlistCount}
+                  </span>
+                )}
+              </Link>
+            )}
+
+            {/* Cart */}
             <Link to="/cart" className="relative">
               <ShoppingCart className="h-6 w-6 text-white" />
               {cartItemCount > 0 && (
@@ -240,56 +251,15 @@ const Navbar = () => {
 
         {/* Mobile menu */}
         {isMobileMenuOpen && (
-          <div className="md:hidden bg-white">
-            <div className="px-2 pt-2 pb-3 space-y-1">
-              {/* Navigation Links */}
-              <Link
-                to="/"
-                className={`block px-3 py-2 rounded-md text-base font-medium ${
-                  location.pathname === "/"
-                    ? "bg-orange-100 text-orange-600"
-                    : "text-gray-600 hover:bg-orange-50"
-                }`}
-              >
-                <div className="flex items-center">
-                  <Home className="h-5 w-5 mr-3" />
-                  <span>Home</span>
-                </div>
-              </Link>
-              <Link
-                to="/products"
-                className={`block px-3 py-2 rounded-md text-base font-medium ${
-                  location.pathname === "/products"
-                    ? "bg-orange-100 text-orange-600"
-                    : "text-gray-600 hover:bg-orange-50"
-                }`}
-              >
-                <div className="flex items-center">
-                  <Package className="h-5 w-5 mr-3" />
-                  <span>Browse Products</span>
-                </div>
-              </Link>
-              <Link
-                to="/help-center"
-                className={`block px-3 py-2 rounded-md text-base font-medium ${
-                  location.pathname === "/help-center"
-                    ? "bg-orange-100 text-orange-600"
-                    : "text-gray-600 hover:bg-orange-50"
-                }`}
-              >
-                <div className="flex items-center">
-                  <HelpCircle className="h-5 w-5 mr-3" />
-                  <span>Help Center</span>
-                </div>
-              </Link>
-
+          <div className="md:hidden bg-white/95 backdrop-blur-md border-t border-orange-200">
+            <div className="px-4 py-4 space-y-3">
               {/* Search bar */}
-              <form onSubmit={handleSearch} className="px-3 py-2">
+              <form onSubmit={handleSearch} className="mb-4">
                 <div className="relative">
                   <input
                     type="text"
                     placeholder="Search products..."
-                    className="w-full py-2 px-3 pr-10 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                    className="w-full py-3 px-4 pr-12 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 text-gray-900 placeholder-gray-500 bg-white"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
@@ -302,88 +272,71 @@ const Navbar = () => {
                 </div>
               </form>
 
-              {/* Divider */}
-              <div className="border-t border-gray-200 my-2"></div>
+              {/* Navigation Links */}
+              <Link
+                to="/"
+                className="flex items-center px-4 py-3 rounded-lg text-gray-700 font-medium hover:bg-orange-50 transition-all"
+              >
+                <Home className="h-5 w-5 mr-3 text-orange-500" />
+                Home
+              </Link>
 
-              {/* User-specific links */}
-              {isAuthenticated ? (
-                <>
-                  <Link
-                    to={
-                      user?.isSeller
-                        ? "/seller/settings"
-                        : "/buyer-dashboard/profile"
-                    }
-                    className="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:bg-orange-50"
-                  >
-                    <div className="flex items-center">
-                      <User className="h-5 w-5 mr-3" />
-                      <span>My Account</span>
-                    </div>
-                  </Link>
-                  <Link
-                    to={
-                      user?.isSeller
-                        ? "/seller/orders"
-                        : "/buyer-dashboard/purchases"
-                    }
-                    className="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:bg-orange-50"
-                  >
-                    <div className="flex items-center">
-                      <Package className="h-5 w-5 mr-3" />
-                      <span>My Orders</span>
-                    </div>
-                  </Link>
-                  <button
-                    onClick={handleLogout}
-                    className="w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-red-50"
-                  >
-                    <div className="flex items-center">
-                      <LogOut className="h-5 w-5 mr-3" />
-                      <span>Sign out</span>
-                    </div>
-                  </button>
-                </>
-              ) : (
-                <div className="px-3 py-2 space-y-2">
-                  <Link
-                    to="/login"
-                    className="block w-full text-center px-4 py-2 rounded-lg bg-orange-600 text-white font-medium hover:bg-orange-700"
-                  >
-                    Sign In
-                  </Link>
-                  <Link
-                    to="/register"
-                    className="block w-full text-center px-4 py-2 rounded-lg border border-orange-200 text-orange-600 font-medium hover:bg-orange-50"
-                  >
-                    Register
-                  </Link>
-                </div>
+              <Link
+                to="/products"
+                className="flex items-center px-4 py-3 rounded-lg text-gray-700 font-medium hover:bg-orange-50 transition-all"
+              >
+                <Package className="h-5 w-5 mr-3 text-orange-500" />
+                Products
+              </Link>
+
+              {isAuthenticated && (
+                <Link
+                  to={
+                    user?.isSeller
+                      ? "/seller/dashboard"
+                      : "/buyer-dashboard"
+                  }
+                  className="flex items-center px-4 py-3 rounded-lg text-gray-700 font-medium hover:bg-orange-50 transition-all"
+                >
+                  <User className="h-5 w-5 mr-3 text-orange-500" />
+                  Dashboard
+                </Link>
               )}
 
-              {/* Additional sections from image */}
-              <div className="px-2 py-3 space-y-3">
-                <div className="flex items-center justify-center px-3 py-2 rounded-md bg-orange-50 text-orange-600 text-base font-medium">
-                  <span className="mr-2">🚚</span> Fast Delivery
-                </div>
-                <div className="flex items-center justify-center px-3 py-2 rounded-md bg-orange-50 text-orange-600 text-base font-medium">
-                  <span className="mr-2">✅</span> Verified Sellers
-                </div>
-              </div>
+              <Link
+                to="/help-center"
+                className="flex items-center px-4 py-3 rounded-lg text-gray-700 font-medium hover:bg-orange-50 transition-all"
+              >
+                <HelpCircle className="h-5 w-5 mr-3 text-orange-500" />
+                Help
+              </Link>
 
-              {/* Divider */}
-              <div className="border-t border-gray-200 my-2"></div>
-
-              {/* Statistics from image */}
-              <div className="px-2 py-3 grid grid-cols-2 gap-4 text-center">
-                <div className="flex flex-col items-center justify-center p-4 rounded-md bg-gray-100">
-                  <span className="text-xl font-bold text-gray-800">203</span>
-                  <span className="text-sm text-gray-600">Total Products</span>
-                </div>
-                <div className="flex flex-col items-center justify-center p-4 rounded-md bg-gray-100">
-                  <span className="text-xl font-bold text-gray-800">5</span>
-                  <span className="text-sm text-gray-600">Locations</span>
-                </div>
+              {/* Auth Section */}
+              <div className="pt-3 mt-3 border-t border-gray-200">
+                {isAuthenticated ? (
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center w-full px-4 py-3 rounded-lg text-red-600 font-medium hover:bg-red-50 transition-all"
+                  >
+                    <LogOut className="h-5 w-5 mr-3" />
+                    Sign Out
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <Link
+                      to="/login"
+                      className="block w-full text-center px-4 py-3 rounded-lg bg-orange-600 text-white font-medium hover:bg-orange-700 transition-all"
+                    >
+                      Sign In
+                    </Link>
+                    <Link
+                      to="/register"
+                      className="block w-full text-center px-4 py-3 rounded-lg border border-orange-200 text-orange-600 font-medium hover:bg-orange-50 transition-all"
+                    >
+                      Register
+                    </Link>
+                  </div>
+                )}
               </div>
             </div>
           </div>

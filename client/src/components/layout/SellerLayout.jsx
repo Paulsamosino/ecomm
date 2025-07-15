@@ -22,6 +22,8 @@ import {
   Wheat,
   Sun,
   Tractor,
+  User,
+  Mail,
 } from "lucide-react";
 import SellerNavbar from "./SellerNavbar";
 
@@ -101,6 +103,21 @@ const SellerLayout = () => {
       group: "settings",
       label: "Settings",
       items: [
+        {
+          name: "Change Profile",
+          path: "/seller/profile",
+          icon: User,
+        },
+        {
+          name: "Change Name",
+          path: "/seller/change-name",
+          icon: User,
+        },
+        {
+          name: "Change Email",
+          path: "/seller/change-email",
+          icon: Mail,
+        },
         {
           name: "Location",
           path: "/seller/location",

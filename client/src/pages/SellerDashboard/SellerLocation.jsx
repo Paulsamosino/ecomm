@@ -109,7 +109,15 @@ const SellerLocation = () => {
         });
         if (res.ok) {
           const data = await res.json();
-          setLocation(data);
+          // Ensure all fields are strings to prevent controlled/uncontrolled warnings
+          setLocation({
+            street: data.street || "",
+            city: data.city || "",
+            state: data.state || "",
+            zipCode: data.zipCode || "",
+            country: data.country || "Philippines",
+            phone: data.phone || "",
+          });
         }
       } catch (err) {
         // ignore
@@ -139,7 +147,10 @@ const SellerLocation = () => {
   }, [location.state, location.city, location.zipCode]);
 
   const handleChange = (e) => {
-    setLocation((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    setLocation((prev) => ({ 
+      ...prev, 
+      [e.target.name]: e.target.value || "" 
+    }));
   };
 
   const handleSelectChange = (name, value) => {
@@ -148,10 +159,17 @@ const SellerLocation = () => {
       const selectedCity = availableCities.find(city => city.value === value);
       const zipCode = selectedCity?.zipCode || "";
       
-      // Update both city and zipCode
-      setLocation(prev => ({ ...prev, city: value, zipCode }));
+      // Update both city and zipCode, ensure strings
+      setLocation(prev => ({ 
+        ...prev, 
+        city: value || "", 
+        zipCode: zipCode || "" 
+      }));
     } else {
-      setLocation(prev => ({ ...prev, [name]: value }));
+      setLocation(prev => ({ 
+        ...prev, 
+        [name]: value || "" 
+      }));
     }
   };
 
@@ -193,9 +211,9 @@ const SellerLocation = () => {
 
   return (
     <div className="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow">
-      <h2 className="text-2xl font-bold mb-2">Store Pickup Location</h2>
+      <h2 className="text-2xl font-bold mb-2">Change Location</h2>
       <p className="text-gray-600 mb-6">
-        Set your store's pickup location for deliveries. This will be used as the pickup point for all your orders.
+        Update your store location for order pickups and deliveries.
       </p>
       
       <form onSubmit={handleSave} className="space-y-6">
@@ -233,7 +251,7 @@ const SellerLocation = () => {
               </SelectContent>
             </Select>
             <p className="text-xs text-gray-500 mt-1">
-              We support delivery in Metro Manila and South Luzon provinces
+              Metro Manila and South Luzon provinces supported
             </p>
           </div>
 
@@ -274,7 +292,7 @@ const SellerLocation = () => {
               required
             />
             <p className="text-xs text-gray-500 mt-1">
-              Automatically populated based on selected city
+              Auto-populated based on selected city
             </p>
           </div>
 
@@ -311,15 +329,15 @@ const SellerLocation = () => {
             />
           </div>
           <p className="text-xs text-gray-500 mt-1">
-            10-digit mobile number for delivery coordination
+            10-digit mobile number for coordination
           </p>
         </div>
 
         {isDeliverySupported && (
           <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-            <h4 className="font-medium text-green-800 mb-2">✅ Delivery Supported</h4>
+            <h4 className="font-medium text-green-800 mb-2">✅ Delivery Available</h4>
             <p className="text-sm text-green-700">
-              Your location is within our delivery coverage area. Customers can order for delivery from your store.
+              Your location supports delivery services.
             </p>
           </div>
         )}
@@ -328,7 +346,7 @@ const SellerLocation = () => {
           <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
             <h4 className="font-medium text-amber-800 mb-2">⚠️ Limited Delivery</h4>
             <p className="text-sm text-amber-700">
-              Your location may have limited delivery options. Please contact support for more information.
+              Limited delivery options available for your location.
             </p>
           </div>
         )}
@@ -336,16 +354,16 @@ const SellerLocation = () => {
         <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <h4 className="font-medium text-blue-800 mb-2">📍 Delivery Information</h4>
           <div className="text-sm text-blue-700 space-y-1">
-            <p><strong>Coverage:</strong> Metro Manila (NCR) and South Luzon provinces (Cavite, Laguna, Batangas, Rizal)</p>
-            <p><strong>Pickup:</strong> Delivery riders will pick up orders from this location</p>
-            <p><strong>Contact:</strong> The phone number will be used to coordinate pickups</p>
+            <p><strong>Coverage:</strong> Metro Manila and South Luzon provinces</p>
+            <p><strong>Pickup:</strong> Orders collected from this location</p>
+            <p><strong>Contact:</strong> Phone number used for coordination</p>
           </div>
         </div>
 
         {error && <div className="text-red-500 text-sm p-3 bg-red-50 border border-red-200 rounded">{error}</div>}
         {success && (
           <div className="text-green-600 text-sm p-3 bg-green-50 border border-green-200 rounded">
-            Location saved successfully! This will be used for all future deliveries.
+            Location updated successfully!
           </div>
         )}
         

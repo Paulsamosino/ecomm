@@ -42,7 +42,13 @@ const userSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      required: true,
+      required: false,
+      default: "",
+    },
+    profilePicture: {
+      type: String,
+      required: false,
+      default: "",
     },
     role: {
       type: String,
@@ -53,7 +59,10 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    address: addressSchema,
+    address: {
+      type: addressSchema,
+      required: false,
+    },
     sellerProfile: {
       businessName: String,
       description: String,

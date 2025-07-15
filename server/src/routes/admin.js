@@ -3,6 +3,7 @@ const router = express.Router();
 const adminController = require("../controllers/adminController");
 const auth = require("../middleware/auth");
 const checkRole = require("../middleware/checkRole");
+const { uploadAds } = require("../config/cloudinary");
 
 // Middleware to check if user is admin
 const isAdmin = checkRole("admin");
@@ -42,5 +43,15 @@ router.put(
   adminController.updateReportStatus
 );
 router.delete("/reports/:id", auth, isAdmin, adminController.deleteReport);
+
+// Advertisement management routes
+router.get("/ads", auth, isAdmin, adminController.getAllAds);
+router.post("/ads", auth, isAdmin, adminController.createAd);
+router.put("/ads/:id", auth, isAdmin, adminController.updateAd);
+router.delete("/ads/:id", auth, isAdmin, adminController.deleteAd);
+router.put("/ads/:id/status", auth, isAdmin, adminController.updateAdStatus);
+router.get("/ads/:id/stats", auth, isAdmin, adminController.getAdStats);
+router.get("/ads/:id/analytics", auth, isAdmin, adminController.getAdAnalytics);
+router.post("/ads/upload", auth, isAdmin, uploadAds.single('image'), adminController.uploadAdImage);
 
 module.exports = router;

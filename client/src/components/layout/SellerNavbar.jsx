@@ -130,13 +130,6 @@ const SellerNavbar = () => {
                       </p>
                     </div>
                     <Link
-                      to="/seller-dashboard/profile"
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      <User className="h-4 w-4 mr-2 text-orange-500" />
-                      My Account
-                    </Link>
-                    <Link
                       to="/seller-dashboard/orders"
                       className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >

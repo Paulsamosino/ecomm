@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Camera, Upload, X, Loader2 } from "lucide-react";
 import { Button } from "./button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,8 +8,13 @@ import toast from "react-hot-toast";
 const ProfilePictureUpload = ({ currentImage, onImageUpdate, size = "lg" }) => {
   const { user, updateUser } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
-  const [previewImage, setPreviewImage] = useState(currentImage || null);
+  const [previewImage, setPreviewImage] = useState(currentImage || user?.profilePicture || null);
   const fileInputRef = useRef(null);
+
+  // Sync preview image with user profile picture when user data changes
+  useEffect(() => {
+    setPreviewImage(currentImage || user?.profilePicture || null);
+  }, [currentImage, user?.profilePicture]);
 
   const sizeClasses = {
     sm: "w-16 h-16",
@@ -73,8 +78,8 @@ const ProfilePictureUpload = ({ currentImage, onImageUpdate, size = "lg" }) => {
         { profilePicture: imageUrl }
       );
 
-      // Update local user state
-      updateUser({ ...user, profilePicture: imageUrl });
+      // Update local user state with the response data to ensure it's current
+      updateUser(profileResponse.data);
 
       // Call callback if provided
       if (onImageUpdate) {
@@ -101,12 +106,12 @@ const ProfilePictureUpload = ({ currentImage, onImageUpdate, size = "lg" }) => {
   const handleRemoveImage = async () => {
     setIsUploading(true);
     try {
-      await axiosInstance.post("/auth/profile-picture", {
+      const response = await axiosInstance.post("/auth/profile-picture", {
         profilePicture: null,
       });
 
       setPreviewImage(null);
-      updateUser({ ...user, profilePicture: null });
+      updateUser(response.data);
 
       if (onImageUpdate) {
         onImageUpdate(null);

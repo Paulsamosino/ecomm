@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiGetProducts } from "@/api/products";
 import { useCart } from "@/contexts/CartContext";
+import TestAd from "@/components/ads/TestAd";
 import {
   ShoppingCart,
   Store,

@@ -13,6 +13,7 @@ const SellerSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
+    name: "",
     businessName: "",
     email: "",
     phone: "",
@@ -39,6 +40,7 @@ const SellerSettings = () => {
 
     if (user?.sellerProfile) {
       setFormData({
+        name: user.name || "",
         businessName: user.sellerProfile.businessName || "",
         email: user.email || "",
         phone: user.sellerProfile.phone || "",
@@ -76,6 +78,7 @@ const SellerSettings = () => {
   const validateForm = () => {
     const newErrors = {};
     const requiredFields = {
+      name: "Full name",
       businessName: "Business name",
       email: "Email",
       phone: "Phone number",

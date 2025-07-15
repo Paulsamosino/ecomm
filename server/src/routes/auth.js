@@ -51,6 +51,7 @@ router.post("/register", async (req, res) => {
       email,
       password,
       isSeller: isSeller || false,
+      role: isSeller ? "seller" : "buyer",
     };
 
     if (isSeller) {
@@ -84,7 +85,7 @@ router.post("/register", async (req, res) => {
         name: user.name,
         email: user.email,
         profilePicture: user.profilePicture,
-        isSeller: user.role === "seller",
+        isSeller: user.isSeller,
         sellerProfile: user.sellerProfile,
       },
     });
@@ -176,7 +177,7 @@ router.post("/login", async (req, res) => {
         email: user.email,
         profilePicture: user.profilePicture,
         role: user.role,
-        isSeller: user.role === "seller",
+        isSeller: user.isSeller,
         isAdmin: user.role === "admin",
         sellerProfile: user.sellerProfile,
       },
@@ -202,7 +203,7 @@ router.get("/me", auth, async (req, res) => {
       email: user.email,
       profilePicture: user.profilePicture,
       role: user.role,
-      isSeller: user.role === "seller",
+      isSeller: user.isSeller,
       isAdmin: user.role === "admin",
       sellerProfile: user.sellerProfile,
     });
@@ -236,7 +237,7 @@ router.put("/profile", auth, async (req, res) => {
       name: user.name,
       email: user.email,
       profilePicture: user.profilePicture,
-      isSeller: user.role === "seller",
+      isSeller: user.isSeller,
       sellerProfile: user.sellerProfile,
     });
   } catch (err) {
@@ -252,13 +253,50 @@ router.put("/seller-profile", auth, async (req, res) => {
       return res.status(403).json({ message: "User is not a seller" });
     }
 
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      {
-        sellerProfile: req.body,
-      },
-      { new: true, runValidators: true }
-    );
+    // Extract name and email from request body to update user fields
+    const { name, email, ...sellerProfileData } = req.body;
+    
+    const user = await User.findById(req.user._id);
+    
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Update user name and email if provided
+    if (name) user.name = name;
+    if (email) {
+      // Check if email already exists for another user
+      const existingUser = await User.findOne({ 
+        email: email, 
+        _id: { $ne: req.user._id } 
+      });
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+      user.email = email;
+    }
+    
+    // Only update seller profile fields if they are provided and not undefined
+    if (Object.keys(sellerProfileData).length > 0) {
+      // Filter out undefined values and only update specific fields
+      const allowedFields = ['businessName', 'description', 'phone', 'address', 'city', 'state', 'zipCode'];
+      const filteredData = {};
+      
+      allowedFields.forEach(field => {
+        if (sellerProfileData[field] !== undefined) {
+          filteredData[field] = sellerProfileData[field];
+        }
+      });
+      
+      if (Object.keys(filteredData).length > 0) {
+        user.sellerProfile = {
+          ...(user.sellerProfile || {}),
+          ...filteredData,
+        };
+      }
+    }
+
+    await user.save();
 
     res.json({
       success: true,
@@ -266,13 +304,25 @@ router.put("/seller-profile", auth, async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        isSeller: user.role === "seller",
+        isSeller: user.isSeller,
         sellerProfile: user.sellerProfile,
       },
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
+    console.error("Update seller profile error:", err);
+    console.error("Error details:", {
+      message: err.message,
+      stack: err.stack,
+      name: err.name,
+      code: err.code
+    });
+    if (err.code === 11000) {
+      return res.status(400).json({ message: "Email already exists" });
+    }
+    res.status(500).json({ 
+      message: "Server error", 
+      error: process.env.NODE_ENV === "development" ? err.message : undefined 
+    });
   }
 });
 

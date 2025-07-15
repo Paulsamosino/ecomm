@@ -57,6 +57,16 @@ const storage = new CloudinaryStorage({
   },
 });
 
+// Ads storage configuration
+const adsStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "poultrymart/ads",
+    allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
+    transformation: [{ width: 1200, height: 800, crop: "limit", quality: "auto" }],
+  },
+});
+
 const upload = multer({
   storage: storage,
   limits: {
@@ -74,6 +84,28 @@ const upload = multer({
     } catch (error) {
       console.error("Error in file upload filter:", error);
       cb(new Error("Error processing upload"), false);
+    }
+  },
+});
+
+// Ads upload configuration
+const uploadAds = multer({
+  storage: adsStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit for ads
+  },
+  fileFilter: (req, file, cb) => {
+    try {
+      console.log("Processing ad image:", file.originalname);
+      if (file.mimetype.startsWith("image/")) {
+        cb(null, true);
+      } else {
+        console.error("Invalid file type for ad:", file.mimetype);
+        cb(new Error("Not an image! Please upload only images."), false);
+      }
+    } catch (error) {
+      console.error("Error in ad file upload filter:", error);
+      cb(new Error("Error processing ad upload"), false);
     }
   },
 });
@@ -108,6 +140,7 @@ const uploadToCloudinary = (buffer, options = {}) => {
 module.exports = {
   cloudinary,
   upload,
+  uploadAds,
   uploadToCloudinary,
   isCloudinaryConfigured: isConfigValid,
 };
