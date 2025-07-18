@@ -152,11 +152,11 @@ const SellerDashboard = () => {
             getSellerProducts(),
           ]);
 
-        // Calculate total sales from completed orders
-        const completedOrders = ordersData.filter(
-          (order) => order.status === "completed"
+        // Calculate total sales from delivered orders
+        const deliveredOrders = ordersData.filter(
+          (order) => order.status === "delivered"
         );
-        const totalSales = completedOrders.reduce(
+        const totalSales = deliveredOrders.reduce(
           (sum, order) => sum + (order.totalAmount || 0),
           0
         );
@@ -164,7 +164,7 @@ const SellerDashboard = () => {
         // Calculate monthly revenue (orders from current month)
         const currentMonth = new Date().getMonth();
         const currentYear = new Date().getFullYear();
-        const monthlyOrders = completedOrders.filter((order) => {
+        const monthlyOrders = deliveredOrders.filter((order) => {
           const orderDate = new Date(order.createdAt);
           return (
             orderDate.getMonth() === currentMonth &&

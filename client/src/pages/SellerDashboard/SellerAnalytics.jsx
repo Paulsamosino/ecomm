@@ -165,9 +165,9 @@ const SellerAnalytics = () => {
         // Fetch orders data
         const ordersData = await getSellerOrders();
 
-        // Get completed orders only
-        const completedOrders = ordersData.filter(
-          (order) => order.status === "completed"
+        // Get delivered orders only
+        const deliveredOrders = ordersData.filter(
+          (order) => order.status === "delivered"
         );
 
         // Calculate date ranges

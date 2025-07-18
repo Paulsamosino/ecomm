@@ -47,8 +47,6 @@ const OrderTrackingStatus = ({ order }) => {
         return "bg-purple-100 text-purple-800";
       case "delivered":
         return "bg-green-100 text-green-800";
-      case "completed":
-        return "bg-emerald-100 text-emerald-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -243,8 +241,6 @@ const OrderCard = ({ order, onReviewSubmit }) => {
         return "bg-purple-100 text-purple-800";
       case "delivered":
         return "bg-green-100 text-green-800";
-      case "completed":
-        return "bg-orange-100 text-orange-800";
       case "cancelled":
         return "bg-red-100 text-red-800";
       default:
@@ -702,12 +698,6 @@ const BuyerMyPurchase = () => {
               >
                 Delivered
               </TabsTrigger>
-              <TabsTrigger
-                value="completed"
-                className="data-[state=active]:bg-orange-50 data-[state=active]:text-orange-600 data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-orange-500 rounded-none min-w-[100px] flex-shrink-0"
-              >
-                Completed
-              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -724,9 +714,6 @@ const BuyerMyPurchase = () => {
             {renderOrderList(getFilteredOrders())}
           </TabsContent>
           <TabsContent value="delivered" className="pt-4">
-            {renderOrderList(getFilteredOrders())}
-          </TabsContent>
-          <TabsContent value="completed" className="pt-4">
             {renderOrderList(getFilteredOrders())}
           </TabsContent>
         </div>

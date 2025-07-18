@@ -169,9 +169,6 @@ const SellerDashboardPage = () => {
               {activeTab.includes("/analytics") && (
                 <BarChart2 className="h-4 w-4 mr-2 text-orange-500" />
               )}
-              {activeTab.includes("/breeding") && (
-                <Egg className="h-4 w-4 mr-2 text-orange-500" />
-              )}
               <h2 className="text-sm font-medium text-orange-800">
                 {navItems.find((item) => activeTab === item.path)?.label ||
                   "Dashboard"}

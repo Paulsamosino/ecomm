@@ -69,6 +69,9 @@ import SellerChangeProfile from "@/pages/SellerDashboard/SellerChangeProfile";
 import BuyerMyPurchase from "@/pages/BuyerDashboard/BuyerMyPurchase";
 import BuyerManageProfile from "@/pages/BuyerDashboard/BuyerManageProfile";
 
+// Import Additional Pages
+import BreedingSimulatorPage from "@/pages/BreedingSimulatorPage";
+
 const AppContent = () => {
   const location = useLocation();
   const { user } = useAuth();
@@ -104,6 +107,7 @@ const AppContent = () => {
           <Route path="seller/:sellerId" element={<SellerStorePage />} />
           <Route path="help-center" element={<HelpCenterPage />} />
           <Route path="contact" element={<ContactUsPage />} />
+          <Route path="breeding-simulator" element={<BreedingSimulatorPage />} />
           <Route path="cart" element={<ProtectedRoute restrictTo="buyer" />}>
             <Route index element={<CartPage />} />
           </Route>

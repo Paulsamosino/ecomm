@@ -123,7 +123,6 @@ const orderSchema = new mongoose.Schema(
         "shipped",
         "delivered",
         "cancelled",
-        "completed",
         "refunded",
       ],
       default: "pending",
@@ -134,6 +133,19 @@ const orderSchema = new mongoose.Schema(
       min: 0,
     },
     notes: String,
+    reviewed: {
+      type: Boolean,
+      default: false,
+    },
+    reviewData: {
+      rating: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      comment: String,
+      createdAt: Date,
+    },
   },
   {
     timestamps: true,
@@ -145,8 +157,7 @@ const validStatusTransitions = {
   pending: ["processing", "cancelled"],
   processing: ["shipped", "cancelled"],
   shipped: ["delivered", "cancelled"],
-  delivered: ["completed", "refunded"],
-  completed: ["refunded"],
+  delivered: ["refunded"],
   cancelled: [],
   refunded: [],
 };
@@ -184,9 +195,9 @@ orderSchema.pre("save", function (next) {
   next();
 });
 
-// Update inventory and notify seller when order is completed
+// Update inventory and notify seller when order is delivered
 orderSchema.pre("save", async function (next) {
-  if (this.isModified("status") && this.status === "completed") {
+  if (this.isModified("status") && this.status === "delivered") {
     const Product = mongoose.model("Product");
     const User = mongoose.model("User");
 
@@ -196,8 +207,8 @@ orderSchema.pre("save", async function (next) {
       if (seller && seller.sellerProfile) {
         seller.sellerProfile.totalSales =
           (seller.sellerProfile.totalSales || 0) + this.totalAmount;
-        seller.sellerProfile.completedOrders =
-          (seller.sellerProfile.completedOrders || 0) + 1;
+        seller.sellerProfile.deliveredOrders =
+          (seller.sellerProfile.deliveredOrders || 0) + 1;
         await seller.save();
       }
 
@@ -273,6 +284,40 @@ orderSchema.methods.refund = async function (refundId) {
   return this.save();
 };
 
+// Create a review for the order
+orderSchema.methods.createReview = async function (reviewData) {
+  const { rating, comment } = reviewData;
+
+  // Validate input
+  if (!rating || !comment) {
+    throw new Error("Rating and comment are required");
+  }
+
+  if (rating < 1 || rating > 5) {
+    throw new Error("Rating must be between 1 and 5");
+  }
+
+  // Check if order is eligible for review (delivered status)
+  if (this.status !== "delivered") {
+    throw new Error("You can only review delivered orders");
+  }
+
+  // Check if already reviewed
+  if (this.reviewed) {
+    throw new Error("This order has already been reviewed");
+  }
+
+  // Mark order as reviewed
+  this.reviewed = true;
+  this.reviewData = {
+    rating: Number(rating),
+    comment: comment.trim(),
+    createdAt: new Date(),
+  };
+
+  return this.save();
+};
+
 // Static method to get seller metrics
 orderSchema.statics.getSellerMetrics = async function (
   sellerId,
@@ -287,10 +332,10 @@ orderSchema.statics.getSellerMetrics = async function (
     createdAt: { $gte: startDate },
   });
 
-  // Completed orders in timeframe
-  const completedOrders = await this.countDocuments({
+  // Delivered orders in timeframe
+  const deliveredOrders = await this.countDocuments({
     seller: sellerId,
-    status: "completed",
+    status: "delivered",
     createdAt: { $gte: startDate },
   });
 
@@ -299,7 +344,7 @@ orderSchema.statics.getSellerMetrics = async function (
     {
       $match: {
         seller: mongoose.Types.ObjectId(sellerId),
-        status: "completed",
+        status: "delivered",
         createdAt: { $gte: startDate },
       },
     },
@@ -307,9 +352,9 @@ orderSchema.statics.getSellerMetrics = async function (
   ]);
   const totalRevenue = revenueAgg.length > 0 ? revenueAgg[0].total : 0;
 
-  // Conversion rate: completed/total (avoid div by zero)
+  // Conversion rate: delivered/total (avoid div by zero)
   const conversionRate =
-    totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0;
+    totalOrders > 0 ? (deliveredOrders / totalOrders) * 100 : 0;
 
   // Recent orders (last 5)
   const recentOrders = await this.find({
@@ -325,7 +370,7 @@ orderSchema.statics.getSellerMetrics = async function (
     {
       $match: {
         seller: mongoose.Types.ObjectId(sellerId),
-        status: "completed",
+        status: "delivered",
         createdAt: { $gte: startDate },
       },
     },
@@ -339,7 +384,7 @@ orderSchema.statics.getSellerMetrics = async function (
 
   return {
     totalOrders,
-    completedOrders,
+    deliveredOrders,
     totalRevenue,
     conversionRate,
     recentOrders,

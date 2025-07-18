@@ -92,6 +92,12 @@ const Navbar = () => {
                 Browse Products
               </Link>
               <Link
+                to="/breeding-simulator"
+                className="text-white hover:text-white/90 flex items-center gap-1"
+              >
+                Breeding Simulator
+              </Link>
+              <Link
                 to="/help-center"
                 className="text-white hover:text-white/90"
               >
@@ -287,6 +293,14 @@ const Navbar = () => {
               >
                 <Package className="h-5 w-5 mr-3 text-orange-500" />
                 Products
+              </Link>
+
+              <Link
+                to="/breeding-simulator"
+                className="flex items-center px-4 py-3 rounded-lg text-gray-700 font-medium hover:bg-orange-50 transition-all"
+              >
+                <span className="text-lg mr-3">🐔</span>
+                Breeding Simulator
               </Link>
 
               {isAuthenticated && (
