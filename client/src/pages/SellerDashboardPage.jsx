@@ -14,7 +14,6 @@ import {
   PlusCircle,
   Store,
   HelpCircle,
-  MessageCircle,
   Wheat,
   Sun,
   Leaf,

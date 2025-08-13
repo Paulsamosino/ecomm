@@ -10,6 +10,10 @@ const {
   sendSellerOrderNotification,
   sendOrderStatusUpdate,
 } = require("../utils/emailService");
+const {
+  sendPurchaseNotification,
+  sendOrderStatusUpdate: sendOrderStatusSMS
+} = require("../utils/smsService");
 
 // Create a new order
 router.post("/", protect, async (req, res) => {
@@ -207,6 +211,36 @@ router.post("/", protect, async (req, res) => {
           // Don't fail the order if email fails
         }
 
+        // Send SMS notifications
+        console.log(`📱 Attempting to send SMS notifications for order: ${order._id}`);
+        try {
+          // Send SMS to seller - get phone from seller profile
+          const sellerPhone = populatedOrder.seller?.sellerProfile?.location?.phone;
+          if (sellerPhone) {
+            console.log("📱 Sending seller SMS notification...");
+            const smsResult = await sendPurchaseNotification(sellerPhone, populatedOrder);
+            console.log("📱 Seller SMS notification result:", smsResult);
+          } else {
+            console.log("⚠️ Seller phone number not found in profile - skipping seller SMS");
+          }
+          
+          // You can also send SMS to buyer if they have a phone number
+          const buyerPhone = populatedOrder.shippingAddress?.phone;
+          if (buyerPhone) {
+            console.log("📱 Sending buyer SMS confirmation...");
+            const buyerSmsResult = await sendOrderStatusSMS(buyerPhone, populatedOrder, 'confirmed');
+            console.log("📱 Buyer SMS confirmation result:", buyerSmsResult);
+          } else {
+            console.log("⚠️ Buyer phone number not available - skipping buyer SMS");
+          }
+          
+          console.log("✅ SMS notifications completed");
+        } catch (smsError) {
+          console.error("❌ Error sending SMS notifications:", smsError);
+          console.error("SMS error stack:", smsError.stack);
+          // Don't fail the order if SMS fails
+        }
+
         // Automatically create delivery order with enhanced logging
         console.log(`🚚 Starting automatic delivery creation for order ${order._id}...`);
         try {
@@ -329,6 +363,21 @@ router.put("/:id/status", protect, async (req, res) => {
     } catch (emailError) {
       console.error("Error sending status update email:", emailError);
       // Don't fail the update if email fails
+    }
+
+    // Send SMS status update to buyer
+    try {
+      const buyerPhone = order.shippingAddress?.phone;
+      if (buyerPhone) {
+        console.log(`📱 Sending status update SMS to buyer: ${buyerPhone}`);
+        const smsResult = await sendOrderStatusSMS(buyerPhone, order, status);
+        console.log("📱 Buyer SMS status update result:", smsResult);
+      } else {
+        console.log("⚠️ Buyer phone number not available - skipping status SMS");
+      }
+    } catch (smsError) {
+      console.error("❌ Error sending status update SMS:", smsError);
+      // Don't fail the update if SMS fails
     }
 
     res.json(order);

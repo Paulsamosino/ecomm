@@ -3,11 +3,11 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 const path = require("path");
 const http = require("http");
-const setupSocketServer = require("./socket");
 require("dotenv").config();
 
 const app = express();
 const server = http.createServer(app);
+const { Server } = require("socket.io");
 
 // Basic middleware
 app.use(express.json());
@@ -139,6 +139,57 @@ const productUploadsDir = path.join(uploadDir, "products");
 // Serve uploaded files
 app.use("/uploads", express.static(uploadDir));
 
+// Initialize Socket.IO with CORS matching Express
+const io = new Server(server, {
+  cors: {
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (
+        allowedDomains.includes(origin) ||
+        origin.endsWith(".render.com") ||
+        origin.endsWith(".chickenpoultry.shop") ||
+        origin.endsWith(".vercel.app")
+      ) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST"],
+  },
+});
+
+// Attach io to app for controllers to emit events
+app.set("io", io);
+
+io.on("connection", (socket) => {
+  console.log("🔌 Socket connected:", socket.id);
+
+  socket.on("join_chat", ({ chatId }) => {
+    if (chatId) {
+      socket.join(`chat:${chatId}`);
+      socket.emit("joined_chat", { chatId });
+    }
+  });
+
+  socket.on("leave_chat", ({ chatId }) => {
+    if (chatId) {
+      socket.leave(`chat:${chatId}`);
+    }
+  });
+
+  socket.on("typing", ({ chatId, isTyping }) => {
+    if (chatId) {
+      socket.to(`chat:${chatId}`).emit("typing", { chatId, isTyping });
+    }
+  });
+
+  socket.on("disconnect", () => {
+    console.log("🔌 Socket disconnected:", socket.id);
+  });
+});
+
 // Connect to MongoDB with improved configuration
 const connectWithRetry = async () => {
   try {
@@ -163,14 +214,15 @@ const connectWithRetry = async () => {
     console.log("Host:", mongoose.connection.host);
     console.log("Connection state:", mongoose.connection.readyState);
 
-    // Import and register all models after successful connection
+  // Import and register all models after successful connection
     require("./src/models/User");
     require("./src/models/Product");
     require("./src/models/Order");
-    require("./src/models/Chat");
-    require("./src/models/Message");
     require("./src/models/Report");
     require("./src/models/Ad");
+  // Chat models
+  require("./src/models/Chat");
+  require("./src/models/Message");
 
     console.log("All models registered successfully");
   } catch (err) {
@@ -209,18 +261,17 @@ process.on("SIGINT", async () => {
 // Start the connection
 connectWithRetry();
 
-// Initialize Socket.IO
-setupSocketServer(server);
-
 // Import routes
 const authRoutes = require("./src/routes/auth");
 const productRoutes = require("./src/routes/products");
-const chatRoutes = require("./src/routes/chat");
 const sellerRoutes = require("./src/routes/seller");
 const uploadRoutes = require("./src/routes/upload");
 const adminRoutes = require("./src/routes/admin");
 const userRoutes = require("./src/routes/user");
 const deliveryRoutes = require("./src/routes/delivery");
+const chatRoutes = require("./src/routes/chat");
+const blogRoutes = require("./src/routes/blog");
+const socialRoutes = require("./src/routes/social");
 
 // Serve static files from the React app
 if (process.env.NODE_ENV === "production") {
@@ -230,7 +281,6 @@ if (process.env.NODE_ENV === "production") {
 // Register routes with proper error handling
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
-app.use("/api/chat", chatRoutes);
 app.use("/api/seller", sellerRoutes);
 app.use("/api/orders", require("./src/routes/orders"));
 app.use("/api/delivery", deliveryRoutes); // Delivery routes with sync controls
@@ -238,6 +288,9 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/ads", require("./src/routes/ads")); // Public ads route
+app.use("/api/chat", chatRoutes);
+app.use("/api/blog", blogRoutes);
+app.use("/api/social", socialRoutes);
 
 // Basic route for testing
 app.get("/", (req, res) => {
@@ -357,8 +410,8 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-// Use PORT from environment variable, defaulting to 3001 only in development
-const PORT = process.env.NODE_ENV === "production" ? process.env.PORT : 3001;
+// Use PORT from environment variable, defaulting to 3001
+const PORT = process.env.PORT || 3001;
 server.listen(PORT, "0.0.0.0", async () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV}`);

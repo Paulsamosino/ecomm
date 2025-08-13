@@ -307,6 +307,33 @@ orderSchema.methods.createReview = async function (reviewData) {
     throw new Error("This order has already been reviewed");
   }
 
+  // Import Product model
+  const Product = mongoose.model("Product");
+
+  // Add review to each product in the order
+  for (const item of this.items) {
+    const product = await Product.findById(item.product);
+    if (product) {
+      // Check if user has already reviewed this specific product
+      const existingReview = product.reviews.find(
+        (review) => review.user.toString() === this.buyer.toString()
+      );
+
+      if (!existingReview) {
+        // Add the review to the product
+        const newReview = {
+          user: this.buyer,
+          rating: Number(rating),
+          comment: comment.trim(),
+          createdAt: new Date(),
+        };
+
+        product.reviews.push(newReview);
+        await product.save(); // This will trigger the pre-save hook to update averageRating
+      }
+    }
+  }
+
   // Mark order as reviewed
   this.reviewed = true;
   this.reviewData = {

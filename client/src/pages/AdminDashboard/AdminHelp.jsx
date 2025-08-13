@@ -134,18 +134,7 @@ const AdminHelp = () => {
                 </div>
               </div>
 
-              <div className="flex items-start gap-3">
-                <MessageSquare className="h-5 w-5 text-primary mt-1" />
-                <div>
-                  <h3 className="font-medium">Live Chat</h3>
-                  <p className="text-sm text-gray-600 mb-1">
-                    Instant support from our team
-                  </p>
-                  <button className="text-sm text-primary hover:underline">
-                    Start Chat
-                  </button>
-                </div>
-              </div>
+              {/* Live Chat removed */}
             </div>
           </div>
 

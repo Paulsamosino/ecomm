@@ -786,15 +786,71 @@ exports.uploadAdImage = async (req, res) => {
 // Get active ads for public display
 exports.getActiveAds = async (req, res) => {
   try {
-    const { type = 'banner' } = req.query;
-    const ads = await Ad.find({ 
-      status: 'active',
-      type: type 
-    }).sort({ createdAt: -1 });
+    console.log('Request body:', req.body);
+    console.log('Received request with query:', req.query);
     
-    res.json(ads);
+    const { type = 'banner', sort = '-createdAt', limit = '10' } = req.query;
+    
+    // Build query object
+    const query = { status: 'active' };
+    if (type) {
+      query.type = type;
+    }
+    
+    console.log('Built query:', JSON.stringify(query));
+    
+    // Parse sort parameter
+    let sortOption = {};
+    if (sort.startsWith('-')) {
+      sortOption[sort.substring(1)] = -1;
+    } else {
+      sortOption[sort] = 1;
+    }
+    
+    // Add secondary sort by createdAt for consistency
+    if (!sortOption.createdAt) {
+      sortOption.createdAt = -1;
+    }
+    
+    console.log('Sort option:', JSON.stringify(sortOption));
+    
+    // Check database connection before querying
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState !== 1) {
+      console.error('Database not connected, readyState:', mongoose.connection.readyState);
+      return res.status(503).json({ 
+        message: "Database connection unavailable",
+        readyState: mongoose.connection.readyState 
+      });
+    }
+    
+    // Execute query with timeout protection
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Database query timeout')), 8000);
+    });
+    
+    const queryPromise = Ad.find(query)
+      .sort(sortOption)
+      .limit(parseInt(limit))
+      .lean(); // Use lean() for better performance
+    
+    const ads = await Promise.race([queryPromise, timeoutPromise]);
+    
+    res.json(ads || []);
   } catch (error) {
     console.error("Error fetching active ads:", error);
-    res.status(500).json({ message: "Error fetching active ads" });
+    
+    // Send appropriate error response based on error type
+    if (error.message === 'Database query timeout' || error.name === 'MongooseError') {
+      res.status(503).json({ 
+        message: "Database service temporarily unavailable",
+        error: error.message 
+      });
+    } else {
+      res.status(500).json({ 
+        message: "Error fetching active ads",
+        error: error.message 
+      });
+    }
   }
 };

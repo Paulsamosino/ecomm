@@ -24,6 +24,7 @@ import {
   getSellerProducts,
 } from "@/api/seller";
 import { toast } from "react-hot-toast";
+import EnhancedSellerChatWidget from "@/components/chat/EnhancedSellerChatWidget";
 
 const StatCard = ({
   title,
@@ -284,6 +285,7 @@ const SellerDashboard = () => {
   }
 
   return (
+    <>
     <div className="p-8">
       {/* Header with welcome message and action button */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
@@ -434,6 +436,8 @@ const SellerDashboard = () => {
         </div>
       </div>
     </div>
+    <EnhancedSellerChatWidget />
+    </>
   );
 };
 

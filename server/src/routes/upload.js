@@ -56,4 +56,35 @@ router.post("/image", auth, upload.single("image"), async (req, res) => {
   }
 });
 
+// Handle blog cover image upload
+router.post("/blog-image", auth, upload.single("image"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No image file provided" });
+    }
+
+    // Upload to Cloudinary with blog-specific settings
+    const result = await uploadToCloudinary(req.file.buffer, {
+      folder: "blog_images",
+      public_id: `blog_${req.user._id}_${Date.now()}`,
+      transformation: [
+        { width: 1200, height: 630, crop: "fill" }, // Good for blog covers
+        { quality: "auto" },
+        { format: "jpg" },
+      ],
+    });
+
+    res.json({
+      imageUrl: result.secure_url,
+      public_id: result.public_id,
+    });
+  } catch (error) {
+    console.error("Error uploading blog image:", error);
+    res.status(500).json({
+      message: "Failed to upload blog image",
+      error: error.message,
+    });
+  }
+});
+
 module.exports = router;

@@ -263,10 +263,12 @@ router.get("/", async (req, res) => {
 // Get a single product
 router.get("/:id", async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id).populate(
-      "seller",
-      "name email"
-    );
+    const product = await Product.findById(req.params.id)
+      .populate("seller", "name email")
+      .populate({
+        path: "reviews.user",
+        select: "name"
+      });
 
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
@@ -362,11 +364,11 @@ router.post("/:productId/reviews", auth, async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    // Check if user has purchased this product
+    // Check if user has purchased this product (delivered orders are eligible for review)
     const hasPurchased = await Order.findOne({
       buyer: userId,
       "items.product": productId,
-      "paymentInfo.status": "completed",
+      status: "delivered", // Changed from payment status to delivery status
     });
 
     if (!hasPurchased) {
@@ -477,11 +479,11 @@ router.get("/:productId/can-review", auth, async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    // Check if user has purchased this product
+    // Check if user has purchased this product (delivered orders are eligible for review)
     const hasPurchased = await Order.findOne({
       buyer: userId,
       "items.product": productId,
-      "paymentInfo.status": "completed",
+      status: "delivered", // Changed from payment status to delivery status
     });
 
     // Check if user has already reviewed this product

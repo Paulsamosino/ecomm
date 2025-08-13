@@ -1,17 +1,26 @@
 const express = require("express");
 const router = express.Router();
-const { protect, authorize } = require("../middleware/authMiddleware");
-const blogController = require("../controllers/blogController");
+const { protect } = require("../middleware/authMiddleware");
+const blog = require("../controllers/blogController");
 
-// Public routes
-router.get("/", blogController.getAllPosts);
-router.get("/categories", blogController.getCategories);
-router.get("/tags", blogController.getTags);
-router.get("/:slug", blogController.getPostBySlug);
+// Public
+router.get("/", blog.getAllPosts);
+router.get("/categories", blog.getCategories);
+router.get("/tags", blog.getTags);
+router.get("/:slug", blog.getPostBySlug);
 
-// Admin only routes
-router.post("/", protect, authorize("admin"), blogController.createPost);
-router.put("/:id", protect, authorize("admin"), blogController.updatePost);
-router.delete("/:id", protect, authorize("admin"), blogController.deletePost);
+// Auth required
+router.get("/post/:id", protect, blog.getPostById);
+router.get("/feed/me", protect, blog.feed);
+router.post("/", protect, blog.createPost);
+router.put("/:id", protect, blog.updatePost);
+router.delete("/:id", protect, blog.deletePost);
+
+router.get("/:id/comments", blog.getComments);
+router.post("/:id/comments", protect, blog.addComment);
+router.delete("/:id/comments/:commentId", protect, blog.deleteComment);
+
+router.post("/:id/vote", protect, blog.votePost);
+router.post("/comments/:commentId/vote", protect, blog.voteComment);
 
 module.exports = router;

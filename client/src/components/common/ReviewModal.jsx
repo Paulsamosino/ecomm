@@ -1,15 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Star, X } from 'lucide-react';
 import { apiAddReview } from '../../api/products';
+import axiosInstance from '../../api/axios';
 import { useAuth } from '../../contexts/AuthContext';
 
-const ReviewModal = ({ isOpen, onClose, productId, onReviewAdded }) => {
+const ReviewModal = ({ isOpen, onClose, productId, onReviewAdded, editingReview = null }) => {
   const { user } = useAuth();
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // Update form when editing review or modal opens/closes
+  useEffect(() => {
+    if (editingReview && isOpen) {
+      setRating(editingReview.rating);
+      setComment(editingReview.comment);
+    } else if (!isOpen) {
+      // Reset form when modal closes
+      setRating(0);
+      setComment('');
+      setError('');
+      setHoveredRating(0);
+    }
+  }, [editingReview, isOpen]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -28,18 +43,29 @@ const ReviewModal = ({ isOpen, onClose, productId, onReviewAdded }) => {
     setIsSubmitting(true);
     
     try {
-      const response = await apiAddReview(productId, {
-        rating,
-        comment: comment.trim()
-      });
-
+      let response;
+      
+      if (editingReview) {
+        // Update existing review
+        response = await axiosInstance.put(`/reviews/review/${editingReview._id}`, {
+          rating,
+          comment: comment.trim()
+        });
+      } else {
+        // Create new review
+        response = await apiAddReview(productId, {
+          rating,
+          comment: comment.trim()
+        });
+      }
+      
       // Call the callback to update the parent component
       onReviewAdded(response.data);
       
-      // Reset form
+      // Reset form (modal closing will be handled by parent)
       setRating(0);
       setComment('');
-      onClose();
+      setError('');
     } catch (error) {
       setError(error.response?.data?.message || 'Failed to submit review');
     } finally {
@@ -61,7 +87,9 @@ const ReviewModal = ({ isOpen, onClose, productId, onReviewAdded }) => {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-semibold text-gray-900">Write a Review</h2>
+          <h2 className="text-xl font-semibold text-gray-900">
+            {editingReview ? 'Edit Review' : 'Write a Review'}
+          </h2>
           <button
             onClick={handleClose}
             className="text-gray-400 hover:text-gray-600"
@@ -142,7 +170,7 @@ const ReviewModal = ({ isOpen, onClose, productId, onReviewAdded }) => {
               disabled={isSubmitting || !rating || !comment.trim()}
               className="px-4 py-2 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-md transition-colors"
             >
-              {isSubmitting ? 'Submitting...' : 'Submit Review'}
+              {isSubmitting ? 'Submitting...' : (editingReview ? 'Update Review' : 'Submit Review')}
             </button>
           </div>
         </form>

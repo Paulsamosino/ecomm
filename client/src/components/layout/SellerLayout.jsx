@@ -11,7 +11,6 @@ import {
   Users,
   TrendingUp,
   ChevronDown,
-  MessageSquare,
   Menu,
   X,
   LayoutGrid,
@@ -83,11 +82,6 @@ const SellerLayout = () => {
       label: "Customer",
       items: [
         {
-          name: "Messages",
-          path: "/seller/messages",
-          icon: MessageSquare,
-        },
-        {
           name: "Reviews",
           path: "/seller/reviews",
           icon: Star,
@@ -97,6 +91,18 @@ const SellerLayout = () => {
           path: "/seller/customers",
           icon: Users,
         },
+        {
+          name: "Messages",
+          path: "/seller/messages",
+          icon: Mail,
+        },
+      ],
+    },
+    {
+      group: "community",
+      label: "Community",
+      items: [
+  { name: "Blog", path: "/seller/blog", icon: Bird },
       ],
     },
     {
@@ -159,7 +165,7 @@ const SellerLayout = () => {
             ${
               isMobile
                 ? "fixed inset-y-0 left-0 z-30 w-64"
-                : "sticky top-16 w-64 md:w-20 lg:w-64"
+                : "fixed top-16 left-0 w-64 md:w-20 lg:w-64"
             }
             bg-white border-r border-orange-100 transition-all duration-300 ease-in-out
             h-[calc(100vh-4rem)] overflow-y-auto
@@ -229,7 +235,7 @@ const SellerLayout = () => {
         {/* Main Content */}
         <main
           className={`flex-1 py-4 px-3 sm:px-4 md:px-6 lg:px-8 ${
-            isMobile ? "w-full pb-24" : ""
+            isMobile ? "w-full pb-24" : "ml-64 md:ml-20 lg:ml-64"
           } relative z-10`}
         >
           <div className="max-w-7xl mx-auto">

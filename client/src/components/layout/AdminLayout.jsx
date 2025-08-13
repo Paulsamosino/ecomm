@@ -11,6 +11,7 @@ import {
   LogOut,
   Flag,
   MonitorPlay,
+  FileText,
 } from "lucide-react";
 
 const AdminLayout = () => {
@@ -31,8 +32,8 @@ const AdminLayout = () => {
     { name: "Reports", path: "/admin/reports", icon: Flag },
     { name: "Ads", path: "/admin/ads", icon: MonitorPlay },
     { name: "Analytics", path: "/admin/analytics", icon: BarChart },
-    { name: "Settings", path: "/admin/settings", icon: Settings },
-    { name: "Help", path: "/admin/help", icon: HelpCircle },
+    { name: "Blog", path: "/admin/blog", icon: FileText },
+    { name: "Messages", path: "/admin/messages", icon: HelpCircle },
   ];
 
   if (!user || user.role !== "admin") {
@@ -42,23 +43,23 @@ const AdminLayout = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Sidebar */}
-      <div className="fixed top-0 left-0 z-40 w-64 h-screen bg-white border-r shadow-sm">
-        <div className="h-full px-3 py-4 overflow-y-auto">
+      <div className="fixed top-0 left-0 z-40 w-64 h-screen bg-gradient-to-b from-orange-600 to-orange-700 shadow-xl">
+        <div className="h-full px-4 py-6 overflow-y-auto">
           {/* Header */}
-          <div className="mb-6 p-2">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-blue-600 text-white">
-                <LayoutDashboard className="h-6 w-6" />
+          <div className="mb-8 p-3">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
+                <LayoutDashboard className="h-7 w-7 text-white" />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-900">Admin Panel</p>
-                <p className="text-xs text-gray-500">{user?.name || "Administrator"}</p>
+                <p className="text-lg font-bold text-white">Admin Panel</p>
+                <p className="text-sm text-orange-100">{user?.name || "Administrator"}</p>
               </div>
             </div>
           </div>
 
           {/* Navigation */}
-          <nav className="space-y-1">
+          <nav className="space-y-2">
             {navigation.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
@@ -66,27 +67,32 @@ const AdminLayout = () => {
                 <Link
                   key={item.name}
                   to={item.path}
-                  className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 group ${
                     isActive
-                      ? "bg-blue-50 text-blue-700 border border-blue-200"
-                      : "text-gray-700 hover:bg-gray-100"
+                      ? "bg-white text-orange-600 shadow-lg transform scale-105"
+                      : "text-orange-100 hover:bg-white/10 hover:text-white hover:pl-6"
                   }`}
                 >
-                  <Icon className="mr-3 h-5 w-5" />
-                  {item.name}
+                  <Icon className={`mr-4 h-5 w-5 transition-transform duration-200 ${
+                    isActive ? "text-orange-600" : "text-orange-200 group-hover:text-white group-hover:scale-110"
+                  }`} />
+                  <span className="font-medium">{item.name}</span>
+                  {isActive && (
+                    <div className="ml-auto w-2 h-2 bg-orange-500 rounded-full"></div>
+                  )}
                 </Link>
               );
             })}
           </nav>
 
           {/* Logout */}
-          <div className="absolute bottom-4 left-3 right-3">
+          <div className="absolute bottom-6 left-4 right-4">
             <button
               onClick={logout}
-              className="w-full flex items-center px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+              className="w-full flex items-center px-4 py-3 text-sm font-medium text-orange-100 hover:bg-red-500/20 hover:text-white rounded-xl transition-all duration-200 group border border-orange-400/30"
             >
-              <LogOut className="mr-3 h-5 w-5" />
-              Logout
+              <LogOut className="mr-4 h-5 w-5 text-orange-200 group-hover:text-white transition-colors duration-200" />
+              <span className="font-medium">Logout</span>
             </button>
           </div>
         </div>

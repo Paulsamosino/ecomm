@@ -10,8 +10,6 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import MainLayout from "@/components/layout/MainLayout";
 import SellerLayout from "@/components/layout/SellerLayout";
 import AdminLayout from "@/components/layout/AdminLayout";
-import EnhancedChatWidget from "@/components/chat/EnhancedChatWidget";
-import { chatNotificationService } from "@/services/chatNotificationService";
 import RedirectBasedOnRole from "@/components/routes/RedirectBasedOnRole";
 import AdminRoute from "@/components/routes/AdminRoute";
 import HomeRedirect from "@/components/routes/HomeRedirect";
@@ -34,15 +32,15 @@ import SellerStorePage from "@/pages/SellerStorePage";
 import SellerDashboard from "@/pages/SellerDashboard/SellerDashboard";
 import SellerProducts from "@/pages/SellerDashboard/SellerProducts";
 import SellerOrders from "@/pages/SellerDashboard/SellerOrders";
-import SellerReviews from "@/pages/SellerDashboard/SellerReviews";
+import SellerReviews from "@/pages/SellerDashboard/SellerReviewsPage";
 import SellerSettings from "@/pages/SellerDashboard/SellerSettings";
 import SellerAnalytics from "@/pages/SellerDashboard/SellerAnalytics";
 import SellerCustomers from "@/pages/SellerDashboard/SellerCustomers";
 import SellerHelp from "@/pages/SellerDashboard/SellerHelp";
 import SellerCartManagement from "@/pages/SellerDashboard/SellerCartManagement";
 import SellerPayments from "@/pages/SellerDashboard/SellerPayments";
+import SellerMessages from "@/pages/SellerDashboard/SellerMessages";
 import BuyerDashboardPage from "@/pages/BuyerDashboardPage";
-import ChatPage from "@/pages/ChatPage";
 
 // Import Admin Dashboard Components
 import AdminDashboardPage from "@/pages/AdminDashboard/AdminDashboardPage";
@@ -53,13 +51,13 @@ import AdminSettings from "@/pages/AdminDashboard/AdminSettings";
 import AdminReports from "@/pages/AdminDashboard/AdminReports";
 import AdminHelp from "@/pages/AdminDashboard/AdminHelp";
 import AdminAdsPage from "@/pages/AdminDashboard/AdminAdsPage";
+import AdminMessages from "@/pages/AdminDashboard/AdminMessages";
+import AdminBlogManagement from "@/pages/AdminDashboard/AdminBlogManagement";
 
 // Import Seller Route and Product Management
 import SellerRoute from "@/components/routes/SellerRoute";
 import AddProduct from "@/pages/SellerDashboard/AddProduct";
 import EditProduct from "@/pages/SellerDashboard/EditProduct";
-import EnhancedChatPage from "@/pages/EnhancedChatPage";
-import SellerMessages from "@/pages/SellerDashboard/SellerMessages";
 import SellerLocation from "@/pages/SellerDashboard/SellerLocation";
 import SellerChangeName from "@/pages/SellerDashboard/SellerChangeName";
 import SellerChangeEmail from "@/pages/SellerDashboard/SellerChangeEmail";
@@ -71,26 +69,18 @@ import BuyerManageProfile from "@/pages/BuyerDashboard/BuyerManageProfile";
 
 // Import Additional Pages
 import BreedingSimulatorPage from "@/pages/BreedingSimulatorPage";
+import BlogList from "@/pages/Blog/BlogList";
+import BlogPostView from "@/pages/Blog/BlogPostView";
+import BlogEditor from "@/pages/Blog/BlogEditor";
+import Feed from "@/pages/Feed/Feed";
+import BlogLayout from "@/pages/Blog/BlogLayout";
+import SellerBlogLayout from "@/pages/Blog/SellerBlogLayout";
 
 const AppContent = () => {
   const location = useLocation();
   const { user } = useAuth();
   const isSellerRoute = location.pathname.startsWith("/seller");
   const isAdminRoute = location.pathname.startsWith("/admin");
-
-  // Initialize chat notifications for buyers
-  useEffect(() => {
-    if (user && !user.isSeller && !user.isAdmin) {
-      const token = localStorage.getItem("token");
-      if (token) {
-        chatNotificationService.initialize(token, user._id);
-      }
-    }
-
-    return () => {
-      chatNotificationService.disconnect();
-    };
-  }, [user]);
 
   return (
     <>
@@ -108,6 +98,21 @@ const AppContent = () => {
           <Route path="help-center" element={<HelpCenterPage />} />
           <Route path="contact" element={<ContactUsPage />} />
           <Route path="breeding-simulator" element={<BreedingSimulatorPage />} />
+          <Route path="blog" element={<BlogLayout />}>
+            {/* Default landing: Explore; BlogLayout will redirect to Feed if logged-in */}
+            <Route index element={<BlogList />} />
+            <Route path="explore" element={<BlogList />} />
+            <Route path="feed" element={<ProtectedRoute />}>
+              <Route index element={<Feed />} />
+            </Route>
+            <Route path="new" element={<ProtectedRoute />}>
+              <Route index element={<BlogEditor />} />
+            </Route>
+            <Route path="edit/:id" element={<ProtectedRoute />}>
+              <Route index element={<BlogEditor />} />
+            </Route>
+            <Route path=":slug" element={<BlogPostView />} />
+          </Route>
           <Route path="cart" element={<ProtectedRoute restrictTo="buyer" />}>
             <Route index element={<CartPage />} />
           </Route>
@@ -135,8 +140,6 @@ const AppContent = () => {
             <Route index element={<BuyerMyPurchase />} />
             <Route path="purchases" element={<BuyerMyPurchase />} />
             <Route path="profile" element={<BuyerManageProfile />} />
-            <Route path="chat" element={<EnhancedChatPage />} />
-            <Route path="chat/:chatId" element={<EnhancedChatPage />} />
           </Route>
         </Route>
 
@@ -145,13 +148,12 @@ const AppContent = () => {
           <Route element={<SellerLayout />}>
             <Route index element={<SellerDashboard />} />
             <Route path="dashboard" element={<SellerDashboard />} />
-            <Route path="messages" element={<SellerMessages />} />
-            <Route path="messages/:chatId" element={<SellerMessages />} />
             <Route path="analytics" element={<SellerAnalytics />} />
             <Route path="products" element={<SellerProducts />} />
             <Route path="products/new" element={<AddProduct />} />
             <Route path="products/edit/:id" element={<EditProduct />} />
             <Route path="orders" element={<SellerOrders />} />
+            <Route path="messages" element={<SellerMessages />} />
             <Route path="reviews" element={<SellerReviews />} />
             <Route path="customers" element={<SellerCustomers />} />
             <Route path="cart" element={<SellerCartManagement />} />
@@ -163,6 +165,15 @@ const AppContent = () => {
             <Route path="profile" element={<SellerChangeProfile />} />
             <Route path="change-name" element={<SellerChangeName />} />
             <Route path="change-email" element={<SellerChangeEmail />} />
+            {/* Blog routes for sellers with SellerBlogLayout */}
+            <Route path="blog" element={<SellerBlogLayout />}>
+              <Route index element={<BlogList />} />
+              <Route path="explore" element={<BlogList />} />
+              <Route path="feed" element={<Feed />} />
+              <Route path="new" element={<BlogEditor />} />
+              <Route path="edit/:id" element={<BlogEditor />} />
+              <Route path=":slug" element={<BlogPostView />} />
+            </Route>
           </Route>
         </Route>
 
@@ -175,6 +186,8 @@ const AppContent = () => {
             <Route path="analytics" element={<AdminManageAnalytics />} />
             <Route path="reports" element={<AdminReports />} />
             <Route path="ads" element={<AdminAdsPage />} />
+            <Route path="blog" element={<AdminBlogManagement />} />
+            <Route path="messages" element={<AdminMessages />} />
             <Route path="settings" element={<AdminSettings />} />
             <Route path="help" element={<AdminHelp />} />
           </Route>
@@ -188,9 +201,6 @@ const AppContent = () => {
         {/* Redirect to home if no route matches */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-
-      {/* Chat widget for buyers only */}
-      {user && !user.isSeller && !user.isAdmin && <EnhancedChatWidget />}
     </>
   );
 };

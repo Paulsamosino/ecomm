@@ -105,15 +105,15 @@ const AdminDashboardPage = () => {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-lg border">
+    <div className="bg-white p-6 rounded-lg border">
           <div className="flex items-center gap-3 mb-4">
-            <Users className="h-6 w-6 text-blue-600" />
+      <Users className="h-6 w-6 text-orange-600" />
             <h3 className="text-lg font-semibold">User Management</h3>
           </div>
           <p className="text-gray-600 mb-4">Manage user accounts and permissions</p>
           <Link 
             to="/admin/users"
-            className="inline-flex items-center text-blue-600 hover:text-blue-700 font-medium"
+      className="inline-flex items-center text-orange-600 hover:text-orange-700 font-medium"
           >
             Manage Users →
           </Link>
@@ -121,13 +121,13 @@ const AdminDashboardPage = () => {
 
         <div className="bg-white p-6 rounded-lg border">
           <div className="flex items-center gap-3 mb-4">
-            <Package className="h-6 w-6 text-green-600" />
+            <Package className="h-6 w-6 text-orange-600" />
             <h3 className="text-lg font-semibold">Product Listings</h3>
           </div>
           <p className="text-gray-600 mb-4">Review and manage product listings</p>
           <Link 
             to="/admin/listings"
-            className="inline-flex items-center text-green-600 hover:text-green-700 font-medium"
+            className="inline-flex items-center text-orange-600 hover:text-orange-700 font-medium"
           >
             Manage Listings →
           </Link>
@@ -135,13 +135,13 @@ const AdminDashboardPage = () => {
 
         <div className="bg-white p-6 rounded-lg border">
           <div className="flex items-center gap-3 mb-4">
-            <Flag className="h-6 w-6 text-red-600" />
+            <Flag className="h-6 w-6 text-orange-600" />
             <h3 className="text-lg font-semibold">Reports</h3>
           </div>
           <p className="text-gray-600 mb-4">Handle user and content reports</p>
           <Link 
             to="/admin/reports"
-            className="inline-flex items-center text-red-600 hover:text-red-700 font-medium"
+            className="inline-flex items-center text-orange-600 hover:text-orange-700 font-medium"
           >
             View Reports →
           </Link>
@@ -149,13 +149,13 @@ const AdminDashboardPage = () => {
 
         <div className="bg-white p-6 rounded-lg border">
           <div className="flex items-center gap-3 mb-4">
-            <MonitorPlay className="h-6 w-6 text-blue-600" />
+            <MonitorPlay className="h-6 w-6 text-orange-600" />
             <h3 className="text-lg font-semibold">Advertisement Management</h3>
           </div>
           <p className="text-gray-600 mb-4">Create and manage ads shown to buyers</p>
           <Link 
             to="/admin/ads"
-            className="inline-flex items-center text-blue-600 hover:text-blue-700 font-medium"
+            className="inline-flex items-center text-orange-600 hover:text-orange-700 font-medium"
           >
             Manage Ads →
           </Link>
@@ -163,13 +163,13 @@ const AdminDashboardPage = () => {
 
         <div className="bg-white p-6 rounded-lg border">
           <div className="flex items-center gap-3 mb-4">
-            <BarChart3 className="h-6 w-6 text-purple-600" />
+            <BarChart3 className="h-6 w-6 text-orange-600" />
             <h3 className="text-lg font-semibold">Analytics</h3>
           </div>
           <p className="text-gray-600 mb-4">View platform metrics and insights</p>
           <Link 
             to="/admin/analytics"
-            className="inline-flex items-center text-purple-600 hover:text-purple-700 font-medium"
+            className="inline-flex items-center text-orange-600 hover:text-orange-700 font-medium"
           >
             View Analytics →
           </Link>
@@ -177,13 +177,13 @@ const AdminDashboardPage = () => {
 
         <div className="bg-white p-6 rounded-lg border">
           <div className="flex items-center gap-3 mb-4">
-            <Settings className="h-6 w-6 text-gray-600" />
+            <Settings className="h-6 w-6 text-orange-600" />
             <h3 className="text-lg font-semibold">Settings</h3>
           </div>
           <p className="text-gray-600 mb-4">Configure platform settings</p>
           <Link 
             to="/admin/settings"
-            className="inline-flex items-center text-gray-600 hover:text-gray-700 font-medium"
+            className="inline-flex items-center text-orange-600 hover:text-orange-700 font-medium"
           >
             Open Settings →
           </Link>

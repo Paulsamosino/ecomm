@@ -100,7 +100,9 @@ class DeliveryStatusSyncService {
         'COMPLETED': 'COMPLETED',
         'CANCELLED': 'CANCELLED',
         'EXPIRED': 'EXPIRED',
-        'REJECTED': 'REJECTED'
+        'REJECTED': 'REJECTED',
+        'DRIVER_CANCELLED': 'DRIVER_CANCELLED',
+        'SYSTEM_CANCELLED': 'SYSTEM_CANCELLED'
       };
       
       const mappedStatus = statusMapping[newStatus] || newStatus;
@@ -136,6 +138,10 @@ class DeliveryStatusSyncService {
         } else if (mappedStatus === 'PICKED_UP' && order.status !== 'shipped') {
           order.status = 'shipped';
           console.log(`   📦 Order marked as SHIPPED (package picked up)`);
+        } else if (['EXPIRED', 'CANCELLED', 'REJECTED', 'DRIVER_CANCELLED', 'SYSTEM_CANCELLED'].includes(mappedStatus) && order.status !== 'cancelled') {
+          order.status = 'cancelled';
+          order.delivery.cancelledAt = new Date();
+          console.log(`   ❌ Order marked as CANCELLED (delivery ${mappedStatus.toLowerCase()})`);
         }
         
         await order.save();

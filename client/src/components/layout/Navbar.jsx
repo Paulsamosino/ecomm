@@ -16,6 +16,10 @@ import {
   Bell,
   HelpCircle,
   Sun,
+  Egg,
+  Newspaper,
+  Rss,
+  PenSquare,
 } from "lucide-react";
 import {
   Tooltip,
@@ -91,12 +95,10 @@ const Navbar = () => {
               <Link to="/products" className="text-white hover:text-white/90">
                 Browse Products
               </Link>
-              <Link
-                to="/breeding-simulator"
-                className="text-white hover:text-white/90 flex items-center gap-1"
-              >
-                Breeding Simulator
+              <Link to="/blog" className="text-white hover:text-white/90">
+                Blog
               </Link>
+              {/* Breeding Simulator moved into user dropdown */}
               <Link
                 to="/help-center"
                 className="text-white hover:text-white/90"
@@ -169,6 +171,34 @@ const Navbar = () => {
                           {user?.email || ""}
                         </p>
                       </div>
+                      <Link
+                        to="/blog"
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <Newspaper className="h-4 w-4 mr-2 text-orange-500" />
+                        Blog
+                      </Link>
+                      <Link
+                        to="/blog/feed"
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <Rss className="h-4 w-4 mr-2 text-orange-500" />
+                        My Feed
+                      </Link>
+                      <Link
+                        to="/blog/new"
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <PenSquare className="h-4 w-4 mr-2 text-orange-500" />
+                        Write Post
+                      </Link>
+                      <Link
+                        to="/breeding-simulator"
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <Egg className="h-4 w-4 mr-2 text-orange-500" />
+                        Breeding Simulator
+                      </Link>
                       {!user?.isSeller && (
                         <Link
                           to="/buyer-dashboard/profile"
@@ -296,12 +326,33 @@ const Navbar = () => {
               </Link>
 
               <Link
-                to="/breeding-simulator"
+                to="/blog"
                 className="flex items-center px-4 py-3 rounded-lg text-gray-700 font-medium hover:bg-orange-50 transition-all"
               >
-                <span className="text-lg mr-3">🐔</span>
-                Breeding Simulator
+                <Newspaper className="h-5 w-5 mr-3 text-orange-500" />
+                Blog
               </Link>
+
+              {isAuthenticated && (
+                <>
+                  <Link
+                    to="/blog/feed"
+                    className="flex items-center px-4 py-3 rounded-lg text-gray-700 font-medium hover:bg-orange-50 transition-all"
+                  >
+                    <Rss className="h-5 w-5 mr-3 text-orange-500" />
+                    My Feed
+                  </Link>
+                  <Link
+                    to="/blog/new"
+                    className="flex items-center px-4 py-3 rounded-lg text-gray-700 font-medium hover:bg-orange-50 transition-all"
+                  >
+                    <PenSquare className="h-5 w-5 mr-3 text-orange-500" />
+                    Write Post
+                  </Link>
+                </>
+              )}
+
+              {/* Breeding Simulator moved into user dropdown; keep a quick link here on mobile if desired */}
 
               {isAuthenticated && (
                 <Link

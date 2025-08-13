@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import axiosInstance from "@/api/axios";
-import { socketService } from "@/services/socket";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -445,59 +444,19 @@ const BuyerMyPurchase = () => {
     }
   }, []);
 
-  // Initialize socket connection and set up event listeners
+  // Initialize and fetch orders
   useEffect(() => {
-    let socket;
-
-    const initializeSocket = async () => {
-      try {
-        // Get the token from localStorage
-        const token = localStorage.getItem("token");
-        if (!token) {
-          console.error("No authentication token found");
-          return;
-        }
-
-        // Connect to socket server
-        socket = await socketService.connect(token, { isSeller: false });
-
-        if (socket) {
-          // Set up event listeners
-          socket.on("orderStatusUpdated", (updatedOrder) => {
-            setOrders((prevOrders) =>
-              prevOrders.map((order) =>
-                order._id === updatedOrder._id ? updatedOrder : order
-              )
-            );
-            toast.success(
-              `Order #${updatedOrder._id.slice(-6)} status updated to ${
-                updatedOrder.status
-              }`
-            );
-          });
-
-          socket.on("connect_error", (err) => {
-            console.error("Socket connection error:", err);
-            toast.error(
-              "Connection to server lost. Some features may not work."
-            );
-          });
-        }
-      } catch (error) {
-        console.error("Error initializing socket:", error);
-      }
-    };
-
-    // Initialize socket and fetch orders
+    // Initialize and fetch orders
     fetchOrders();
-    initializeSocket();
+
+    // Set up polling for order status updates every 30 seconds
+    const pollInterval = setInterval(() => {
+      fetchOrders();
+    }, 30000);
 
     // Cleanup function
     return () => {
-      if (socket) {
-        socket.off("orderStatusUpdated");
-        socket.off("connect_error");
-      }
+      clearInterval(pollInterval);
     };
   }, [fetchOrders]);
 

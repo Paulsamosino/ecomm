@@ -170,7 +170,7 @@ const Footer = () => {
                   )}
                   <FooterLink to="/orders">My Orders</FooterLink>
                   <FooterLink to="/wishlist">Wishlist</FooterLink>
-                  <FooterLink to="/chat">Messages</FooterLink>
+                  {/* Messages feature removed */}
                 </>
               ) : (
                 <>

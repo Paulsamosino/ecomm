@@ -70,7 +70,7 @@ const HelpCenterPage = () => {
     {
       question: "What if I have issues with my order?",
       answer:
-        "Contact the seller directly through our messaging system or reach out to our customer support team. We have a buyer protection policy to ensure your satisfaction.",
+        "Contact the seller using the contact details on the order or reach out to our customer support team. We have a buyer protection policy to ensure your satisfaction.",
     },
   ];
 
@@ -166,18 +166,7 @@ const HelpCenterPage = () => {
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3">
-                  <MessageSquare className="h-5 w-5 text-[#fcba6d] mt-1" />
-                  <div>
-                    <h3 className="font-medium text-gray-800">Live Chat</h3>
-                    <p className="text-sm text-gray-600 mb-1">
-                      Chat with our support team
-                    </p>
-                    <button className="text-sm text-[#cd8539] hover:text-[#fcba6d] transition-colors">
-                      Start Chat
-                    </button>
-                  </div>
-                </div>
+                {/* Live Chat removed */}
               </div>
             </div>
 

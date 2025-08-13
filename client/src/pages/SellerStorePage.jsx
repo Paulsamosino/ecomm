@@ -8,7 +8,6 @@ import {
   CheckCircle,
   Package,
   Users,
-  MessageCircle,
   Calendar,
   Shield,
   Award,
@@ -69,7 +68,7 @@ const SellerStorePage = () => {
         // Create fallback seller data but with a more generic name if the seller might exist
         sellerData = {
           _id: sellerId,
-          name: "Seller Store",
+          name: "Store",
           sellerProfile: {
             businessName: `Store ${sellerId.slice(-6)}`,
             description: "Welcome to our store! We're just getting started and adding more products soon.",
@@ -86,8 +85,8 @@ const SellerStorePage = () => {
         productsData = await apiGetSellerProducts(sellerId);
         
         // If we got products but no real seller profile, this is likely a real seller
-        if (productsData && productsData.length > 0 && sellerData.name === "Seller Store") {
-          sellerData.sellerProfile.businessName = `Seller's Store`;
+        if (productsData && productsData.length > 0 && sellerData.name === "Store") {
+          sellerData.sellerProfile.businessName = `Store`;
           sellerData.sellerProfile.description = "Check out our amazing products below!";
         }
       } catch (productsErr) {
@@ -103,7 +102,7 @@ const SellerStorePage = () => {
       // Even if there's an error, show the store with default data
       setSeller({
         _id: sellerId,
-        name: "Seller Store",
+        name: "Store",
         sellerProfile: {
           businessName: `Store ${sellerId.slice(-6)}`,
           description: "Welcome to our store! We're just getting started.",
@@ -117,6 +116,15 @@ const SellerStorePage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleMessageSeller = () => {
+    if (!user) {
+      toast.error("Please login to message this seller");
+      return;
+    }
+    if (!sellerId) return;
+    window.postMessage({ type: "OPEN_DIRECT_CHAT", payload: { sellerId } }, "*");
   };
 
   const handleAddToCart = (product) => {
@@ -136,41 +144,6 @@ const SellerStorePage = () => {
       removeFromWishlist(product._id, false);
     } else {
       addToWishlist(product);
-    }
-  };
-
-  const handleContactSeller = async () => {
-    if (!user) {
-      toast.error("Please login to contact the seller");
-      return;
-    }
-
-    if (user._id === sellerId) {
-      toast.error("You cannot message yourself");
-      return;
-    }
-
-    try {
-      // Show loading toast
-      const loadingToast = toast.loading("Starting conversation...");
-
-      // Create a new chat or get existing chat with the seller
-      const response = await axiosInstance.post("/chat", {
-        sellerId: sellerId,
-      });
-
-      toast.dismiss(loadingToast);
-      toast.success("Chat started with seller");
-
-      // Create a custom event to notify the ChatWidget to open with this chat
-      const chatEvent = new CustomEvent("openChatWidget", {
-        detail: { chatId: response.data._id },
-      });
-      window.dispatchEvent(chatEvent);
-
-    } catch (err) {
-      console.error("Error creating chat:", err);
-      toast.error("Failed to start chat. Please try again.");
     }
   };
 
@@ -229,7 +202,7 @@ const SellerStorePage = () => {
 
   // Store information with default values
   const storeInfo = {
-    name: seller?.sellerProfile?.businessName || seller?.name || `Store`,
+    name: seller?.name || `Store`,
     rating: seller?.sellerProfile?.rating || 0,
     reviewCount: seller?.sellerProfile?.reviewCount || 0,
     description: seller?.sellerProfile?.description || "Welcome to our store! We offer quality products with excellent service.",
@@ -276,13 +249,6 @@ const SellerStorePage = () => {
                 </div>
               </div>
             </div>
-            <Button
-              onClick={handleContactSeller}
-              className="bg-white text-orange-600 hover:bg-orange-50 border-2 border-white shadow-lg"
-            >
-              <MessageCircle className="h-4 w-4 mr-2" />
-              Contact Seller
-            </Button>
           </div>
         </div>
       </div>
@@ -443,6 +409,7 @@ const SellerStorePage = () => {
                         <List className="h-4 w-4" />
                       </button>
                     </div>
+                    <Button onClick={handleMessageSeller} className="ml-2 bg-orange-500 text-white hover:bg-orange-600">Message Seller</Button>
                   </div>
                 </div>
 
@@ -492,13 +459,6 @@ const SellerStorePage = () => {
                       </Button>
                     ) : (
                       <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                        <Button
-                          onClick={handleContactSeller}
-                          className="bg-orange-600 hover:bg-orange-700 text-white"
-                        >
-                          <MessageCircle className="h-4 w-4 mr-2" />
-                          Contact Seller
-                        </Button>
                         <Button
                           onClick={() => navigate("/products")}
                           variant="outline"

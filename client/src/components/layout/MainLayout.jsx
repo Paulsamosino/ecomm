@@ -1,8 +1,8 @@
 import React from "react";
 import { Outlet } from "react-router-dom";
 import Footer from "./Footer";
+import BuyerChatWidget from "@/components/chat/BuyerChatWidget";
 import Navbar from "./Navbar";
-import ChatWidget from "../chat/ChatWidget";
 import { Egg, Wheat, Sun } from "lucide-react";
 
 const MainLayout = () => {
@@ -29,9 +29,10 @@ const MainLayout = () => {
         <Outlet />
       </main>
 
-      {/* Footer */}
+  {/* Footer */}
       <Footer />
-      <ChatWidget />
+  {/* Buyer chat widget */}
+  <BuyerChatWidget />
     </div>
   );
 };

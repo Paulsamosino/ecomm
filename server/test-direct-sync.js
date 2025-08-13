@@ -39,7 +39,9 @@ async function testDirectSync() {
           'COMPLETED': 'COMPLETED',
           'CANCELLED': 'CANCELLED',
           'EXPIRED': 'EXPIRED',
-          'REJECTED': 'REJECTED'
+          'REJECTED': 'REJECTED',
+          'DRIVER_CANCELLED': 'DRIVER_CANCELLED',
+          'SYSTEM_CANCELLED': 'SYSTEM_CANCELLED'
         };
         
         const mappedStatus = statusMapping[normalizedStatus] || 'ON_GOING';
@@ -52,6 +54,14 @@ async function testDirectSync() {
           order.status = 'delivered';
           order.delivery.completedAt = new Date();
           console.log('   🎉 Order marked as delivered!');
+        }
+        
+        // Update order status for failed deliveries
+        if ((mappedStatus === 'CANCELLED' || mappedStatus === 'EXPIRED' || mappedStatus === 'REJECTED' || 
+             mappedStatus === 'DRIVER_CANCELLED' || mappedStatus === 'SYSTEM_CANCELLED') && 
+             order.status !== 'cancelled') {
+          order.status = 'cancelled';
+          console.log(`   ❌ Order marked as cancelled due to delivery status: ${mappedStatus}`);
         }
         
         await order.save();

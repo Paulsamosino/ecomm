@@ -5,6 +5,9 @@ const sellerRoutes = require("./routes/seller");
 const deliveryRoutes = require("./routes/delivery");
 const webhookRoutes = require("./routes/webhook");
 const reportRoutes = require("./routes/reports");
+const reviewRoutes = require("./routes/reviews");
+const blogRoutes = require("./routes/blog");
+const socialRoutes = require("./routes/social");
 const cors = require("cors");
 const express = require("express");
 
@@ -33,7 +36,9 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/seller", sellerRoutes);
 app.use("/api/delivery", deliveryRoutes);
 app.use("/api/reports", reportRoutes);
-app.use("/api/chat", require("./routes/chat"));
+app.use("/api/reviews", reviewRoutes);
+app.use("/api/blog", blogRoutes);
+app.use("/api/social", socialRoutes);
 app.use("/api/upload", require("./routes/upload"));
 
 // Webhook Routes (no /api prefix for external service webhooks)

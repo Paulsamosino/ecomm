@@ -6,8 +6,6 @@ require("dotenv").config();
 const User = require("./models/User");
 const Product = require("./models/Product");
 const Order = require("./models/Order");
-const Chat = require("./models/Chat");
-const Message = require("./models/Message");
 const Report = require("./models/Report");
 
 // Import delivery locations
@@ -498,119 +496,6 @@ productTemplates.forEach((template) => {
   }
 });
 
-// Sample chat messages for more realistic conversations
-const chatMessages = [
-  // Inquiry about chicken availability
-  {
-    sender: "buyer",
-    content:
-      "Hi, I'm interested in your Rhode Island Reds. Do you have any currently available?",
-    status: "READ",
-  },
-  {
-    sender: "seller",
-    content:
-      "Yes, we have several Rhode Island Reds available! They're 4 months old and already laying. Would you like more information?",
-    status: "READ",
-  },
-  {
-    sender: "buyer",
-    content:
-      "Great! What's the price per bird and do you offer vaccination records?",
-    status: "READ",
-  },
-  {
-    sender: "seller",
-    content:
-      "They're $45 each, and yes, all our birds come with complete vaccination records. We can also provide health certificates if needed.",
-    status: "READ",
-  },
-  {
-    sender: "buyer",
-    content: "Perfect, I'd like to purchase 3 birds. What's the next step?",
-    status: "READ",
-  },
-
-  // Duck breeding inquiry
-  {
-    sender: "buyer",
-    content:
-      "Hello, do you have any experience with breeding Khaki Campbell ducks?",
-    status: "READ",
-  },
-  {
-    sender: "seller",
-    content:
-      "Yes, we've been breeding Khaki Campbells for 5 years. They're excellent egg layers!",
-    status: "READ",
-  },
-  {
-    sender: "buyer",
-    content: "What's the typical egg production I can expect?",
-    status: "READ",
-  },
-  {
-    sender: "seller",
-    content:
-      "Our Khaki Campbells typically lay 250-300 eggs per year when properly cared for.",
-    status: "READ",
-  },
-
-  // Equipment purchase
-  {
-    sender: "buyer",
-    content:
-      "I'm looking for an automatic chicken feeder for 20 birds. Any recommendations?",
-    status: "READ",
-  },
-  {
-    sender: "seller",
-    content:
-      "We have a 20lb capacity automatic feeder that would be perfect for your flock. It's weather-resistant and has anti-waste features.",
-    status: "READ",
-  },
-  {
-    sender: "buyer",
-    content: "Sounds good. What's the price and is installation included?",
-    status: "READ",
-  },
-  {
-    sender: "seller",
-    content:
-      "It's $89.99 and comes with detailed installation instructions. We can also provide setup assistance via video call if needed.",
-    status: "READ",
-  },
-  {
-    sender: "buyer",
-    content: "Great, I'll take it. Can you ship to California?",
-    status: "READ",
-  },
-
-  // Turkey inquiry
-  {
-    sender: "buyer",
-    content:
-      "Hi, I'm interested in heritage turkeys for breeding. What breeds do you have?",
-    status: "READ",
-  },
-  {
-    sender: "seller",
-    content:
-      "We currently have Bourbon Red and Narragansett turkeys available for breeding.",
-    status: "READ",
-  },
-  {
-    sender: "buyer",
-    content: "Can you tell me more about the Bourbon Reds?",
-    status: "READ",
-  },
-  {
-    sender: "seller",
-    content:
-      "Our Bourbon Reds are from champion bloodlines, excellent foragers, and typically reach 23-25 lbs for toms.",
-    status: "READ",
-  },
-];
 
 // Helper function for generating prices
 function generatePrice(min, max) {
@@ -721,8 +606,7 @@ async function seedDatabase() {
     await User.deleteMany({});
     await Product.deleteMany({});
     await Order.deleteMany({});
-    await Chat.deleteMany({});
-    await Message.deleteMany({});
+  // Chat/messages feature removed – nothing to clear for Chat/Message
     await Report.deleteMany({});
     console.log("Cleared existing data");
 
@@ -766,54 +650,7 @@ async function seedDatabase() {
 
     // Orders are not seeded by default.
 
-    // Create chats with more realistic conversation flows
-    const chats = [];
-
-    // Group chat messages into conversations
-    const conversations = [
-      chatMessages.slice(0, 5), // Conversation 1
-      chatMessages.slice(5, 9), // Conversation 2
-      chatMessages.slice(9, 14), // Conversation 3
-      chatMessages.slice(14, 18), // Conversation 4
-    ];
-
-    for (let i = 0; i < 6; i++) {
-      const buyer = buyers[i % buyers.length];
-      const product = createdProducts[i % createdProducts.length];
-      const seller = await User.findById(product.seller);
-
-      // Skip if buyer or seller is undefined/null
-      if (!buyer || !seller) continue;
-
-      // Select a random conversation template
-      const conversation = conversations[i % conversations.length];
-
-      // Create message array from conversation template
-      const messages = conversation.map((msg) => ({
-        content: msg.content,
-        senderId: msg.sender === "buyer" ? buyer._id : seller._id,
-        read: msg.read,
-        createdAt: new Date(
-          Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000)
-        ), // Random time in last week
-      }));
-
-      // Sort messages by created date
-      messages.sort((a, b) => a.createdAt - b.createdAt);
-
-      const chat = {
-        buyer: buyer._id,
-        seller: seller._id,
-        product: product._id,
-        messages: messages,
-        lastMessage: messages[messages.length - 1], // Use the entire message object instead of just the content
-        updatedAt: messages[messages.length - 1].createdAt,
-      };
-
-      chats.push(chat);
-    }
-    await Chat.insertMany(chats);
-    console.log("Chats created with conversations");
+  // Chat/messages feature removed – skipping chat seeding
 
     console.log("Database seeded successfully!");
     process.exit(0);

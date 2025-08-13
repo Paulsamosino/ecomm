@@ -54,16 +54,35 @@ async function syncAllPendingDeliveries() {
         const status = await lalamoveService.getOrderStatus(order.delivery.lalamoveOrderId);
         
         const oldStatus = order.delivery.status;
-        const normalizedStatus = status.status.toLowerCase();
+        
+        // Map Lalamove status to our enum values  
+        const statusMapping = {
+          'ASSIGNING_DRIVER': 'ASSIGNING_DRIVER',
+          'ON_GOING': 'ON_GOING', 
+          'PICKED_UP': 'PICKED_UP',
+          'COMPLETED': 'COMPLETED',
+          'CANCELLED': 'CANCELLED',
+          'EXPIRED': 'EXPIRED',
+          'REJECTED': 'REJECTED',
+          'DRIVER_CANCELLED': 'DRIVER_CANCELLED',
+          'SYSTEM_CANCELLED': 'SYSTEM_CANCELLED'
+        };
+        
+        const normalizedStatus = statusMapping[status.status] || status.status;
         
         order.delivery.status = normalizedStatus;
         order.delivery.lastStatusCheck = new Date();
         
-        if (normalizedStatus === 'completed' && order.status !== 'delivered') {
+        if (normalizedStatus === 'COMPLETED' && order.status !== 'delivered') {
           order.status = 'delivered';
           order.delivery.completedAt = new Date();
           results.completedOrders.push(order._id.toString());
           console.log(`  🎉 Order marked as DELIVERED`);
+        } else if (['EXPIRED', 'CANCELLED', 'REJECTED', 'DRIVER_CANCELLED', 'SYSTEM_CANCELLED'].includes(normalizedStatus) && order.status !== 'cancelled') {
+          order.status = 'cancelled';
+          order.delivery.cancelledAt = new Date();
+          results.completedOrders.push(order._id.toString()); // Add to completed for tracking
+          console.log(`  ❌ Order marked as CANCELLED (delivery ${normalizedStatus.toLowerCase()})`);
         }
         
         await order.save();

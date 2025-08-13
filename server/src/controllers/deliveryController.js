@@ -415,17 +415,20 @@ const deliveryController = {
         order.delivery.lalamoveOrderId
       );
 
-      // Enhanced status mapping
+      // Enhanced status mapping - maps Lalamove statuses to our Order model enum values
       const statusMapping = {
-        'ASSIGNING_DRIVER': 'assigning_driver',
-        'ON_GOING': 'ongoing', 
-        'PICKED_UP': 'picked_up',
-        'COMPLETED': 'completed',
-        'CANCELLED': 'cancelled',
-        'EXPIRED': 'expired'
+        'ASSIGNING_DRIVER': 'ASSIGNING_DRIVER',
+        'ON_GOING': 'ON_GOING', 
+        'PICKED_UP': 'PICKED_UP',
+        'COMPLETED': 'COMPLETED',
+        'CANCELLED': 'CANCELLED',
+        'EXPIRED': 'EXPIRED',
+        'REJECTED': 'REJECTED',
+        'DRIVER_CANCELLED': 'DRIVER_CANCELLED',
+        'SYSTEM_CANCELLED': 'SYSTEM_CANCELLED'
       };
 
-      const normalizedStatus = statusMapping[status.status] || status.status.toLowerCase();
+      const normalizedStatus = statusMapping[status.status] || status.status;
 
       // Update order with latest status
       const previousStatus = order.delivery.status;
@@ -433,10 +436,14 @@ const deliveryController = {
       order.delivery.lastStatusCheck = new Date();
 
       // Auto-update order status based on delivery status
-      if (normalizedStatus === 'completed' && order.status !== 'delivered') {
+      if (normalizedStatus === 'COMPLETED' && order.status !== 'delivered') {
         order.status = 'delivered';
         order.delivery.completedAt = new Date();
         console.log(`Order ${orderId} marked as delivered - Lalamove delivery completed`);
+      } else if (['EXPIRED', 'CANCELLED', 'REJECTED', 'DRIVER_CANCELLED', 'SYSTEM_CANCELLED'].includes(normalizedStatus) && order.status !== 'cancelled') {
+        order.status = 'cancelled';
+        order.delivery.cancelledAt = new Date();
+        console.log(`Order ${orderId} marked as cancelled - Lalamove delivery ${normalizedStatus.toLowerCase()}`);
       }
 
       if (status.driver) {
@@ -457,8 +464,9 @@ const deliveryController = {
 
       res.json({
         ...status,
-        previousStatus,
-        currentStatus: normalizedStatus,
+        status: normalizedStatus.toLowerCase(), // Frontend expects lowercase
+        previousStatus: previousStatus?.toLowerCase(),
+        currentStatus: normalizedStatus.toLowerCase(),
         orderStatus: order.status
       });
     } catch (error) {
@@ -728,27 +736,34 @@ const deliveryController = {
 
       const previousStatus = order.delivery.status;
       
-      // Enhanced status mapping
+      // Enhanced status mapping - maps Lalamove statuses to our Order model enum values
       const statusMapping = {
-        'ASSIGNING_DRIVER': 'assigning_driver',
-        'ON_GOING': 'ongoing', 
-        'PICKED_UP': 'picked_up',
-        'COMPLETED': 'completed',
-        'CANCELLED': 'cancelled',
-        'EXPIRED': 'expired'
+        'ASSIGNING_DRIVER': 'ASSIGNING_DRIVER',
+        'ON_GOING': 'ON_GOING', 
+        'PICKED_UP': 'PICKED_UP',
+        'COMPLETED': 'COMPLETED',
+        'CANCELLED': 'CANCELLED',
+        'EXPIRED': 'EXPIRED',
+        'REJECTED': 'REJECTED',
+        'DRIVER_CANCELLED': 'DRIVER_CANCELLED',
+        'SYSTEM_CANCELLED': 'SYSTEM_CANCELLED'
       };
 
-      const normalizedStatus = statusMapping[latestStatus.status] || latestStatus.status.toLowerCase();
+      const normalizedStatus = statusMapping[latestStatus.status] || latestStatus.status;
 
       // Update order with latest status
       order.delivery.status = normalizedStatus;
       order.delivery.lastStatusCheck = new Date();
       
       // If completed, update order status too
-      if (normalizedStatus === 'completed' && order.status !== 'delivered') {
+      if (normalizedStatus === 'COMPLETED' && order.status !== 'delivered') {
         order.status = 'delivered';
         order.delivery.completedAt = new Date();
         console.log(`Order ${orderId} marked as delivered - Lalamove delivery completed`);
+      } else if (['EXPIRED', 'CANCELLED', 'REJECTED', 'DRIVER_CANCELLED', 'SYSTEM_CANCELLED'].includes(normalizedStatus) && order.status !== 'cancelled') {
+        order.status = 'cancelled';
+        order.delivery.cancelledAt = new Date();
+        console.log(`Order ${orderId} marked as cancelled - Lalamove delivery ${normalizedStatus.toLowerCase()}`);
       }
 
       if (latestStatus.driver) {
@@ -842,18 +857,36 @@ const deliveryController = {
         return res.status(404).json({ message: "Order not found" });
       }
 
-      // Update delivery status
+      // Update delivery status with proper mapping
       const previousStatus = order.delivery.status;
-      const normalizedStatus = newStatus.toLowerCase();
+      
+      // Map Lalamove status to our enum values
+      const statusMapping = {
+        'ASSIGNING_DRIVER': 'ASSIGNING_DRIVER',
+        'ON_GOING': 'ON_GOING', 
+        'PICKED_UP': 'PICKED_UP',
+        'COMPLETED': 'COMPLETED',
+        'CANCELLED': 'CANCELLED',
+        'EXPIRED': 'EXPIRED',
+        'REJECTED': 'REJECTED',
+        'DRIVER_CANCELLED': 'DRIVER_CANCELLED',
+        'SYSTEM_CANCELLED': 'SYSTEM_CANCELLED'
+      };
+      
+      const normalizedStatus = statusMapping[newStatus] || newStatus;
       
       order.delivery.status = normalizedStatus;
       order.delivery.lastWebhookUpdate = new Date();
 
       // Update order status if delivery completed
-      if (normalizedStatus === 'completed' && order.status !== 'delivered') {
+      if (normalizedStatus === 'COMPLETED' && order.status !== 'delivered') {
         order.status = 'delivered';
         order.delivery.completedAt = new Date();
         console.log(`Order ${order._id} marked as delivered via webhook`);
+      } else if (['EXPIRED', 'CANCELLED', 'REJECTED', 'DRIVER_CANCELLED', 'SYSTEM_CANCELLED'].includes(normalizedStatus) && order.status !== 'cancelled') {
+        order.status = 'cancelled';
+        order.delivery.cancelledAt = new Date();
+        console.log(`Order ${order._id} marked as cancelled via webhook - delivery ${normalizedStatus.toLowerCase()}`);
       }
 
       // Update driver info if provided

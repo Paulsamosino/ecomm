@@ -1,721 +1,411 @@
 import React, { useState, useEffect } from "react";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
-  Cell,
-  AreaChart,
-  Area,
-} from "recharts";
-import {
+  BarChart3,
   TrendingUp,
   DollarSign,
-  ShoppingBag,
+  Package,
+  ShoppingCart,
   Users,
   Calendar,
-  Clock,
   ArrowUp,
   ArrowDown,
-  Target,
-  ShoppingCart,
-  Package,
-  Activity,
+  Eye,
+  Download,
 } from "lucide-react";
-import { getSellerOrders } from "@/api/seller";
+import { getSellerAnalytics, getSellerStats } from "@/api/seller";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "react-hot-toast";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
-const COLORS = {
-  vip: "#FF6B6B",
-  regular: "#4ECDC4",
-  occasional: "#45B7D1",
-};
-
-const SEGMENT_DESCRIPTIONS = {
-  vip: "5+ orders or ₱10,000+ spent",
-  regular: "2-4 orders or ₱5,000+ spent",
-  occasional: "1 order",
-};
-
-const StatCard = ({
-  title,
-  value,
-  icon: Icon,
-  description,
-  trend,
-  className = "",
-}) => (
-  <div
-    className={`bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all ${className}`}
-  >
-    <div className="flex items-center justify-between mb-4">
-      <div className="bg-primary/10 p-3 rounded-full">
-        <Icon className="w-6 h-6 text-primary" />
-      </div>
-      {trend !== undefined && (
-        <div
-          className={`flex items-center px-2 py-1 rounded-full text-sm ${
-            trend >= 0
-              ? "bg-green-100 text-green-700"
-              : "bg-red-100 text-red-700"
-          }`}
-        >
-          {trend >= 0 ? (
-            <ArrowUp className="w-3 h-3 mr-1" />
-          ) : (
-            <ArrowDown className="w-3 h-3 mr-1" />
-          )}
-          <span className="font-medium">{Math.abs(trend).toFixed(1)}%</span>
-        </div>
-      )}
-    </div>
-    <h3 className="text-3xl font-bold text-gray-900 mb-2">{value}</h3>
-    <div className="flex flex-col">
-      <p className="text-gray-600 font-medium">{title}</p>
-      <p className="text-gray-500 text-sm">{description}</p>
-    </div>
-  </div>
-);
-
-const CustomerSegmentCard = ({
-  segment,
-  count,
-  revenue,
-  total,
-  description,
-}) => (
-  <div className="flex items-center p-4 rounded-lg border border-gray-200 hover:shadow-md transition-all">
-    <div
-      className={`w-2 h-12 rounded-full mr-4`}
-      style={{ backgroundColor: COLORS[segment.toLowerCase()] }}
-    />
-    <div className="flex-1">
-      <div className="flex flex-wrap gap-3 sm:gap-4">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-[#FF6B6B]"></div>
-          <span className="text-xs sm:text-sm text-gray-600">VIP</span>
-        </div>
-        <span className="text-sm font-medium text-gray-500">
-          {((count / total) * 100).toFixed(2)}%
-        </span>
-      </div>
-      <p className="text-sm text-gray-600 mb-2">{description}</p>
-      <div className="flex justify-between items-center">
-        <div>
-          <p className="text-sm text-gray-500">Customers</p>
-          <p className="font-semibold">{count.toLocaleString()}</p>
-        </div>
-        <div>
-          <p className="text-sm text-gray-500">Revenue</p>
-          <p className="font-semibold">₱{revenue.toLocaleString()}</p>
-        </div>
-        <div>
-          <p className="text-sm text-gray-500">Avg. Value</p>
-          <p className="font-semibold">
-            ₱{(revenue / count || 0).toLocaleString()}
-          </p>
-        </div>
-      </div>
-    </div>
-  </div>
-);
 
 const SellerAnalytics = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [timeRange, setTimeRange] = useState("week");
-  const [stats, setStats] = useState({
-    totalRevenue: 0,
-    totalOrders: 0,
-    totalCustomers: 0,
-    averageOrderValue: 0,
-    revenueTrend: 0,
-    orderTrend: 0,
-    customerTrend: 0,
-    conversionRate: 0,
+  const [analyticsData, setAnalyticsData] = useState({
+    dailyRevenue: [],
+    categoryBreakdown: [],
+    recentReviews: [],
   });
-  const [salesData, setSalesData] = useState([]);
-  const [productPerformance, setProductPerformance] = useState([]);
-  const [customerSegments, setCustomerSegments] = useState([]);
-  const [hourlyStats, setHourlyStats] = useState([]);
+  const [stats, setStats] = useState({
+    totalProducts: 0,
+    totalOrders: 0,
+    totalRevenue: 0,
+    averageRating: 0,
+    totalReviews: 0,
+    recentReviews: [],
+  });
+  const [timeframe, setTimeframe] = useState("30");
 
   useEffect(() => {
-    const fetchAnalytics = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+    fetchAnalyticsData();
+    fetchStats();
+  }, [timeframe]);
 
-        // Fetch orders data
-        const ordersData = await getSellerOrders();
-
-        // Get delivered orders only
-        const deliveredOrders = ordersData.filter(
-          (order) => order.status === "delivered"
-        );
-
-        // Calculate date ranges
-        const now = new Date();
-        const timeRangeMap = {
-          week: 7,
-          month: 30,
-          year: 365,
-        };
-        const daysToCompare = timeRangeMap[timeRange];
-        const compareDate = new Date(
-          now.getTime() - daysToCompare * 24 * 60 * 60 * 1000
-        );
-
-        const currentPeriodOrders = completedOrders.filter(
-          (order) => new Date(order.createdAt) >= compareDate
-        );
-        const previousPeriodOrders = completedOrders.filter((order) => {
-          const orderDate = new Date(order.createdAt);
-          return (
-            orderDate >=
-              new Date(
-                compareDate.getTime() - daysToCompare * 24 * 60 * 60 * 1000
-              ) && orderDate < compareDate
-          );
-        });
-
-        // Calculate trends
-        const currentRevenue = currentPeriodOrders.reduce(
-          (sum, order) => sum + (order.totalAmount || 0),
-          0
-        );
-        const previousRevenue = previousPeriodOrders.reduce(
-          (sum, order) => sum + (order.totalAmount || 0),
-          0
-        );
-        const revenueTrend = previousRevenue
-          ? ((currentRevenue - previousRevenue) / previousRevenue) * 100
-          : 0;
-
-        const orderTrend = previousPeriodOrders.length
-          ? ((currentPeriodOrders.length - previousPeriodOrders.length) /
-              previousPeriodOrders.length) *
-            100
-          : 0;
-
-        const currentCustomers = new Set(
-          currentPeriodOrders.map((order) => order.buyer?._id)
-        ).size;
-        const previousCustomers = new Set(
-          previousPeriodOrders.map((order) => order.buyer?._id)
-        ).size;
-        const customerTrend = previousCustomers
-          ? ((currentCustomers - previousCustomers) / previousCustomers) * 100
-          : 0;
-
-        // Calculate total stats
-        const totalRevenue = completedOrders.reduce(
-          (sum, order) => sum + (order.totalAmount || 0),
-          0
-        );
-        const totalOrders = completedOrders.length;
-        const uniqueCustomers = new Set(
-          ordersData.map((order) => order.buyer?._id)
-        ).size;
-        const averageOrderValue =
-          totalOrders > 0 ? totalRevenue / totalOrders : 0;
-        const conversionRate =
-          (completedOrders.length / ordersData.length) * 100;
-
-        // Process daily sales data with moving averages
-        const dailyData = new Map();
-        completedOrders.forEach((order) => {
-          const date = new Date(order.createdAt).toLocaleDateString();
-          const existing = dailyData.get(date) || {
-            revenue: 0,
-            orders: 0,
-            items: 0,
-          };
-          dailyData.set(date, {
-            revenue: existing.revenue + (order.totalAmount || 0),
-            orders: existing.orders + 1,
-            items: existing.items + (order.items?.length || 0),
-          });
-        });
-
-        // Calculate moving averages and convert to array
-        const salesTrendData = Array.from(dailyData, ([date, data]) => ({
-          date,
-          revenue: data.revenue,
-          orders: data.orders,
-          items: data.items,
-        }))
-          .sort((a, b) => new Date(a.date) - new Date(b.date))
-          .map((day, index, array) => {
-            const movingAverage =
-              array
-                .slice(Math.max(0, index - 6), index + 1)
-                .reduce((sum, curr) => sum + curr.revenue, 0) /
-              Math.min(index + 1, 7);
-            return {
-              ...day,
-              movingAverage,
-            };
-          });
-
-        // Process hourly stats
-        const hourlyMap = new Map();
-        completedOrders.forEach((order) => {
-          const hour = new Date(order.createdAt).getHours();
-          const existing = hourlyMap.get(hour) || { orders: 0, revenue: 0 };
-          hourlyMap.set(hour, {
-            orders: existing.orders + 1,
-            revenue: existing.revenue + (order.totalAmount || 0),
-          });
-        });
-
-        const hourlyStatsData = Array.from({ length: 24 }, (_, hour) => {
-          const data = hourlyMap.get(hour) || { orders: 0, revenue: 0 };
-          return {
-            hour: `${hour}:00`,
-            ...data,
-          };
-        });
-
-        // Process customer segments
-        const customerData = new Map();
-        completedOrders.forEach((order) => {
-          const customerId = order.buyer?._id;
-          if (!customerId) return;
-
-          const existing = customerData.get(customerId) || {
-            orders: 0,
-            totalSpent: 0,
-          };
-
-          customerData.set(customerId, {
-            orders: existing.orders + 1,
-            totalSpent: existing.totalSpent + (order.totalAmount || 0),
-          });
-        });
-
-        const segments = {
-          vip: { count: 0, revenue: 0 },
-          regular: { count: 0, revenue: 0 },
-          occasional: { count: 0, revenue: 0 },
-        };
-
-        customerData.forEach((data) => {
-          if (data.orders >= 5 || data.totalSpent >= 10000) {
-            segments.vip.count++;
-            segments.vip.revenue += data.totalSpent;
-          } else if (data.orders >= 2 || data.totalSpent >= 5000) {
-            segments.regular.count++;
-            segments.regular.revenue += data.totalSpent;
-          } else {
-            segments.occasional.count++;
-            segments.occasional.revenue += data.totalSpent;
-          }
-        });
-
-        const customerSegmentsData = Object.entries(segments).map(
-          ([key, value]) => ({
-            name: key.charAt(0).toUpperCase() + key.slice(1),
-            customers: value.count,
-            revenue: value.revenue,
-          })
-        );
-
-        // Process product performance
-        const productData = new Map();
-        completedOrders.forEach((order) => {
-          order.items?.forEach((item) => {
-            if (!item.product) return;
-            const existing = productData.get(item.product.name) || {
-              sales: 0,
-              revenue: 0,
-              orders: 0,
-            };
-            productData.set(item.product.name, {
-              sales: existing.sales + (item.quantity || 0),
-              revenue:
-                existing.revenue + (item.price || 0) * (item.quantity || 0),
-              orders: existing.orders + 1,
-            });
-          });
-        });
-
-        const productPerformanceData = Array.from(
-          productData,
-          ([name, data]) => ({
-            name,
-            sales: data.sales,
-            revenue: data.revenue,
-            orders: data.orders,
-            averageOrderValue: data.revenue / data.orders,
-          })
-        ).sort((a, b) => b.revenue - a.revenue);
-
-        // Update state
-        setStats({
-          totalRevenue,
-          totalOrders,
-          totalCustomers: uniqueCustomers,
-          averageOrderValue,
-          revenueTrend,
-          orderTrend,
-          customerTrend,
-          conversionRate,
-        });
-
-        setSalesData(salesTrendData);
-        setProductPerformance(productPerformanceData);
-        setCustomerSegments(customerSegmentsData);
-        setHourlyStats(hourlyStatsData);
-      } catch (err) {
-        console.error("Error fetching analytics:", err);
-        setError(
-          err.response?.data?.message || "Failed to load analytics data"
-        );
-        toast.error("Failed to load analytics data. Please try again later.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (user) {
-      fetchAnalytics();
+  const fetchAnalyticsData = async () => {
+    try {
+      const data = await getSellerAnalytics();
+      console.log("Analytics data received:", data);
+      setAnalyticsData(data);
+    } catch (error) {
+      console.error("Error fetching analytics:", error);
+      toast.error("Failed to fetch analytics data");
     }
-  }, [user, timeRange]);
+  };
 
-  if (!user) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-red-600 mb-4">
-            Access Denied
-          </h2>
-          <p className="text-gray-600 mb-4">Please log in to view analytics.</p>
-        </div>
-      </div>
-    );
-  }
+  const fetchStats = async () => {
+    try {
+      const data = await getSellerStats();
+      console.log("Stats data received:", data);
+      setStats(data);
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+      toast.error("Failed to fetch stats");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  if (error) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-red-600 mb-4">
-            Error Loading Analytics
-          </h2>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
+  const calculateTotalRevenue = () => {
+    return analyticsData.dailyRevenue.reduce(
+      (sum, day) => sum + day.revenue,
+      0
     );
-  }
+  };
+
+  const calculateTotalOrders = () => {
+    return analyticsData.dailyRevenue.reduce(
+      (sum, day) => sum + day.orders,
+      0
+    );
+  };
+
+  const calculateAverageOrderValue = () => {
+    const totalRevenue = calculateTotalRevenue();
+    const totalOrders = calculateTotalOrders();
+    return totalOrders > 0 ? totalRevenue / totalOrders : 0;
+  };
+
+  const getRevenueGrowth = () => {
+    if (analyticsData.dailyRevenue.length < 2) return 0;
+    
+    const recent = analyticsData.dailyRevenue.slice(-7);
+    const previous = analyticsData.dailyRevenue.slice(-14, -7);
+    
+    const recentRevenue = recent.reduce((sum, day) => sum + day.revenue, 0);
+    const previousRevenue = previous.reduce((sum, day) => sum + day.revenue, 0);
+    
+    if (previousRevenue === 0) return 0;
+    return ((recentRevenue - previousRevenue) / previousRevenue) * 100;
+  };
+
+  const exportData = () => {
+    const csvData = [
+      ["Date", "Revenue", "Orders"],
+      ...analyticsData.dailyRevenue.map((day) => [
+        day._id,
+        day.revenue.toFixed(2),
+        day.orders,
+      ]),
+    ];
+
+    const csvContent = csvData.map((row) => row.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `analytics-${new Date().toISOString().split("T")[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+
+    toast.success("Analytics data exported successfully");
+  };
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Loading Analytics...</h2>
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
       </div>
     );
   }
 
+  const revenueGrowth = getRevenueGrowth();
+  const totalRevenue = calculateTotalRevenue();
+  const totalOrders = calculateTotalOrders();
+  const averageOrderValue = calculateAverageOrderValue();
+
+  // Debug: Log current reviews data
+  console.log("Current analytics reviews:", analyticsData.recentReviews);
+  console.log("Current stats reviews:", stats.recentReviews);
+  console.log("Total reviews count:", stats.totalReviews);
+
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-8 mb-6 sm:mb-8">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">Analytics Dashboard</h1>
-          <p className="text-gray-600">
-            Comprehensive insights into your store's performance
-          </p>
-        </div>
-        <Select value={timeRange} onValueChange={setTimeRange}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Select time range" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="week">Last 7 days</SelectItem>
-            <SelectItem value="month">Last 30 days</SelectItem>
-            <SelectItem value="year">Last 365 days</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Debug Info */}
+      <div className="mb-4 p-4 bg-yellow-100 border border-yellow-300 rounded-lg">
+        <h4 className="font-semibold text-yellow-800">Debug Info:</h4>
+        <p className="text-sm text-yellow-700">
+          Current User: {user?.name || 'Not logged in'} ({user?.email || 'No email'})
+        </p>
+        <p className="text-sm text-yellow-700">
+          User ID: {user?._id || 'No ID'}
+        </p>
+        <p className="text-sm text-yellow-700">
+          Is Seller: {user?.isSeller ? 'Yes' : 'No'}
+        </p>
       </div>
-
-      {/* Overview Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
-        <StatCard
-          title="Total Revenue"
-          value={`₱${stats.totalRevenue.toLocaleString()}`}
-          icon={DollarSign}
-          description="Lifetime earnings"
-          trend={stats.revenueTrend}
-        />
-        <StatCard
-          title="Total Orders"
-          value={stats.totalOrders.toLocaleString()}
-          icon={ShoppingBag}
-          description="Orders processed"
-          trend={stats.orderTrend}
-        />
-        <StatCard
-          title="Total Customers"
-          value={stats.totalCustomers.toLocaleString()}
-          icon={Users}
-          description="Unique buyers"
-          trend={stats.customerTrend}
-        />
-        <StatCard
-          title="Conversion Rate"
-          value={`${stats.conversionRate.toFixed(1)}%`}
-          icon={Target}
-          description="Order completion rate"
-        />
-      </div>
-
-      {/* Sales Trend */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 mb-6 sm:mb-8">
-        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-          <h2 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6">Revenue Trend</h2>
-          <div className="h-[300px] sm:h-[400px]">
-            {salesData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={salesData}>
-                  <defs>
-                    <linearGradient id="revenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="#8884d8" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis
-                    tickFormatter={(value) => `₱${value.toLocaleString()}`}
-                  />
-                  <Tooltip
-                    formatter={(value) => [
-                      `₱${value.toLocaleString()}`,
-                      "Revenue",
-                    ]}
-                  />
-                  <Legend />
-                  <Area
-                    type="monotone"
-                    dataKey="revenue"
-                    stroke="#8884d8"
-                    fill="url(#revenue)"
-                    name="Daily Revenue"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="movingAverage"
-                    stroke="#82ca9d"
-                    name="7-Day Average"
-                    dot={false}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-gray-500">No revenue data available</p>
-              </div>
-            )}
+      
+      <div className="mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Analytics</h1>
+            <p className="text-gray-600">Track your store performance and insights</p>
           </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-          <h2 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6">Hourly Performance</h2>
-          <div className="h-[300px] sm:h-[400px]">
-            {hourlyStats.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={hourlyStats}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="hour" />
-                  <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
-                  <YAxis
-                    yAxisId="right"
-                    orientation="right"
-                    stroke="#82ca9d"
-                    tickFormatter={(value) => `₱${value.toLocaleString()}`}
-                  />
-                  <Tooltip
-                    formatter={(value, name) => [
-                      name === "revenue"
-                        ? `₱${value.toLocaleString()}`
-                        : name === "averageOrderValue"
-                        ? `₱${value.toLocaleString()}`
-                        : value,
-                      name
-                        .replace(/([A-Z])/g, " $1")
-                        .charAt(0)
-                        .toUpperCase() +
-                        name.replace(/([A-Z])/g, " $1").slice(1),
-                    ]}
-                  />
-                  <Legend />
-                  <Bar
-                    yAxisId="left"
-                    dataKey="orders"
-                    fill="#8884d8"
-                    name="Orders"
-                  />
-                  <Bar
-                    yAxisId="right"
-                    dataKey="revenue"
-                    fill="#82ca9d"
-                    name="Revenue"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-gray-500">No hourly data available</p>
-              </div>
-            )}
+          <div className="flex gap-4 mt-4 md:mt-0">
+            <select
+              value={timeframe}
+              onChange={(e) => setTimeframe(e.target.value)}
+              className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+            </select>
+            <button
+              onClick={exportData}
+              className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Export
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Customer Segments and Product Performance */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 mb-6 sm:mb-8">
-        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
-            <h2 className="text-lg sm:text-xl font-semibold">Customer Segments</h2>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-[#FF6B6B]"></div>
-              <span className="text-xs sm:text-sm text-gray-600">VIP</span>
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <div className="bg-white rounded-xl p-6 shadow-md border border-orange-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm font-medium">Total Revenue</p>
+              <h3 className="text-2xl font-bold mt-1 text-gray-800">
+                ₱{totalRevenue.toLocaleString()}
+              </h3>
+              <div className="flex items-center mt-1">
+                <span
+                  className={`text-xs font-medium flex items-center ${
+                    revenueGrowth >= 0 ? "text-green-600" : "text-red-600"
+                  }`}
+                >
+                  {revenueGrowth >= 0 ? (
+                    <ArrowUp className="w-3 h-3 mr-1" />
+                  ) : (
+                    <ArrowDown className="w-3 h-3 mr-1" />
+                  )}
+                  {Math.abs(revenueGrowth).toFixed(1)}%
+                </span>
+                <span className="text-gray-500 text-xs ml-2">vs last week</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-[#4ECDC4]"></div>
-              <span className="text-xs sm:text-sm text-gray-600">Regular</span>
+            <div className="bg-gradient-to-br from-green-400 to-green-600 p-3 rounded-xl">
+              <DollarSign className="w-6 h-6 text-white" />
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-[#45B7D1]"></div>
-              <span className="text-xs sm:text-sm text-gray-600">Occasional</span>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl p-6 shadow-md border border-orange-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm font-medium">Total Orders</p>
+              <h3 className="text-2xl font-bold mt-1 text-gray-800">
+                {totalOrders}
+              </h3>
+              <p className="text-gray-500 text-xs mt-1">Last {timeframe} days</p>
             </div>
+            <div className="bg-gradient-to-br from-blue-400 to-blue-600 p-3 rounded-xl">
+              <ShoppingCart className="w-6 h-6 text-white" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl p-6 shadow-md border border-orange-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm font-medium">Avg Order Value</p>
+              <h3 className="text-2xl font-bold mt-1 text-gray-800">
+                ₱{averageOrderValue.toFixed(0)}
+              </h3>
+              <p className="text-gray-500 text-xs mt-1">Per order</p>
+            </div>
+            <div className="bg-gradient-to-br from-purple-400 to-purple-600 p-3 rounded-xl">
+              <TrendingUp className="w-6 h-6 text-white" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl p-6 shadow-md border border-orange-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm font-medium">Total Products</p>
+              <h3 className="text-2xl font-bold mt-1 text-gray-800">
+                {stats.totalProducts}
+              </h3>
+              <p className="text-gray-500 text-xs mt-1">Active listings</p>
+            </div>
+            <div className="bg-gradient-to-br from-orange-400 to-orange-600 p-3 rounded-xl">
+              <Package className="w-6 h-6 text-white" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl p-6 shadow-md border border-orange-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm font-medium">Total Reviews</p>
+              <h3 className="text-2xl font-bold mt-1 text-gray-800">
+                {stats.totalReviews || 0}
+              </h3>
+              <p className="text-gray-500 text-xs mt-1">Customer feedback</p>
+            </div>
+            <div className="bg-gradient-to-br from-yellow-400 to-yellow-600 p-3 rounded-xl">
+              <Users className="w-6 h-6 text-white" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Revenue Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div className="bg-white rounded-xl p-6 shadow-md border border-orange-100">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold">Daily Revenue</h3>
+            <BarChart3 className="w-5 h-5 text-gray-400" />
           </div>
           <div className="space-y-4">
-            {customerSegments.map((segment) => (
-              <CustomerSegmentCard
-                key={segment.name}
-                segment={segment.name}
-                count={segment.customers}
-                revenue={segment.revenue}
-                total={customerSegments.reduce(
-                  (sum, s) => sum + s.customers,
-                  0
-                )}
-                description={SEGMENT_DESCRIPTIONS[segment.name.toLowerCase()]}
-              />
+            {analyticsData.dailyRevenue.slice(-7).map((day, index) => (
+              <div key={day._id} className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full mr-3"></div>
+                  <span className="text-sm text-gray-600">
+                    {new Date(day._id).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="font-medium">₱{day.revenue.toLocaleString()}</span>
+                  <div className="text-xs text-gray-500">{day.orders} orders</div>
+                </div>
+              </div>
             ))}
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-          <h2 className="text-xl font-semibold mb-6">Top Products</h2>
-          <div className="h-[300px] sm:h-[400px]">
-            {productPerformance.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={productPerformance.slice(0, 5)}
-                  layout="vertical"
-                  margin={{ left: 100 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis type="category" dataKey="name" width={100} />
-                  <Tooltip
-                    formatter={(value, name) => [
-                      name === "revenue"
-                        ? `₱${value.toLocaleString()}`
-                        : name === "averageOrderValue"
-                        ? `₱${value.toLocaleString()}`
-                        : value,
-                      name
-                        .replace(/([A-Z])/g, " $1")
-                        .charAt(0)
-                        .toUpperCase() +
-                        name.replace(/([A-Z])/g, " $1").slice(1),
-                    ]}
-                  />
-                  <Legend />
-                  <Bar dataKey="sales" fill="#8884d8" name="Units Sold" />
-                  <Bar dataKey="revenue" fill="#82ca9d" name="Revenue" />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-gray-500">No product data available</p>
+        <div className="bg-white rounded-xl p-6 shadow-md border border-orange-100">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold">Category Performance</h3>
+            <Eye className="w-5 h-5 text-gray-400" />
+          </div>
+          <div className="space-y-4">
+            {analyticsData.categoryBreakdown.slice(0, 5).map((category, index) => (
+              <div key={category._id} className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div 
+                    className="w-3 h-3 rounded-full mr-3"
+                    style={{ 
+                      backgroundColor: `hsl(${(index * 60) % 360}, 70%, 50%)` 
+                    }}
+                  ></div>
+                  <span className="text-sm text-gray-600 capitalize">
+                    {category._id || "Uncategorized"}
+                  </span>
+                </div>
+                <span className="font-medium">
+                  ₱{category.total.toLocaleString()}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="bg-white rounded-xl p-6 shadow-md border border-orange-100">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold">Recent Reviews</h3>
+            <Users className="w-5 h-5 text-gray-400" />
+          </div>
+          <div className="space-y-4">
+            {(analyticsData.recentReviews || stats.recentReviews || []).slice(0, 5).map((review, index) => (
+              <div key={review._id || index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                <div className="flex-shrink-0">
+                  <div className="flex items-center gap-1">
+                    {[...Array(5)].map((_, i) => (
+                      <span
+                        key={i}
+                        className={`text-xs ${
+                          i < review.rating ? "text-yellow-400" : "text-gray-300"
+                        }`}
+                      >
+                        ★
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-800 font-medium">
+                    {review.user?.name || "Anonymous"}
+                  </p>
+                  <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                    {review.comment}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {review.productName} • {new Date(review.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+            ))}
+            {(!analyticsData.recentReviews?.length && !stats.recentReviews?.length) && (
+              <div className="text-center py-4 text-gray-500">
+                <p className="text-sm">No reviews yet</p>
+                <p className="text-xs">Reviews will appear here when customers review your products</p>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Additional Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Average Order Value"
-          value={`₱${stats.averageOrderValue.toLocaleString()}`}
-          icon={ShoppingCart}
-          description="Per transaction"
-          className="bg-gradient-to-br from-blue-50 to-white"
-        />
-        <StatCard
-          title="Products per Order"
-          value={(stats.totalOrders
-            ? productPerformance.reduce(
-                (sum, product) => sum + product.sales,
-                0
-              ) / stats.totalOrders
-            : 0
-          ).toFixed(1)}
-          icon={Package}
-          description="Average items"
-          className="bg-gradient-to-br from-green-50 to-white"
-        />
-        <StatCard
-          title="Peak Hour"
-          value={
-            hourlyStats.reduce(
-              (max, curr) => (curr.orders > (max?.orders || 0) ? curr : max),
-              {}
-            )?.hour || "N/A"
-          }
-          icon={Clock}
-          description="Most active time"
-          className="bg-gradient-to-br from-purple-50 to-white"
-        />
-        <StatCard
-          title="Customer Value"
-          value={`₱${(
-            stats.totalRevenue / stats.totalCustomers || 0
-          ).toLocaleString()}`}
-          icon={Activity}
-          description="Per customer"
-          className="bg-gradient-to-br from-orange-50 to-white"
-        />
+      {/* Performance Summary */}
+      <div className="bg-white rounded-xl p-6 shadow-md border border-orange-100">
+        <h3 className="text-lg font-semibold mb-6">Performance Summary</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="text-center">
+            <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3">
+              <TrendingUp className="w-8 h-8 text-green-600" />
+            </div>
+            <h4 className="font-semibold mb-1">Revenue Growth</h4>
+            <p className="text-2xl font-bold text-green-600 mb-1">
+              {revenueGrowth >= 0 ? "+" : ""}{revenueGrowth.toFixed(1)}%
+            </p>
+            <p className="text-sm text-gray-500">Compared to last week</p>
+          </div>
+
+          <div className="text-center">
+            <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Users className="w-8 h-8 text-blue-600" />
+            </div>
+            <h4 className="font-semibold mb-1">Customer Rating</h4>
+            <p className="text-2xl font-bold text-blue-600 mb-1">
+              {stats.averageRating || "0.0"}
+            </p>
+            <p className="text-sm text-gray-500">Average rating</p>
+          </div>
+
+          <div className="text-center">
+            <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Calendar className="w-8 h-8 text-purple-600" />
+            </div>
+            <h4 className="font-semibold mb-1">Active Days</h4>
+            <p className="text-2xl font-bold text-purple-600 mb-1">
+              {analyticsData.dailyRevenue.filter(day => day.orders > 0).length}
+            </p>
+            <p className="text-sm text-gray-500">Days with sales</p>
+          </div>
+        </div>
       </div>
     </div>
   );

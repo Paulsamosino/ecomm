@@ -6,6 +6,9 @@ const Product = require("../models/Product");
 const Order = require("../models/Order");
 const User = require("../models/User");
 const sellerController = require("../controllers/sellerController");
+const {
+  sendOrderStatusUpdate: sendOrderStatusSMS
+} = require("../utils/smsService");
 
 // Public routes for accessing seller information without authentication
 
@@ -102,47 +105,7 @@ router.get("/all", protect, async (req, res) => {
 });
 
 // Get seller dashboard stats
-router.get("/stats", protect, async (req, res) => {
-  try {
-    const totalProducts = await Product.countDocuments({ seller: req.user.id });
-    const totalOrders = await Order.countDocuments({ seller: req.user.id });
-    const totalRevenue = await Order.aggregate([
-      { $match: { seller: req.user.id, status: "completed" } },
-      { $group: { _id: null, total: { $sum: "$total" } } },
-    ]);
-    const revenue = totalRevenue.length > 0 ? totalRevenue[0].total : 0;
-
-    const recentOrders = await Order.find({ seller: req.user.id })
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .populate("buyer", "name email");
-
-    const topProducts = await Order.aggregate([
-      { $match: { seller: req.user.id } },
-      { $unwind: "$items" },
-      {
-        $group: {
-          _id: "$items.product",
-          totalSold: { $sum: "$items.quantity" },
-        },
-      },
-      { $sort: { totalSold: -1 } },
-      { $limit: 5 },
-    ]);
-
-    res.json({
-      stats: {
-        totalProducts,
-        totalOrders,
-        revenue,
-        recentOrders,
-        topProducts,
-      },
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Server error" });
-  }
-});
+router.get("/stats", protect, sellerController.getSellerStats);
 
 // Get seller products
 router.get("/products", protect, async (req, res) => {
@@ -272,12 +235,30 @@ router.put("/orders/:id/status", protect, async (req, res) => {
       });
     }
 
+    // Send SMS notification to buyer about status update
+    try {
+      const buyerPhone = updatedOrder.shippingAddress?.phone;
+      if (buyerPhone) {
+        console.log(`📱 Sending status update SMS to buyer: ${buyerPhone}`);
+        const smsResult = await sendOrderStatusSMS(buyerPhone, updatedOrder, status);
+        console.log("📱 Buyer SMS status update result:", smsResult);
+      } else {
+        console.log("⚠️ Buyer phone number not available - skipping status SMS");
+      }
+    } catch (smsError) {
+      console.error("❌ Error sending status update SMS:", smsError);
+      // Don't fail the update if SMS fails
+    }
+
     res.json(updatedOrder);
   } catch (error) {
     console.error("Error updating order status:", error);
     res.status(500).json({ message: "Error updating order status" });
   }
 });
+
+// Get seller reviews
+router.get("/reviews", protect, sellerController.getSellerReviews);
 
 // Get seller customers
 router.get("/customers", protect, async (req, res) => {
@@ -357,60 +338,7 @@ router.get("/customers", protect, async (req, res) => {
 });
 
 // Get seller analytics
-router.get("/analytics", protect, async (req, res) => {
-  try {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const sellerId = new mongoose.Types.ObjectId(req.user.id);
-
-    const dailyRevenue = await Order.aggregate([
-      {
-        $match: {
-          seller: sellerId,
-          status: "completed",
-          createdAt: { $gte: thirtyDaysAgo },
-        },
-      },
-      {
-        $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-          revenue: { $sum: "$totalAmount" },
-          orders: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-
-    const categoryBreakdown = await Order.aggregate([
-      { $match: { seller: sellerId, status: "completed" } },
-      { $unwind: "$items" },
-      {
-        $lookup: {
-          from: "products",
-          localField: "items.product",
-          foreignField: "_id",
-          as: "product",
-        },
-      },
-      { $unwind: "$product" },
-      {
-        $group: {
-          _id: "$product.category",
-          total: { $sum: { $multiply: ["$items.quantity", "$totalAmount"] } },
-        },
-      },
-    ]);
-
-    res.json({
-      dailyRevenue,
-      categoryBreakdown,
-    });
-  } catch (error) {
-    console.error("Error fetching analytics:", error);
-    res.status(500).json({ message: "Error fetching analytics data" });
-  }
-});
+router.get("/analytics", protect, sellerController.getSellerAnalytics);
 
 // Get seller reviews
 router.get("/reviews", protect, async (req, res) => {

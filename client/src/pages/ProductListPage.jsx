@@ -829,56 +829,90 @@ const ProductListPage = () => {
                 {/* Test Ad - After Products */}
                 <TestAd type="banner" className="mt-8 mb-4" />
 
-                {/* Pagination */}
+                {/* Enhanced Pagination */}
                 {totalPages > 1 && (
-                  <div className="mt-12 flex justify-center">
-                    <nav className="flex items-center gap-1 px-2 bg-white py-3 rounded-xl shadow-sm border border-[#ffecd4]">
+                  <div className="mt-16 flex flex-col items-center space-y-4">
+                    {/* Page Info */}
+                    <div className="text-sm text-gray-600 bg-white/70 backdrop-blur-sm px-4 py-2 rounded-full border border-[#ffecd4]/30">
+                      Showing page <span className="font-semibold text-[#cd8539]">{currentPage}</span> of{" "}
+                      <span className="font-semibold text-[#cd8539]">{totalPages}</span>
+                    </div>
+
+                    {/* Navigation */}
+                    <nav className="flex items-center gap-2 px-4 py-3 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-[#ffecd4]/30 hover:shadow-xl transition-all duration-300">
                       <PaginationButton
                         onClick={prevPage}
                         disabled={currentPage === 1}
                         icon={<ArrowLeft className="h-4 w-4" />}
+                        label="Previous"
                       />
 
-                      {[...Array(totalPages)].map((_, i) => {
-                        const pageNumber = i + 1;
-                        // Show first page, last page, and pages around current page
-                        if (
-                          pageNumber === 1 ||
-                          pageNumber === totalPages ||
-                          (pageNumber >= currentPage - 1 &&
-                            pageNumber <= currentPage + 1)
-                        ) {
-                          return (
-                            <PaginationNumber
-                              key={pageNumber}
-                              pageNumber={pageNumber}
-                              currentPage={currentPage}
-                              onClick={() => paginate(pageNumber)}
-                            />
-                          );
-                        }
+                      <div className="flex items-center gap-1 mx-2">
+                        {[...Array(totalPages)].map((_, i) => {
+                          const pageNumber = i + 1;
+                          // Show first page, last page, and pages around current page
+                          if (
+                            pageNumber === 1 ||
+                            pageNumber === totalPages ||
+                            (pageNumber >= currentPage - 2 &&
+                              pageNumber <= currentPage + 2)
+                          ) {
+                            return (
+                              <PaginationNumber
+                                key={pageNumber}
+                                pageNumber={pageNumber}
+                                currentPage={currentPage}
+                                onClick={() => paginate(pageNumber)}
+                              />
+                            );
+                          }
 
-                        // Show dots for skipped pages
-                        if (pageNumber === 2 || pageNumber === totalPages - 1) {
-                          return (
-                            <span
-                              key={`dots-${pageNumber}`}
-                              className="px-1 text-gray-400 flex items-center justify-center text-lg select-none"
-                            >
-                              ...
-                            </span>
-                          );
-                        }
+                          // Show dots for skipped pages
+                          if (
+                            (pageNumber === currentPage - 3 && currentPage > 4) ||
+                            (pageNumber === currentPage + 3 && currentPage < totalPages - 3)
+                          ) {
+                            return (
+                              <span
+                                key={`dots-${pageNumber}`}
+                                className="px-2 text-gray-400 flex items-center justify-center text-sm select-none"
+                              >
+                                •••
+                              </span>
+                            );
+                          }
 
-                        return null;
-                      })}
+                          return null;
+                        })}
+                      </div>
 
                       <PaginationButton
                         onClick={nextPage}
                         disabled={currentPage === totalPages}
                         icon={<ArrowRight className="h-4 w-4" />}
+                        label="Next"
                       />
                     </nav>
+
+                    {/* Quick Jump (for large page counts) */}
+                    {totalPages > 10 && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-gray-500">Jump to page:</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max={totalPages}
+                          value={currentPage}
+                          onChange={(e) => {
+                            const page = parseInt(e.target.value);
+                            if (page >= 1 && page <= totalPages) {
+                              paginate(page);
+                            }
+                          }}
+                          className="w-16 px-2 py-1 border border-[#ffecd4] rounded-lg text-center bg-white/70 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-[#fcba6d]/30 focus:border-[#fcba6d]"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1052,17 +1086,19 @@ const FarmProductCard = ({
               </span>
             )}
           </div>
-          <button
-            onClick={() => onAddToCart(product)}
-            disabled={quantity === 0}
-            className={`p-2.5 rounded-lg ${
-              quantity === 0
-                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                : "bg-[#fff5e9] text-[#fcba6d] hover:bg-[#fcba6d] hover:text-white"
-            } transition-colors shadow-sm`}
-          >
-            <ShoppingCart className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onAddToCart(product)}
+              disabled={quantity === 0}
+              className={`p-2.5 rounded-lg ${
+                quantity === 0
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-[#fff5e9] text-[#fcba6d] hover:bg-[#fcba6d] hover:text-white"
+              } transition-colors shadow-sm`}
+            >
+              <ShoppingCart className="h-5 w-5" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1229,37 +1265,48 @@ const EmptyState = ({ clearFilters }) => (
   </div>
 );
 
-const PaginationButton = ({ onClick, disabled, icon }) => (
+const PaginationButton = ({ onClick, disabled, icon, label }) => (
   <button
     onClick={onClick}
     disabled={disabled}
-    className={`w-9 h-9 flex items-center justify-center rounded-full transition-all duration-200 border border-transparent bg-white shadow-sm
+    className={`group relative flex items-center justify-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 border font-medium text-sm
       ${
         disabled
-          ? "text-gray-300 cursor-not-allowed bg-gray-50"
-          : "text-amber-600 hover:bg-[#fffbe6] hover:border-[#ffecd4] focus:ring-2 focus:ring-amber-200"
+          ? "text-gray-300 cursor-not-allowed bg-gray-50/50 border-gray-200"
+          : "text-[#cd8539] hover:text-white hover:bg-gradient-to-br hover:from-[#fcba6d] hover:to-[#cd8539] hover:shadow-lg hover:scale-105 focus:ring-2 focus:ring-[#fcba6d]/30 bg-white/80 border-[#ffecd4] hover:border-transparent backdrop-blur-sm"
       }
     `}
-    style={{ minWidth: 36, minHeight: 36 }}
+    style={{ minWidth: label ? "auto" : 40, minHeight: 40 }}
+    title={label}
   >
     {icon}
+    {label && <span className="hidden sm:inline ml-1">{label}</span>}
+    {!disabled && (
+      <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[#fcba6d]/0 to-[#cd8539]/0 group-hover:from-[#fcba6d]/10 group-hover:to-[#cd8539]/10 transition-all duration-300" />
+    )}
   </button>
 );
 
 const PaginationNumber = ({ pageNumber, currentPage, onClick }) => (
   <button
     onClick={onClick}
-    className={`w-9 h-9 flex items-center justify-center rounded-full text-sm font-semibold transition-all duration-200
+    className={`relative w-10 h-10 flex items-center justify-center rounded-xl text-sm font-bold transition-all duration-300 group
       ${
         currentPage === pageNumber
-          ? "bg-gradient-to-br from-[#fcba6d] to-[#cd8539] text-white shadow-md scale-105"
-          : "text-[#cd8539] hover:bg-[#fffbe6] hover:border-[#ffecd4] border border-transparent bg-white"
+          ? "bg-gradient-to-br from-[#fcba6d] to-[#cd8539] text-white shadow-lg shadow-[#fcba6d]/30 scale-110 border-2 border-white"
+          : "text-[#cd8539] hover:text-white hover:bg-gradient-to-br hover:from-[#fcba6d]/80 hover:to-[#cd8539]/80 hover:scale-105 hover:shadow-md border border-[#ffecd4] bg-white/80 backdrop-blur-sm"
       }
     `}
-    style={{ minWidth: 36, minHeight: 36 }}
+    style={{ minWidth: 40, minHeight: 40 }}
     aria-current={currentPage === pageNumber ? "page" : undefined}
   >
-    {pageNumber}
+    <span className="relative z-10">{pageNumber}</span>
+    {currentPage === pageNumber && (
+      <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[#fcba6d]/20 to-[#cd8539]/20 animate-pulse" />
+    )}
+    {currentPage !== pageNumber && (
+      <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[#fcba6d]/0 to-[#cd8539]/0 group-hover:from-[#fcba6d]/10 group-hover:to-[#cd8539]/10 transition-all duration-300" />
+    )}
   </button>
 );
 

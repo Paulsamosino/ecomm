@@ -8,7 +8,6 @@ import {
   Package,
   ShoppingBag,
   Users,
-  MessageSquare,
   LogOut,
   ChevronDown,
   User,
@@ -213,17 +212,7 @@ const SellerNavbar = () => {
               <Users className="h-5 w-5 mr-3" />
               <span>Customers</span>
             </Link>
-            <Link
-              to="/seller/messages"
-              className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
-                location.pathname === "/seller/messages"
-                  ? "bg-orange-100 text-orange-600"
-                  : "text-gray-600 hover:bg-orange-50"
-              }`}
-            >
-              <MessageSquare className="h-5 w-5 mr-3" />
-              <span>Messages</span>
-            </Link>
+            {/* Messages feature removed */}
           </div>
         </div>
       )}

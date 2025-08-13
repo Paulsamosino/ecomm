@@ -6,7 +6,6 @@ import { axiosInstance } from "@/contexts/axios";
 import { apiGetProduct, apiCanReviewProduct } from "@/api/products";
 import {
   Star,
-  MessageSquare,
   Truck,
   Package,
   Info,
@@ -96,6 +95,13 @@ const ProductDetailPage = () => {
         });
       }
 
+      // Debug: Log product reviews
+      console.log("Product data:", data);
+      console.log("Reviews:", data.reviews);
+      console.log("Reviews length:", data.reviews?.length);
+      console.log("Average rating:", data.averageRating);
+      console.log("Num reviews:", data.numReviews);
+
       // Fetch similar products
       try {
         // Get products in the same category with similar characteristics
@@ -163,15 +169,10 @@ const ProductDetailPage = () => {
     }
   };
 
-  const handleReviewAdded = (reviewData) => {
-    // Update the product with the new review and ratings
-    setProduct(prev => ({
-      ...prev,
-      reviews: [...(prev.reviews || []), reviewData.review],
-      averageRating: reviewData.product.averageRating,
-      numReviews: reviewData.product.numReviews
-    }));
-
+  const handleReviewAdded = () => {
+    // Refresh product data to get updated reviews
+    fetchProduct();
+    
     // Update review eligibility
     setReviewEligibility(prev => ({
       ...prev,
@@ -179,7 +180,8 @@ const ProductDetailPage = () => {
       hasReviewed: true
     }));
 
-    toast.success("Review submitted successfully!");
+    // Close the modal
+    setIsReviewModalOpen(false);
   };
 
   const handleWriteReview = () => {
@@ -250,45 +252,6 @@ const ProductDetailPage = () => {
     }
   };
 
-  const handleMessageSeller = async () => {
-    if (!user) {
-      toast.error("Please login to message the seller");
-      navigate("/login", { state: { from: `/products/${id}` } });
-      return;
-    }
-
-    if (user._id === product.seller._id) {
-      toast.error("You cannot message yourself");
-      return;
-    }
-
-    try {
-      // Show loading toast
-      const loadingToast = toast.loading("Starting conversation...");
-
-      // Create a new chat or get existing chat
-      const response = await axiosInstance.post("/chat", {
-        sellerId: product.seller._id,
-        productId: product._id,
-      });
-
-      toast.dismiss(loadingToast);
-      toast.success("Chat started with seller");
-
-      // Create a custom event to notify the ChatWidget to open with this chat
-      const chatEvent = new CustomEvent("openChatWidget", {
-        detail: { chatId: response.data._id, product },
-      });
-      window.dispatchEvent(chatEvent);
-
-      // Optional: Can also navigate to full chat page
-      // navigate(`/chat/${response.data._id}`);
-    } catch (err) {
-      console.error("Error creating chat:", err);
-      toast.error("Failed to start chat. Please try again.");
-    }
-  };
-
   const handleAddToCart = () => {
     if (!user) {
       toast.error("Please login to add items to your cart");
@@ -310,6 +273,38 @@ const ProductDetailPage = () => {
 
     // In a real app, you would navigate to checkout with the selected product
     navigate("/checkout", { state: { products: [{ ...product, quantity }] } });
+  };
+
+  const handleMessageSeller = () => {
+    if (!user) {
+      toast.error("Please login to message the seller");
+      navigate("/login", { state: { from: `/products/${id}` } });
+      return;
+    }
+    if (!product?.seller?._id) return;
+    
+    // Enhanced product context for chat
+    const productContext = {
+      _id: product._id,
+      name: product.name,
+      price: product.price,
+      category: product.category,
+      image: product.images?.[0],
+      seller: {
+        _id: product.seller._id,
+        name: product.seller.name || product.seller.sellerProfile?.businessName
+      }
+    };
+
+    window.postMessage({ 
+      type: "OPEN_DIRECT_CHAT", 
+      payload: { 
+        sellerId: product.seller._id, 
+        productId: product._id,
+        productContext,
+        initialMessage: `Hi! I'm interested in your ${product.name}. Could you tell me more about it?`
+      } 
+    }, "*");
   };
 
   const handleShareProduct = () => {
@@ -373,7 +368,7 @@ const ProductDetailPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
+        <Loader2 className="h-10 w-10 animate-spin text-[#fcba6d]" />
       </div>
     );
   }
@@ -392,7 +387,7 @@ const ProductDetailPage = () => {
           </p>
           <Link
             to="/products"
-            className="flex items-center text-orange-600 hover:text-orange-700 transition-colors"
+            className="flex items-center text-[#cd8539] hover:text-[#b8753a] transition-colors"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Products
@@ -415,18 +410,13 @@ const ProductDetailPage = () => {
     "Unknown Seller";
 
   // Format reviews count
-  const reviewCount = product.reviews?.length || 0;
+  const reviewCount = product.numReviews || product.reviews?.length || 0;
 
   // Calculate average rating
-  const avgRating =
-    product.rating ||
-    (product.reviews?.length
-      ? product.reviews.reduce((sum, r) => sum + r.rating, 0) /
-        product.reviews.length
-      : 0);
+  const avgRating = product.averageRating || 0;
 
   return (
-    <div className="bg-gradient-to-b from-orange-50 to-white min-h-screen">
+    <div className="bg-gradient-to-b from-[#fff5e9] to-white min-h-screen">
       {/* Farm-themed background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
@@ -436,30 +426,30 @@ const ProductDetailPage = () => {
               "url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48ZyBmaWxsPSIjZmM5ODMwIiBmaWxsLW9wYWNpdHk9IjAuNCIgZmlsbC1ydWxlPSJldmVub2RkIj48cGF0aCBkPSJNMCAwaDIwdjIwSDB6Ii8+PHBhdGggZD0iTTIwIDBoMjB2MjBIMjB6Ii8+PHBhdGggZD0iTTAgMjBoMjB2MjBIMjB6Ii8+PC9nPjwvc3ZnPg==')",
           }}
         />
-        <div className="absolute top-20 -right-20 w-64 h-64 bg-orange-400/10 rounded-full blur-[80px] animate-pulse-slow" />
+        <div className="absolute top-20 -right-20 w-64 h-64 bg-[#fcba6d]/10 rounded-full blur-[80px] animate-pulse-slow" />
         <div className="absolute bottom-40 -left-20 w-80 h-80 bg-yellow-400/10 rounded-full blur-[100px] animate-pulse-slow" />
       </div>
 
       {/* Breadcrumbs */}
-      <div className="bg-white/50 py-4 border-b border-orange-100 relative">
+      <div className="bg-white/50 py-4 border-b border-[#ffecd4] relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center text-sm text-gray-500">
-            <Link to="/" className="hover:text-orange-600">
+            <Link to="/" className="hover:text-[#cd8539]">
               Home
             </Link>
-            <span className="mx-2 text-orange-300">•</span>
-            <Link to="/products" className="hover:text-orange-600">
+            <span className="mx-2 text-[#fcba6d]/60">•</span>
+            <Link to="/products" className="hover:text-[#cd8539]">
               Products
             </Link>
-            <span className="mx-2 text-orange-300">•</span>
+            <span className="mx-2 text-[#fcba6d]/60">•</span>
             <Link
               to={`/products?category=${product.category}`}
-              className="hover:text-orange-600"
+              className="hover:text-[#cd8539]"
             >
               {product.category || "Poultry"}
             </Link>
-            <span className="mx-2 text-orange-300">•</span>
-            <span className="text-orange-700 font-medium">{product.name}</span>
+            <span className="mx-2 text-[#fcba6d]/60">•</span>
+            <span className="text-[#cd8539] font-medium">{product.name}</span>
           </div>
         </div>
       </div>
@@ -469,7 +459,7 @@ const ProductDetailPage = () => {
           {/* Product Images */}
           <div>
             {/* Main Image */}
-            <div className="relative rounded-lg overflow-hidden border border-orange-100 bg-white mb-4 shadow-sm hover:shadow-md transition-all">
+            <div className="relative rounded-lg overflow-hidden border border-[#ffecd4] bg-white mb-4 shadow-sm hover:shadow-md transition-all">
               <div className="aspect-w-1 aspect-h-1">
                 <img
                   src={product.images?.[currentImageIndex] || "/1f425.png"}
@@ -487,14 +477,14 @@ const ProductDetailPage = () => {
                 <>
                   <button
                     onClick={handlePreviousImage}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-gradient-to-r from-orange-400 to-orange-500 p-2 rounded-full shadow-md hover:shadow-lg transition-all text-white"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-gradient-to-r from-[#fcba6d] to-[#eead5f] p-2 rounded-full shadow-md hover:shadow-lg transition-all text-white"
                     aria-label="Previous image"
                   >
                     <ChevronLeft className="h-5 w-5" />
                   </button>
                   <button
                     onClick={handleNextImage}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-gradient-to-r from-orange-400 to-orange-500 p-2 rounded-full shadow-md hover:shadow-lg transition-all text-white"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-gradient-to-r from-[#fcba6d] to-[#eead5f] p-2 rounded-full shadow-md hover:shadow-lg transition-all text-white"
                     aria-label="Next image"
                   >
                     <ChevronRight className="h-5 w-5" />
@@ -817,14 +807,15 @@ const ProductDetailPage = () => {
                 >
                   View Store
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-orange-600 border-orange-200 hover:bg-orange-50"
-                  onClick={handleMessageSeller}
-                >
-                  Contact
-                </Button>
+                {product?.seller?._id && (
+                  <Button
+                    size="sm"
+                    className="bg-orange-500 hover:bg-orange-600 text-white"
+                    onClick={handleMessageSeller}
+                  >
+                    Message Seller
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -1021,36 +1012,9 @@ const ProductDetailPage = () => {
               <div>
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-semibold">Customer Reviews</h3>
-                  {user ? (
-                    <button
-                      onClick={handleOpenReviewModal}
-                      disabled={!reviewEligibility.canReview}
-                      className={`text-sm font-medium px-4 py-2 rounded-md transition-colors ${
-                        reviewEligibility.canReview
-                          ? 'text-white bg-orange-600 hover:bg-orange-700'
-                          : 'text-gray-500 bg-gray-200 cursor-not-allowed'
-                      }`}
-                      title={
-                        !reviewEligibility.hasPurchased 
-                          ? "You must purchase this product to write a review"
-                          : reviewEligibility.hasReviewed 
-                          ? "You have already reviewed this product"
-                          : "Write a review"
-                      }
-                    >
-                      {reviewEligibility.hasReviewed ? "Already Reviewed" : "Write a Review"}
-                    </button>
-                  ) : (
-                    <button 
-                      onClick={() => navigate("/login")}
-                      className="text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-md transition-colors"
-                    >
-                      Login to Review
-                    </button>
-                  )}
                 </div>
 
-                <div className="bg-gray-50 rounded-lg p-6 mb-6">
+                <div className="bg-[#fff8ef] rounded-lg p-6 mb-6">
                   <div className="flex flex-col md:flex-row gap-6 items-center">
                     <div className="text-center">
                       <div className="text-5xl font-bold text-gray-900 mb-2">
@@ -1090,9 +1054,9 @@ const ProductDetailPage = () => {
                             <div className="w-24 text-sm text-gray-600">
                               {starCount} stars
                             </div>
-                            <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div className="flex-1 h-2 bg-[#ffecd4] rounded-full overflow-hidden">
                               <div
-                                className="bg-yellow-400 h-full rounded-full"
+                                className="bg-[#fcba6d] h-full rounded-full"
                                 style={{ width: `${percentage}%` }}
                               ></div>
                             </div>
@@ -1116,7 +1080,7 @@ const ProductDetailPage = () => {
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center">
-                            <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-full bg-[#fff0dd] flex items-center justify-center">
                               {review.userName?.charAt(0) || review.user?.name?.charAt(0) || "U"}
                             </div>
                             <h4 className="font-medium ml-2">
@@ -1148,9 +1112,9 @@ const ProductDetailPage = () => {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-gray-500 text-center py-8">
-                    No reviews yet. Be the first to review this product!
-                  </p>
+                        <p className="text-gray-500 text-center py-8">
+                          No reviews yet. Be the first to review this product!
+                        </p>
                 )}
               </div>
             )}
@@ -1231,14 +1195,6 @@ const ProductDetailPage = () => {
         reporterRole={user?.isSeller ? "seller" : "buyer"}
       />
 
-      {/* Add the Review Modal */}
-      <ReviewModal
-        isOpen={isReviewModalOpen}
-        onClose={() => setIsReviewModalOpen(false)}
-        productId={product?._id}
-        onReviewSubmitted={handleReviewSubmitted}
-      />
-      
       {/* Review Modal */}
       <ReviewModal
         isOpen={isReviewModalOpen}

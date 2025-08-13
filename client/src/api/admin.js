@@ -155,3 +155,29 @@ export const apiUploadAdImage = async (file) => {
   });
   return response.data;
 };
+
+// Blog Management Functions
+export const apiGetAllPosts = async (params = {}) => {
+  const response = await axiosInstance.get("/blog", { params });
+  return response.data;
+};
+
+export const apiGetBlogStats = async () => {
+  const response = await axiosInstance.get("/admin/blog/stats");
+  return response.data;
+};
+
+export const apiUpdatePostStatus = async (postId, status) => {
+  const response = await axiosInstance.put(`/blog/${postId}`, { status });
+  return response.data;
+};
+
+export const apiDeletePost = async (postId) => {
+  const response = await axiosInstance.delete(`/blog/${postId}`);
+  return response.data;
+};
+
+export const apiGetPostById = async (postId) => {
+  const response = await axiosInstance.get(`/blog/post/${postId}`);
+  return response.data;
+};
