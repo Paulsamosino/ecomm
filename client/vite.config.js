@@ -5,7 +5,10 @@ import path from "path";
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: true, // This will listen on all network interfaces
+  // Bind to localhost so Vite only reports the local URL and doesn't list
+  // every network interface (Wi‑Fi, virtual adapters, etc.). Change to
+  // "0.0.0.0" when you need access from other devices on the network.
+  host: "localhost",
     port: 5173,
   },
   build: {

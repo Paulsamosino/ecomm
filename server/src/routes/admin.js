@@ -27,6 +27,9 @@ router.put(
 );
 router.delete("/products/:id", auth, isAdmin, adminController.deleteProduct);
 
+// Order management routes
+router.get("/orders", auth, isAdmin, adminController.getAllOrders);
+
 // Analytics routes
 router.get("/analytics", auth, isAdmin, adminController.getAnalytics);
 

@@ -1,9 +1,14 @@
 import axios from "axios";
 
-// Get the API URL based on environment
+// Get the API URL based on environment. When VITE_API_URL isn't provided, use
+// the same host as the current page but on the backend port (3001). This
+// avoids hard-coding 'localhost' which can resolve differently on some systems.
 const getApiUrl = () => {
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  if (typeof window !== "undefined") {
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+    return `${protocol}//${hostname}:3001`;
   }
   return "http://localhost:3001";
 };

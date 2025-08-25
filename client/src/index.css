@@ -6,9 +6,63 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Force Light Mode - Override System Preferences */
+html {
+  color-scheme: light !important;
+  background-color: white !important;
+}
+
+html[data-theme="dark"],
+html.dark,
+[data-theme="dark"],
+.dark {
+  color-scheme: light !important;
+  background-color: white !important;
+}
+
 body {
-  color: rgba(69, 26, 3, 0.9);
+  color: rgba(69, 26, 3, 0.9) !important;
+  background-color: white !important;
   overflow-x: hidden;
+}
+
+/* Override any dark mode styles */
+* {
+  color-scheme: light !important;
+}
+
+/* Ensure all backgrounds stay white */
+.bg-white {
+  background-color: white !important;
+}
+
+.bg-gray-50 {
+  background-color: #f9fafb !important;
+}
+
+.bg-gray-100 {
+  background-color: #f3f4f6 !important;
+}
+
+/* Ensure text colors stay dark */
+.text-gray-900 {
+  color: #111827 !important;
+}
+
+.text-gray-800 {
+  color: #1f2937 !important;
+}
+
+.text-gray-700 {
+  color: #374151 !important;
+}
+
+.text-gray-600 {
+  color: #4b5563 !important;
+}
+
+.text-gray-500 {
+  color: #6b7280 !important;
 }
 
 /* Glass Effects */

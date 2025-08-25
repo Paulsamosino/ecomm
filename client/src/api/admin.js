@@ -32,6 +32,12 @@ export const apiGetAllListings = async () => {
   return response.data;
 };
 
+// Get all orders (for admin analytics)
+export const apiGetAllOrders = async () => {
+  const response = await axiosInstance.get("/admin/orders");
+  return response.data;
+};
+
 // Update listing status
 export const apiUpdateListingStatus = async (listingId, status) => {
   const response = await axiosInstance.put(

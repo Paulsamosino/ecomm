@@ -131,6 +131,21 @@ exports.getAllProducts = async (req, res) => {
   }
 };
 
+// Get all orders (for admin analytics)
+exports.getAllOrders = async (req, res) => {
+  try {
+    const orders = await Order.find()
+      .populate("buyer", "name email")
+      .populate("seller", "name email") 
+      .populate("items.product", "name price")
+      .sort({ createdAt: -1 });
+    res.json(orders);
+  } catch (error) {
+    console.error("Error fetching orders:", error);
+    res.status(500).json({ message: "Error fetching orders" });
+  }
+};
+
 // Update product status
 exports.updateProductStatus = async (req, res) => {
   try {
