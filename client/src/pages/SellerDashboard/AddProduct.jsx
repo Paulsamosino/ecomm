@@ -63,6 +63,8 @@ const AddProduct = () => {
     images: [],
     location: "",
     shippingInfo: "",
+  warrantyPeriod: "",
+  warrantyDetails: "",
   });
 
   const [errors, setErrors] = useState({});
@@ -446,6 +448,31 @@ const AddProduct = () => {
     </div>
   );
 
+  const renderWarranty = () => (
+    <div className="space-y-4">
+      <div>
+        <Label className="text-sm text-gray-600">Warranty Period</Label>
+        <input
+          name="warrantyPeriod"
+          value={formData.warrantyPeriod}
+          onChange={handleChange}
+          placeholder="e.g. 6 months, 1 year, No warranty"
+          className="mt-1 block w-full border-gray-200 rounded-md shadow-sm"
+        />
+      </div>
+      <div>
+        <Label className="text-sm text-gray-600">Warranty Details</Label>
+        <Textarea
+          name="warrantyDetails"
+          value={formData.warrantyDetails}
+          onChange={handleChange}
+          placeholder="Describe warranty terms, what it covers, exclusions..."
+          className="min-h-[80px] resize-none"
+        />
+      </div>
+    </div>
+  );
+
   const renderStep3 = () => (
     <div className="space-y-6">
       <div className="space-y-4">
@@ -603,6 +630,7 @@ const AddProduct = () => {
                 {currentStep === 1 && renderStep1()}
                 {currentStep === 2 && renderStep2()}
                 {currentStep === 3 && renderStep3()}
+                {currentStep === 2 && renderWarranty()}
               </div>
 
               <div className="flex justify-between pt-6 border-t">

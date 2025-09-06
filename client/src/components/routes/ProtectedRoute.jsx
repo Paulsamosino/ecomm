@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
@@ -17,7 +17,10 @@ const ProtectedRoute = ({ allowedRoles = [], restrictTo = null }) => {
   }
 
   if (!user) {
-    toast.error("Please login to access this page");
+    // Use useEffect to avoid setState during render
+    useEffect(() => {
+      toast.error("Please login to access this page");
+    }, []);
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
@@ -37,7 +40,10 @@ const ProtectedRoute = ({ allowedRoles = [], restrictTo = null }) => {
     }
 
     if (!hasRequiredRole) {
-      toast.error("You don't have permission to access this page");
+      // Use useEffect to avoid setState during render
+      useEffect(() => {
+        toast.error("You don't have permission to access this page");
+      }, []);
 
       // Redirect to the appropriate dashboard based on role
       if (isAdmin) {
@@ -52,7 +58,11 @@ const ProtectedRoute = ({ allowedRoles = [], restrictTo = null }) => {
 
   // Handle restrictions based on user types
   if (restrictTo === "buyer" && (user.isSeller || user.isAdmin)) {
-    toast.error("This page is only accessible to buyers");
+    // Use useEffect to avoid setState during render
+    useEffect(() => {
+      toast.error("This page is only accessible to buyers");
+    }, []);
+    
     if (user.isAdmin) {
       return <Navigate to="/admin" replace />;
     } else {

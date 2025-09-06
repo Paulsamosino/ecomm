@@ -17,11 +17,10 @@ import { Link } from "react-router-dom";
 const SellerRegisterPage = () => {
   const { register, isLoading, error } = useAuth();
   const [formData, setFormData] = useState({
-    name: "",
+    businessName: "",
     email: "",
     password: "",
     confirmPassword: "",
-    businessName: "",
     description: "",
     address: {
       street: "",
@@ -45,6 +44,19 @@ const SellerRegisterPage = () => {
           [child]: value,
         },
       }));
+    } else if (name === "phone") {
+      // Automatically add +63 prefix for Philippine numbers
+      let phoneValue = value.replace(/\D/g, ""); // Remove non-digits
+      if (phoneValue.startsWith("63")) {
+        phoneValue = phoneValue.substring(2); // Remove 63 if user typed it
+      }
+      if (phoneValue.startsWith("0")) {
+        phoneValue = phoneValue.substring(1); // Remove leading 0
+      }
+      setFormData((prev) => ({
+        ...prev,
+        [name]: phoneValue ? `+63${phoneValue}` : "",
+      }));
     } else {
       setFormData((prev) => ({
         ...prev,
@@ -63,7 +75,7 @@ const SellerRegisterPage = () => {
     }
 
     const userData = {
-      name: formData.name,
+      name: formData.businessName, // Use business name as the primary name
       email: formData.email,
       password: formData.password,
       isSeller: true,
@@ -102,14 +114,14 @@ const SellerRegisterPage = () => {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Personal Information
+                    Account Information
                   </label>
                   <div className="space-y-3">
                     <Input
                       type="text"
-                      name="name"
-                      placeholder="Full Name"
-                      value={formData.name}
+                      name="businessName"
+                      placeholder="Business/Farm Name"
+                      value={formData.businessName}
                       onChange={handleChange}
                       required
                     />
@@ -142,20 +154,12 @@ const SellerRegisterPage = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Business Information
+                    Business Description
                   </label>
                   <div className="space-y-3">
-                    <Input
-                      type="text"
-                      name="businessName"
-                      placeholder="Business Name"
-                      value={formData.businessName}
-                      onChange={handleChange}
-                      required
-                    />
                     <Textarea
                       name="description"
-                      placeholder="Business Description"
+                      placeholder="Tell customers about your business..."
                       value={formData.description}
                       onChange={handleChange}
                       required
@@ -220,14 +224,20 @@ const SellerRegisterPage = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Contact Information
                   </label>
-                  <Input
-                    type="tel"
-                    name="phone"
-                    placeholder="Phone Number"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    required
-                  />
+                  <div className="flex">
+                    <div className="flex items-center px-3 bg-gray-50 border border-r-0 border-gray-300 rounded-l-md text-gray-600 text-sm">
+                      +63
+                    </div>
+                    <Input
+                      type="tel"
+                      name="phone"
+                      placeholder="9123456789"
+                      value={formData.phone.replace('+63', '')}
+                      onChange={handleChange}
+                      required
+                      className="rounded-l-none"
+                    />
+                  </div>
                 </div>
               </div>
 

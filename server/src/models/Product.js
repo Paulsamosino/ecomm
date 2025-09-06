@@ -71,6 +71,14 @@ const productSchema = new mongoose.Schema(
       type: String,
       default: "Standard shipping available",
     },
+    warrantyPeriod: {
+      type: String,
+      default: "",
+    },
+    warrantyDetails: {
+      type: String,
+      default: "",
+    },
     seller: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

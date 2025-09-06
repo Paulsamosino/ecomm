@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { axiosInstance } from "@/contexts/axios";
 
 const SellerSettings = () => {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, logout } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -137,6 +137,49 @@ const SellerSettings = () => {
       toast.error(error.response?.data?.message || "Failed to update settings");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Password change state and handler
+  const [passwords, setPasswords] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [pwLoading, setPwLoading] = useState(false);
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    if (!passwords.currentPassword || !passwords.newPassword) {
+      toast.error("Please fill in both current and new password");
+      return;
+    }
+    if (passwords.newPassword !== passwords.confirmPassword) {
+      toast.error("New password and confirmation do not match");
+      return;
+    }
+    if (passwords.newPassword.length < 6) {
+      toast.error("New password must be at least 6 characters");
+      return;
+    }
+
+    setPwLoading(true);
+    try {
+      const resp = await axiosInstance.post("/user/change-password", {
+        currentPassword: passwords.currentPassword,
+        newPassword: passwords.newPassword,
+      });
+      toast.success(resp.data.message || "Password changed successfully");
+      // Invalidate session: remove token and logout
+      localStorage.removeItem("token");
+      if (logout) logout();
+      setTimeout(() => (window.location.href = "/login"), 600);
+    } catch (error) {
+      console.error("Error changing password:", error);
+      toast.error(error.response?.data?.message || "Failed to change password");
+    } finally {
+      setPwLoading(false);
+      setPasswords({ currentPassword: "", newPassword: "", confirmPassword: "" });
     }
   };
 
@@ -403,6 +446,56 @@ const SellerSettings = () => {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Security - Change Password */}
+        <div className="bg-white rounded-xl shadow-sm border p-6">
+          <h2 className="text-xl font-semibold mb-6">Security</h2>
+          <p className="text-sm text-gray-600 mb-4">Change your account password.</p>
+          <form onSubmit={handlePasswordChange} className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Current Password</label>
+              <Input
+                type="password"
+                value={passwords.currentPassword}
+                onChange={(e) => setPasswords(prev => ({ ...prev, currentPassword: e.target.value }))}
+                placeholder="Enter current password"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-700">New Password</label>
+              <Input
+                type="password"
+                value={passwords.newPassword}
+                onChange={(e) => setPasswords(prev => ({ ...prev, newPassword: e.target.value }))}
+                placeholder="Enter new password (min 6 chars)"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-700">Confirm New Password</label>
+              <Input
+                type="password"
+                value={passwords.confirmPassword}
+                onChange={(e) => setPasswords(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                placeholder="Confirm new password"
+              />
+            </div>
+
+            <div className="flex justify-center pt-2">
+              <Button type="submit" disabled={pwLoading}>
+                {pwLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  "Update Password"
+                )}
+              </Button>
+            </div>
+          </form>
         </div>
 
         {Object.keys(errors).length > 0 && (

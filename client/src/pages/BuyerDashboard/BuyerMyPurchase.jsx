@@ -317,6 +317,12 @@ const OrderCard = ({ order, onReviewSubmit }) => {
                 <p className="text-xs text-gray-600 mt-0.5">
                   ₱{item.price?.toLocaleString()} × {item.quantity}
                 </p>
+                {/* Show warranty from order item snapshot first, fallback to populated product */}
+                {(item.warrantyPeriod || item.warrantyDetails || item.product?.warrantyPeriod || item.product?.warrantyDetails) && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {item.warrantyPeriod || item.product?.warrantyPeriod}
+                  </p>
+                )}
               </div>
             </div>
           ))}
@@ -360,6 +366,30 @@ const OrderCard = ({ order, onReviewSubmit }) => {
                   <span className="font-medium">Total:</span> ₱
                   {order.totalAmount.toLocaleString()}
                 </p>
+              </div>
+            </div>
+
+            {/* Full items list with warranty snapshot */}
+            <div className="mt-4 bg-white border border-gray-100 rounded-lg p-4">
+              <h4 className="font-medium mb-2">Items</h4>
+              <div className="space-y-3">
+                {order.items.map((item) => (
+                  <div key={item._id} className="flex justify-between items-start">
+                    <div>
+                      <div className="text-sm font-medium text-gray-800">{item.product?.name || item.name || 'Product'}</div>
+                      <div className="text-xs text-gray-500">Qty: {item.quantity} • ₱{item.price?.toLocaleString()}</div>
+                      {(item.warrantyPeriod || item.warrantyDetails || item.product?.warrantyPeriod || item.product?.warrantyDetails) && (
+                        <div className="text-xs text-gray-600 mt-1">
+                          {item.warrantyPeriod || item.product?.warrantyPeriod}
+                          {item.warrantyDetails || item.product?.warrantyDetails ? (
+                            <div className="mt-1 text-xs text-gray-500">{item.warrantyDetails || item.product?.warrantyDetails}</div>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-sm font-medium">₱{(item.price * item.quantity).toLocaleString()}</div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

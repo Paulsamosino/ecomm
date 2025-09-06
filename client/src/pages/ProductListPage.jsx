@@ -416,20 +416,6 @@ const ProductListPage = () => {
                       </p>
                     </div>
                   </div>
-
-                  <div className="h-8 w-px bg-gray-200 hidden sm:block"></div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-[#fff5e9] flex items-center justify-center">
-                      <MapPin className="h-5 w-5 text-[#fcba6d]" />
-                    </div>
-                    <div className="text-center sm:text-left">
-                      <p className="text-sm text-gray-500">Locations</p>
-                      <p className="text-xl font-bold text-gray-900">
-                        {LOCATIONS.length - 1}
-                      </p>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>

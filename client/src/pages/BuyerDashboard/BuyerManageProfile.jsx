@@ -106,6 +106,7 @@ const formatPhone = (phone) => phone?.startsWith("+63") ? phone.substring(3) : p
 
 const BuyerManageProfile = () => {
   const { user, updateUser } = useAuth();
+  const { logout } = useAuth();
   const [loading, setLoading] = useState(false);
   const [personalInfo, setPersonalInfo] = useState({
     name: "",
@@ -288,6 +289,48 @@ const BuyerManageProfile = () => {
     }
   };
 
+  // Password change state
+  const [passwords, setPasswords] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [pwLoading, setPwLoading] = useState(false);
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    if (!passwords.currentPassword || !passwords.newPassword) {
+      toast.error("Please fill in both current and new password");
+      return;
+    }
+    if (passwords.newPassword !== passwords.confirmPassword) {
+      toast.error("New password and confirmation do not match");
+      return;
+    }
+
+    setPwLoading(true);
+    try {
+      const resp = await axiosInstance.post("/user/change-password", {
+        currentPassword: passwords.currentPassword,
+        newPassword: passwords.newPassword,
+      });
+      toast.success(resp.data.message || "Password changed successfully");
+      // Optionally log the user out to re-login
+      // Clear local token and redirect to login
+      localStorage.removeItem("token");
+      // Call logout from auth context if available
+      if (logout) logout();
+      // Redirect to login
+      setTimeout(() => (window.location.href = "/login"), 800);
+    } catch (error) {
+      console.error("Error changing password:", error);
+      toast.error(error.response?.data?.message || "Failed to change password");
+    } finally {
+      setPwLoading(false);
+      setPasswords({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    }
+  };
+
   return (
     <div className="p-6">
       <h2 className="text-2xl font-semibold mb-6">Manage Profile</h2>
@@ -305,6 +348,10 @@ const BuyerManageProfile = () => {
           <TabsTrigger key="addresses" value="addresses">
             <MapPin className="h-4 w-4 mr-2" />
             Addresses
+          </TabsTrigger>
+          <TabsTrigger key="security" value="security">
+            <User className="h-4 w-4 mr-2" />
+            Security
           </TabsTrigger>
         </TabsList>
 
@@ -659,6 +706,58 @@ const BuyerManageProfile = () => {
                   </form>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent key="security-content" value="security">
+          <Card>
+            <CardHeader>
+              <CardTitle>Security</CardTitle>
+              <CardDescription>Change your account password.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handlePasswordChange} className="space-y-4">
+                <div>
+                  <Label htmlFor="currentPassword">Current Password</Label>
+                  <Input
+                    id="currentPassword"
+                    type="password"
+                    value={passwords.currentPassword}
+                    onChange={(e) => setPasswords(prev => ({ ...prev, currentPassword: e.target.value }))}
+                    placeholder="Enter current password"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="newPassword">New Password</Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    value={passwords.newPassword}
+                    onChange={(e) => setPasswords(prev => ({ ...prev, newPassword: e.target.value }))}
+                    placeholder="Enter new password (min 6 chars)"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={passwords.confirmPassword}
+                    onChange={(e) => setPasswords(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                    placeholder="Confirm new password"
+                    required
+                  />
+                </div>
+
+                <Button type="submit" disabled={pwLoading}>
+                  {pwLoading ? "Updating..." : "Update Password"}
+                </Button>
+              </form>
             </CardContent>
           </Card>
         </TabsContent>

@@ -5,6 +5,7 @@ const Order = require("../models/Order");
 const Product = require("../models/Product");
 const User = require("../models/User");
 const deliveryController = require("../controllers/deliveryController");
+const NotificationService = require("../services/notificationService");
 const {
   sendOrderConfirmationEmail,
   sendSellerOrderNotification,
@@ -104,15 +105,24 @@ router.post("/", protect, async (req, res) => {
         // Calculate proportional platform fee based on this seller's total
         const sellerPlatformFee = (sellerTotal / totalAmount) * (totalAmount * 0.02);
 
-        const order = new Order({
-          buyer: req.user._id,
-          seller: sellerId,
-          items: sellerItems.map((item) => ({
+        // Build items with snapshot of warranty fields
+        const itemsWithWarranty = [];
+        for (const item of sellerItems) {
+          const prod = await Product.findById(item.product);
+          itemsWithWarranty.push({
             product: item.product,
             seller: item.seller,
             quantity: item.quantity,
             price: item.price,
-          })),
+            warrantyPeriod: prod ? prod.warrantyPeriod || "" : "",
+            warrantyDetails: prod ? prod.warrantyDetails || "" : "",
+          });
+        }
+
+        const order = new Order({
+          buyer: req.user._id,
+          seller: sellerId,
+          items: itemsWithWarranty,
           paymentInfo: {
             method: paymentInfo.method || "paypal",
             status: paymentInfo.status || "completed",
@@ -133,6 +143,8 @@ router.post("/", protect, async (req, res) => {
 
         await order.save();
         createdOrders.push(order);
+
+        // Note: Individual order notifications moved to consolidated section below
 
         // Update seller's total sales and stats
         if (seller.sellerProfile) {
@@ -169,6 +181,71 @@ router.post("/", protect, async (req, res) => {
         buyer.orderHistory.push(order._id);
       }
       await buyer.save();
+    }
+
+    // Create consolidated notifications for the buyer (prevents duplicates for multi-seller purchases)
+    try {
+      if (createdOrders.length === 1) {
+        // Single seller purchase - create individual notifications
+        const order = createdOrders[0];
+        
+        await NotificationService.createOrderNotification(
+          req.user._id,
+          order._id,
+          'order_created'
+        );
+        console.log(`✅ Order notification created for buyer: ${order._id}`);
+
+        // Create payment notification for non-cash payments
+        if (paymentInfo.method !== 'cash') {
+          const shippingCost = delivery?.shippingFee || 0;
+          const platformFee = order.paymentInfo.platformFee || 0;
+          const totalPaidAmount = order.totalAmount + platformFee + shippingCost;
+          
+          await NotificationService.createPaymentNotification(
+            req.user._id,
+            order._id,
+            'payment_processed',
+            totalPaidAmount
+          );
+          console.log(`✅ Payment notification created for buyer: ${order._id} - ₱${totalPaidAmount}`);
+        }
+      } else {
+        // Multi-seller purchase - create consolidated notifications
+        const totalItems = createdOrders.reduce((sum, order) => sum + order.items.length, 0);
+        const sellerNames = createdOrders.map(order => order.seller.toString()).slice(0, 2); // Limit to first 2 sellers
+        const sellerCount = createdOrders.length;
+        
+        // Create consolidated order notification
+        const consolidatedOrderMessage = `Your order with ${totalItems} items from ${sellerCount} seller${sellerCount > 1 ? 's' : ''} has been confirmed.`;
+        await NotificationService.createSystemNotification(
+          req.user._id,
+          "Orders Confirmed",
+          consolidatedOrderMessage,
+          `/buyer-dashboard/orders`,
+          'normal'
+        );
+        console.log(`✅ Consolidated order notification created for buyer: ${sellerCount} orders`);
+
+        // Create consolidated payment notification for non-cash payments
+        if (paymentInfo.method !== 'cash') {
+          const shippingCost = delivery?.shippingFee || 0;
+          const totalPlatformFees = createdOrders.reduce((sum, order) => sum + (order.paymentInfo.platformFee || 0), 0);
+          const totalPaidAmount = totalAmount + totalPlatformFees + shippingCost;
+          
+          await NotificationService.createSystemNotification(
+            req.user._id,
+            "Payment Processed",
+            `Payment of ₱${totalPaidAmount.toFixed(2)} processed successfully for your ${sellerCount} order${sellerCount > 1 ? 's' : ''}.`,
+            `/buyer-dashboard/orders`,
+            'normal'
+          );
+          console.log(`✅ Consolidated payment notification created for buyer: ₱${totalPaidAmount} for ${sellerCount} orders`);
+        }
+      }
+    } catch (notificationError) {
+      console.error(`❌ Failed to create consolidated notifications:`, notificationError);
+      // Don't fail the order creation if notification fails
     }
 
     // Process each order for emails and delivery
@@ -365,6 +442,50 @@ router.put("/:id/status", protect, async (req, res) => {
       // Don't fail the update if email fails
     }
 
+    // Create status update notification for buyer
+    try {
+      const notificationTypes = {
+        'processing': 'order_confirmed',
+        'shipped': 'order_shipped',
+        'delivered': 'order_delivered',
+        'cancelled': 'order_cancelled'
+      };
+
+      const notificationType = notificationTypes[status];
+      if (notificationType) {
+        await NotificationService.createOrderNotification(
+          order.buyer._id,
+          order._id,
+          notificationType
+        );
+        console.log(`✅ Status notification created for buyer: ${order._id} - ${status}`);
+      }
+    } catch (notificationError) {
+      console.error("Error creating status notification:", notificationError);
+      // Don't fail the update if notification fails
+    }
+
+    // Send payment notification for cash orders only when completed
+    if (order.paymentInfo.method === 'cash' && status === 'completed') {
+      try {
+        // Calculate total paid amount including platform fee and shipping for cash orders
+        const shippingCost = order.delivery?.price?.amount || 0;
+        const platformFee = order.paymentInfo.platformFee || 0;
+        const totalPaidAmount = order.totalAmount + platformFee + shippingCost;
+        
+        await NotificationService.createPaymentNotification(
+          order.buyer._id,
+          order._id,
+          'payment_processed',
+          totalPaidAmount
+        );
+        console.log(`✅ Cash payment notification created for buyer: ${order._id} - ₱${totalPaidAmount} (Order: ₱${order.totalAmount} + Platform Fee: ₱${platformFee} + Shipping: ₱${shippingCost})`);
+      } catch (notificationError) {
+        console.error(`❌ Failed to create cash payment notification:`, notificationError);
+        // Don't fail the update if notification fails
+      }
+    }
+
     // Send SMS status update to buyer
     try {
       const buyerPhone = order.shippingAddress?.phone;
@@ -406,6 +527,19 @@ router.post("/:id/refund", protect, async (req, res) => {
 
     await order.refund(refundId);
 
+    // Create refund notification for buyer
+    try {
+      await NotificationService.createOrderNotification(
+        order.buyer._id,
+        order._id,
+        'order_refunded'
+      );
+      console.log(`✅ Refund notification created for buyer: ${order._id}`);
+    } catch (notificationError) {
+      console.error(`❌ Failed to create refund notification:`, notificationError);
+      // Don't fail the refund if notification fails
+    }
+
     // Cancel delivery if exists
     if (order.delivery?.lalamoveOrderId) {
       try {
@@ -429,10 +563,9 @@ router.post("/:id/refund", protect, async (req, res) => {
 router.post("/:id/review", protect, async (req, res) => {
   try {
     const { rating, comment } = req.body;
-    const order = await Order.findById(req.params.id).populate(
-      "seller",
-      "name email"
-    );
+    const order = await Order.findById(req.params.id)
+      .populate("seller", "name email")
+      .populate("items.product", "name");
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
@@ -450,6 +583,22 @@ router.post("/:id/review", protect, async (req, res) => {
       await order.createReview({ rating, comment });
     } catch (error) {
       return res.status(400).json({ message: error.message });
+    }
+
+    // Send review notification to seller
+    try {
+      const productNames = order.items.map(item => item.product.name).join(", ");
+      await NotificationService.createSystemNotification(
+        order.seller._id,
+        "New Review Received",
+        `You received a ${rating}-star review for: ${productNames}`,
+        `/seller-dashboard/reviews`,
+        'normal'
+      );
+      console.log(`✅ Review notification sent to seller: ${order.seller._id}`);
+    } catch (notificationError) {
+      console.error(`❌ Failed to send review notification:`, notificationError);
+      // Don't fail the review submission if notification fails
     }
 
     res.json({ message: "Review submitted successfully" });

@@ -26,7 +26,17 @@ const AdminManageListings = () => {
   const fetchListings = async () => {
     try {
       const data = await apiGetAllListings();
-      setListings(data);
+      console.debug("apiGetAllListings response:", data);
+
+      const listingsArray = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.products)
+        ? data.products
+        : Array.isArray(data?.data)
+        ? data.data
+        : [];
+
+      setListings(listingsArray);
     } catch (error) {
       console.error("Error fetching listings:", error);
       toast.error("Failed to fetch listings");

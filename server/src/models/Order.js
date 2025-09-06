@@ -34,6 +34,15 @@ const orderSchema = new mongoose.Schema(
           required: true,
           min: 0,
         },
+        // Snapshot warranty information at time of purchase so order retains warranty
+        warrantyPeriod: {
+          type: String,
+          default: "",
+        },
+        warrantyDetails: {
+          type: String,
+          default: "",
+        },
       },
     ],
     shippingAddress: {

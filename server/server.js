@@ -163,9 +163,13 @@ const io = new Server(server, {
 // Attach io to app for controllers to emit events
 app.set("io", io);
 
+// Make io globally available for models
+global.io = io;
+
 io.on("connection", (socket) => {
   console.log("🔌 Socket connected:", socket.id);
 
+  // Chat functionality
   socket.on("join_chat", ({ chatId }) => {
     if (chatId) {
       socket.join(`chat:${chatId}`);
@@ -185,10 +189,52 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Notification functionality
+  socket.on("join_room", ({ userId, userType }) => {
+    if (userId) {
+      const roomName = `user:${userId}`;
+      socket.join(roomName);
+      socket.userId = userId;
+      socket.userType = userType;
+      console.log(`🔔 User ${userId} (${userType}) joined notification room: ${roomName}`);
+      socket.emit("joined_room", { userId, userType, room: roomName });
+    }
+  });
+
+  socket.on("leave_room", ({ userId }) => {
+    if (userId) {
+      const roomName = `user:${userId}`;
+      socket.leave(roomName);
+      console.log(`🔔 User ${userId} left notification room: ${roomName}`);
+    }
+  });
+
   socket.on("disconnect", () => {
     console.log("🔌 Socket disconnected:", socket.id);
+    if (socket.userId) {
+      console.log(`🔔 User ${socket.userId} disconnected from notifications`);
+    }
   });
 });
+
+// Add notification helper functions to io for use in other parts of the app
+io.sendNotificationToUser = (userId, notification) => {
+  const roomName = `user:${userId}`;
+  io.to(roomName).emit("new_notification", { 
+    type: "new_notification", 
+    notification 
+  });
+  console.log(`🔔 Sent notification to user ${userId} in room ${roomName}`);
+};
+
+io.updateUnreadCount = (userId, unreadCount) => {
+  const roomName = `user:${userId}`;
+  io.to(roomName).emit("notification_count_update", { 
+    type: "notification_count_update", 
+    unreadCount 
+  });
+  console.log(`🔔 Updated unread count for user ${userId}: ${unreadCount}`);
+};
 
 // Connect to MongoDB with improved configuration
 const connectWithRetry = async () => {
@@ -272,6 +318,8 @@ const deliveryRoutes = require("./src/routes/delivery");
 const chatRoutes = require("./src/routes/chat");
 const blogRoutes = require("./src/routes/blog");
 const socialRoutes = require("./src/routes/social");
+const notificationRoutes = require("./src/routes/notifications");
+const testNotificationRoutes = require("./src/routes/testNotification");
 
 // Serve static files from the React app
 if (process.env.NODE_ENV === "production") {
@@ -291,6 +339,9 @@ app.use("/api/ads", require("./src/routes/ads")); // Public ads route
 app.use("/api/chat", chatRoutes);
 app.use("/api/blog", blogRoutes);
 app.use("/api/social", socialRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/test", testNotificationRoutes);
+// PayMaya and Twilio integrations removed from this deployment.
 
 // Basic route for testing
 app.get("/", (req, res) => {

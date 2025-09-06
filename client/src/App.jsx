@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { PayPalProvider } from "@/config/paypal";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { BuyerNotificationProvider } from "@/contexts/BuyerNotificationContext";
 import MainLayout from "@/components/layout/MainLayout";
 import SellerLayout from "@/components/layout/SellerLayout";
 import AdminLayout from "@/components/layout/AdminLayout";
@@ -62,10 +63,12 @@ import SellerLocation from "@/pages/SellerDashboard/SellerLocation";
 import SellerChangeName from "@/pages/SellerDashboard/SellerChangeName";
 import SellerChangeEmail from "@/pages/SellerDashboard/SellerChangeEmail";
 import SellerChangeProfile from "@/pages/SellerDashboard/SellerChangeProfile";
+import SellerChangePassword from "@/pages/SellerDashboard/SellerChangePassword";
 
 // Import Buyer Dashboard Components
 import BuyerMyPurchase from "@/pages/BuyerDashboard/BuyerMyPurchase";
 import BuyerManageProfile from "@/pages/BuyerDashboard/BuyerManageProfile";
+import NotificationsPage from "@/pages/BuyerDashboard/NotificationsPage";
 
 // Import Additional Pages
 import BreedingSimulatorPage from "@/pages/BreedingSimulatorPage";
@@ -139,6 +142,7 @@ const AppContent = () => {
           <Route path="/buyer-dashboard" element={<BuyerDashboardPage />}>
             <Route index element={<BuyerMyPurchase />} />
             <Route path="purchases" element={<BuyerMyPurchase />} />
+            <Route path="notifications" element={<NotificationsPage />} />
             <Route path="profile" element={<BuyerManageProfile />} />
           </Route>
         </Route>
@@ -165,6 +169,7 @@ const AppContent = () => {
             <Route path="profile" element={<SellerChangeProfile />} />
             <Route path="change-name" element={<SellerChangeName />} />
             <Route path="change-email" element={<SellerChangeEmail />} />
+            <Route path="change-password" element={<SellerChangePassword />} />
             {/* Blog routes for sellers with SellerBlogLayout */}
             <Route path="blog" element={<SellerBlogLayout />}>
               <Route index element={<BlogList />} />
@@ -205,36 +210,52 @@ const AppContent = () => {
   );
 };
 
+const AppWithProviders = () => {
+  const { user } = useAuth();
+  
+  return (
+    <CartProvider>
+      <PayPalProvider>
+        {/* Single Toaster component for the entire app */}
+        <Toaster
+          position="top-center"
+          reverseOrder={false}
+          toastOptions={{
+            style: {
+              background: "#333",
+              color: "#fff",
+            },
+            success: {
+              style: {
+                background: "#36d399",
+              },
+            },
+            error: {
+              style: {
+                background: "#f87272",
+              },
+            },
+          }}
+        />
+        {/* Only load the appropriate notification provider based on user type */}
+        {user?.isSeller ? (
+          <NotificationProvider>
+            <AppContent />
+          </NotificationProvider>
+        ) : (
+          <BuyerNotificationProvider>
+            <AppContent />
+          </BuyerNotificationProvider>
+        )}
+      </PayPalProvider>
+    </CartProvider>
+  );
+};
+
 const App = () => {
   return (
     <AuthProvider>
-      <NotificationProvider>
-        <CartProvider>
-          <PayPalProvider>
-            <Toaster
-              position="top-center"
-              reverseOrder={false}
-              toastOptions={{
-                style: {
-                  background: "#333",
-                  color: "#fff",
-                },
-                success: {
-                  style: {
-                    background: "#36d399",
-                  },
-                },
-                error: {
-                  style: {
-                    background: "#f87272",
-                  },
-                },
-              }}
-            />
-            <AppContent />
-          </PayPalProvider>
-        </CartProvider>
-      </NotificationProvider>
+      <AppWithProviders />
     </AuthProvider>
   );
 };

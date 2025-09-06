@@ -187,31 +187,8 @@ const AuthProvider = ({ children }) => {
     verifyAuth();
   }, [navigate, location]);
 
-  // Set up axios interceptor for token expiration
-  useEffect(() => {
-    const interceptor = axiosInstance.interceptors.response.use(
-      (response) => response,
-      (error) => {
-        if (
-          error.response?.status === 401 &&
-          !location.pathname.match(/^\/(login|register)$/)
-        ) {
-          localStorage.removeItem("token");
-          setUser(null);
-          toast.error("Session expired. Please login again.");
-          navigate("/login", {
-            state: { from: location },
-            replace: true,
-          });
-        }
-        return Promise.reject(error);
-      }
-    );
-
-    return () => {
-      axiosInstance.interceptors.response.eject(interceptor);
-    };
-  }, [navigate, location]);
+  // Note: Axios interceptor removed to prevent duplicate auth error handling
+  // Auth errors are now handled by the AUTH_ERROR_EVENT listener above
 
   return (
     <AuthContext.Provider

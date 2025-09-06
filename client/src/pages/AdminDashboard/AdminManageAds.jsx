@@ -306,7 +306,7 @@ const AdFormModal = ({ ad, isOpen, onClose, onSave }) => {
               <Input
                 value={formData.price}
                 onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
-                placeholder="e.g., $29.99, Starting at $50"
+                placeholder="e.g., ₱29.99, Starting at ₱50"
               />
             </div>
           </div>
@@ -449,13 +449,13 @@ const AdminManageAds = () => {
         {
           _id: "1",
           title: "Purina Pro Plan Poultry Feed",
-          description: "Get 25% off premium layer feed. Free shipping on orders over $50!",
+          description: "Get 25% off premium layer feed. Free shipping on orders over ₱50!",
           type: "banner",
           image: null,
           url: "https://example.com/",
           cta: "Shop Now",
           sponsor: "Purina Store",
-          price: "Starting at $24.99",
+          price: "Starting at ₱24.99",
           status: "active",
           impressions: 1250,
           clicks: 47
@@ -469,7 +469,7 @@ const AdminManageAds = () => {
           url: "https://example.com/",
           cta: "Learn More",
           sponsor: "ChickenGuard",
-          price: "$89.99",
+          price: "₱89.99",
           status: "active",
           impressions: 980,
           clicks: 32
@@ -483,7 +483,7 @@ const AdminManageAds = () => {
           url: "https://example.com/",
           cta: "Order Now",
           sponsor: "PackagingPro",
-          price: "100 pack - $32.99",
+          price: "100 pack - ₱32.99",
           status: "paused",
           impressions: 756,
           clicks: 18
@@ -497,7 +497,7 @@ const AdminManageAds = () => {
           url: "https://example.com/",
           cta: "Buy Now",
           sponsor: "FarmTech",
-          price: "$45.99",
+          price: "₱45.99",
           status: "active",
           impressions: 654,
           clicks: 28
@@ -511,7 +511,7 @@ const AdminManageAds = () => {
           url: "https://example.com/",
           cta: "Shop Feed",
           sponsor: "Nature's Best",
-          price: "$28.50/bag",
+          price: "₱28.50/bag",
           status: "active",
           impressions: 543,
           clicks: 21

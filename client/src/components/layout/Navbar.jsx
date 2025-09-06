@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
+import { useBuyerNotifications } from "@/contexts/BuyerNotificationContext";
 import toast from "react-hot-toast";
 import {
   Menu,
@@ -28,15 +29,29 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import ProfileAvatar from "@/components/ui/ProfileAvatar";
+import NotificationDropdown from "@/components/common/NotificationDropdown";
 import { Home } from "lucide-react";
 
 const Navbar = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const { cartItemCount, wishlistItems } = useCart();
+  // Conditionally get notifications based on user type
+  let unreadCount = 0;
+  try {
+    if (isAuthenticated && !user?.isSeller) {
+      const buyerNotifications = useBuyerNotifications();
+      unreadCount = buyerNotifications?.unreadCount || 0;
+    }
+  } catch (error) {
+    // If notification context is not available, default to 0
+    unreadCount = 0;
+  }
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
+  const [isMobileNotificationMenuOpen, setIsMobileNotificationMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -54,6 +69,27 @@ const Navbar = () => {
     setIsMobileMenuOpen(false);
     setIsUserMenuOpen(false);
   }, [location]);
+
+  // Close dropdowns when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Close user dropdown
+      if (isUserMenuOpen && !event.target.closest('.user-dropdown')) {
+        setIsUserMenuOpen(false);
+      }
+      // Close desktop notification dropdown
+      if (isNotificationMenuOpen && !event.target.closest('.notification-dropdown')) {
+        setIsNotificationMenuOpen(false);
+      }
+      // Close mobile notification dropdown
+      if (isMobileNotificationMenuOpen && !event.target.closest('.mobile-notification-dropdown')) {
+        setIsMobileNotificationMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isUserMenuOpen, isNotificationMenuOpen, isMobileNotificationMenuOpen]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -148,9 +184,31 @@ const Navbar = () => {
               </Link>
             )}
 
-            {/* User Menu */}
+            {/* Notifications - Only for authenticated buyers */}
+            {/* Notifications - Only for authenticated buyers */}
+            {isAuthenticated && !user?.isSeller && (
+              <div className="relative notification-dropdown">
+                <button
+                  onClick={() => setIsNotificationMenuOpen(!isNotificationMenuOpen)}
+                  className="relative group focus:outline-none flex items-center"
+                >
+                  <Bell className="h-6 w-6 text-white align-middle" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-1 h-4 w-4 rounded-full bg-red-500 text-xs flex items-center justify-center font-medium text-white">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* Notification Dropdown */}
+                <NotificationDropdown 
+                  isOpen={isNotificationMenuOpen} 
+                  onClose={() => setIsNotificationMenuOpen(false)} 
+                />
+              </div>
+            )}            {/* User Menu */}
             {isAuthenticated ? (
-              <div className="relative">
+              <div className="relative user-dropdown">
                 <button
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                   className="flex items-center space-x-2 focus:outline-none"
@@ -250,6 +308,29 @@ const Navbar = () => {
 
           {/* Mobile menu button */}
           <div className="flex items-center gap-4 md:hidden">
+            {/* Notifications - Mobile */}
+            {isAuthenticated && !user?.isSeller && (
+              <div className="relative mobile-notification-dropdown">
+                <button
+                  onClick={() => setIsMobileNotificationMenuOpen(!isMobileNotificationMenuOpen)}
+                  className="relative focus:outline-none flex items-center"
+                >
+                  <Bell className="h-6 w-6 text-white align-middle" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-1 h-4 w-4 rounded-full bg-red-500 text-xs flex items-center justify-center font-medium text-white">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* Notification Dropdown - Mobile */}
+                <NotificationDropdown 
+                  isOpen={isMobileNotificationMenuOpen} 
+                  onClose={() => setIsMobileNotificationMenuOpen(false)} 
+                />
+              </div>
+            )}
+
             {/* Wishlist */}
             {isAuthenticated && (
               <Link to="/wishlist" className="relative">

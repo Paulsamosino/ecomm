@@ -9,7 +9,7 @@ import {
   Settings,
   MonitorPlay,
 } from "lucide-react";
-import { apiGetAdminStats } from "@/api/admin";
+import { apiGetAdminStats, apiGetReportStats } from "@/api/admin";
 import toast from "react-hot-toast";
 
 const StatsCard = ({ title, value, icon: Icon, status, link }) => (
@@ -42,8 +42,22 @@ const AdminDashboardPage = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const data = await apiGetAdminStats();
-        setStats(data);
+        const [data, reportStats] = await Promise.all([
+          apiGetAdminStats(),
+          apiGetReportStats(),
+        ]);
+
+        // Log raw responses for easier debugging
+        // eslint-disable-next-line no-console
+        console.debug("Admin stats response:", data, "Report stats response:", reportStats);
+
+        // Normalize backend keys to the UI contract
+        setStats({
+          totalUsers: data?.totalUsers ?? data?.total_users ?? 0,
+          totalListings: data?.totalProducts ?? data?.totalListings ?? data?.total_products ?? 0,
+          pendingReports: reportStats?.pending ?? reportStats?.pendingReports ?? 0,
+          pendingListings: data?.pendingListings ?? 0,
+        });
       } catch (error) {
         console.error("Error fetching stats:", error);
         toast.error("Failed to load dashboard data");

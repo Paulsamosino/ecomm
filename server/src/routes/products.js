@@ -6,6 +6,7 @@ const Product = require("../models/Product");
 const Order = require("../models/Order");
 const { upload } = require("../config/cloudinary");
 const mongoose = require("mongoose");
+const wishlistRoutes = require("./wishlist");
 
 // Get seller's products
 router.get("/seller", auth, async (req, res) => {
@@ -54,6 +55,8 @@ router.post("/", auth, upload.array("images", 5), async (req, res) => {
       age,
       location = "Not specified",
       shippingInfo = "Standard shipping available",
+  warrantyPeriod = "",
+  warrantyDetails = "",
     } = req.body;
 
     // Validate required fields
@@ -101,6 +104,8 @@ router.post("/", auth, upload.array("images", 5), async (req, res) => {
       images,
       location,
       shippingInfo,
+  warrantyPeriod,
+  warrantyDetails,
       seller: req.user.id,
     });
 
@@ -296,6 +301,11 @@ router.put("/:id", auth, upload.array("images", 5), async (req, res) => {
     }
 
     const updateData = { ...req.body };
+    
+    // Store old values for notification comparison
+    const oldQuantity = product.quantity;
+    const oldPrice = product.price;
+    const wasOutOfStock = oldQuantity <= 0;
 
     // Handle new images if uploaded
     if (req.files && req.files.length > 0) {
@@ -303,11 +313,39 @@ router.put("/:id", auth, upload.array("images", 5), async (req, res) => {
       updateData.images = req.files.map((file) => file.path);
     }
 
+  // Normalize warranty fields
+  if (typeof updateData.warrantyPeriod === 'undefined') updateData.warrantyPeriod = product.warrantyPeriod || "";
+  if (typeof updateData.warrantyDetails === 'undefined') updateData.warrantyDetails = product.warrantyDetails || "";
+
     const updatedProduct = await Product.findByIdAndUpdate(
       req.params.id,
       updateData,
       { new: true }
     );
+
+    // Check for stock availability notifications
+    if (wasOutOfStock && updatedProduct.quantity > 0) {
+      try {
+        await wishlistRoutes.notifyWishlistStock(req.params.id);
+        console.log(`✅ Stock availability notifications sent for product: ${updatedProduct.name}`);
+      } catch (notificationError) {
+        console.error(`❌ Failed to send stock notifications:`, notificationError);
+      }
+    }
+
+    // Check for price drop notifications
+    if (updateData.price && parseFloat(updateData.price) < oldPrice) {
+      try {
+        await wishlistRoutes.notifyWishlistPriceDrop(
+          req.params.id,
+          oldPrice,
+          parseFloat(updateData.price)
+        );
+        console.log(`✅ Price drop notifications sent for product: ${updatedProduct.name}`);
+      } catch (notificationError) {
+        console.error(`❌ Failed to send price drop notifications:`, notificationError);
+      }
+    }
 
     res.json(updatedProduct);
   } catch (error) {

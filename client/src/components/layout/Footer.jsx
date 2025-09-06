@@ -71,7 +71,7 @@ const Footer = () => {
               <h4 className="text-sm font-semibold text-gray-900">
                 Free Delivery
               </h4>
-              <p className="text-xs text-gray-500 mt-1">On orders over $100</p>
+              <p className="text-xs text-gray-500 mt-1">On orders over ₱100</p>
             </div>
             <div className="flex flex-col items-center">
               <CreditCard className="h-8 w-8 text-primary mb-3" />

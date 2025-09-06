@@ -796,6 +796,17 @@ const ProductDetailPage = () => {
                       </span>
                     </div>
                   </div>
+                  {(product.warrantyPeriod || product.warrantyDetails) && (
+                    <div className="mt-3 p-3 bg-white border rounded-md">
+                      <h4 className="text-sm font-semibold text-gray-800">Warranty</h4>
+                      {product.warrantyPeriod && (
+                        <p className="text-sm text-gray-700">{product.warrantyPeriod}</p>
+                      )}
+                      {product.warrantyDetails && (
+                        <p className="mt-1 text-sm text-gray-600">{product.warrantyDetails}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -1168,7 +1179,7 @@ const ProductDetailPage = () => {
                     )}
                     <div className="flex items-center justify-between">
                       <div className="font-bold text-orange-600">
-                        ${product.price?.toFixed(2)}
+                        ₱{product.price?.toFixed(2)}
                       </div>
                       {product.rating > 0 && (
                         <div className="flex items-center">

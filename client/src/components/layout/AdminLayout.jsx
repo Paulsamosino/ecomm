@@ -30,6 +30,7 @@ const AdminLayout = () => {
     { name: "Users", path: "/admin/users", icon: Users },
     { name: "Listings", path: "/admin/listings", icon: Package },
     { name: "Reports", path: "/admin/reports", icon: Flag },
+    { name: "Logs", path: "/admin/logs", icon: FileText },
     { name: "Ads", path: "/admin/ads", icon: MonitorPlay },
     { name: "Analytics", path: "/admin/analytics", icon: BarChart },
     { name: "Blog", path: "/admin/blog", icon: FileText },

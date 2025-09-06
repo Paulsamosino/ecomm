@@ -23,6 +23,7 @@ import {
   Tractor,
   User,
   Mail,
+  Key,
 } from "lucide-react";
 import SellerNavbar from "./SellerNavbar";
 
@@ -124,6 +125,11 @@ const SellerLayout = () => {
           path: "/seller/change-email",
           icon: Mail,
         },
+            {
+              name: "Change Password",
+              path: "/seller/change-password",
+              icon: Key,
+            },
         {
           name: "Location",
           path: "/seller/location",

@@ -6,10 +6,8 @@ import "./index.css"; // Import global styles
 import ScrollToTop from "./components/common/ScrollToTop";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <ScrollToTop />
-      <App />
-    </BrowserRouter>
-  </React.StrictMode>
+  <BrowserRouter>
+    <ScrollToTop />
+    <App />
+  </BrowserRouter>
 );

@@ -8,6 +8,8 @@ const reportRoutes = require("./routes/reports");
 const reviewRoutes = require("./routes/reviews");
 const blogRoutes = require("./routes/blog");
 const socialRoutes = require("./routes/social");
+const notificationRoutes = require("./routes/notifications");
+const wishlistRoutes = require("./routes/wishlist");
 const cors = require("cors");
 const express = require("express");
 
@@ -39,6 +41,9 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/blog", blogRoutes);
 app.use("/api/social", socialRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/wishlist", wishlistRoutes);
+app.use("/api/test-notifications", require("./routes/testAllNotifications"));
 app.use("/api/upload", require("./routes/upload"));
 
 // Webhook Routes (no /api prefix for external service webhooks)

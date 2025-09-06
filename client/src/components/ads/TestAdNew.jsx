@@ -13,12 +13,12 @@ const TestAd = ({ type = "banner", className = "" }) => {
       {
         _id: "fallback-1",
         title: "Purina Pro Plan Poultry Feed",
-        description: "Get 25% off premium layer feed. Free shipping on orders over $50!",
+        description: "Get 25% off premium layer feed. Free shipping on orders over ₱50!",
         image: null,
         cta: "Shop Now",
         sponsor: "Purina Store",
         url: "https://example.com/",
-        price: "Starting at $24.99"
+        price: "Starting at ₱24.99"
       },
       {
         _id: "fallback-2",
@@ -28,7 +28,7 @@ const TestAd = ({ type = "banner", className = "" }) => {
         cta: "Learn More", 
         sponsor: "ChickenGuard",
         url: "https://example.com/",
-        price: "$89.99"
+        price: "₱89.99"
       },
       {
         _id: "fallback-3",
@@ -38,7 +38,7 @@ const TestAd = ({ type = "banner", className = "" }) => {
         cta: "Order Now",
         sponsor: "PackagingPro",
         url: "https://example.com/", 
-        price: "100 pack - $32.99"
+        price: "100 pack - ₱32.99"
       }
     ],
     square: [
@@ -50,7 +50,7 @@ const TestAd = ({ type = "banner", className = "" }) => {
         cta: "Buy Now",
         sponsor: "FarmTech",
         url: "https://example.com/",
-        price: "$45.99"
+        price: "₱45.99"
       },
       {
         _id: "fallback-5",
@@ -60,7 +60,7 @@ const TestAd = ({ type = "banner", className = "" }) => {
         cta: "Shop Feed",
         sponsor: "Nature's Best",
         url: "https://example.com/",
-        price: "$28.50/bag"
+        price: "₱28.50/bag"
       }
     ],
     small: [

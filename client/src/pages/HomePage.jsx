@@ -263,7 +263,7 @@ const HomePage = () => {
                       </h3>
                       <div className="flex items-center justify-between">
                         <p className="text-lg font-bold text-[#fcba6d]">
-                          ${featuredProducts[0].price?.toFixed(2)}
+                          ₱{featuredProducts[0].price?.toFixed(2)}
                         </p>
                         <div className="flex items-center">
                           <Star className="h-4 w-4 text-yellow-400 mr-1" />
@@ -296,7 +296,7 @@ const HomePage = () => {
               {
                 icon: Truck,
                 title: "Free Shipping",
-                description: "On orders over $50",
+                description: "On orders over ₱50",
                 color: "bg-[#f7f0e6]",
                 iconColor: "text-[#cd8539]",
               },
@@ -484,7 +484,7 @@ const HomePage = () => {
 
                     <div className="flex items-center justify-between">
                       <p className="font-bold text-[#fcba6d]">
-                        ${product.price?.toFixed(2)}
+                        ₱{product.price?.toFixed(2)}
                       </p>
                       <button
                         onClick={(e) => {
@@ -608,7 +608,7 @@ const HomePage = () => {
 
                     <div className="flex items-center justify-between">
                       <p className="font-bold text-[#fcba6d]">
-                        ${product.price?.toFixed(2)}
+                        ₱{product.price?.toFixed(2)}
                       </p>
                       <button
                         onClick={(e) => {
@@ -848,7 +848,7 @@ const FarmProductCard = ({
         </div>
 
         <div className="flex items-center justify-between mt-4">
-          <span className="font-bold text-amber-600">${price?.toFixed(2)}</span>
+          <span className="font-bold text-amber-600">₱{price?.toFixed(2)}</span>
           <button
             onClick={() => onAddToCart(product)}
             disabled={quantity === 0}
@@ -940,7 +940,7 @@ const ProductCard = ({
         </div>
 
         <div className="flex items-center justify-between">
-          <span className="font-bold text-primary">${price?.toFixed(2)}</span>
+          <span className="font-bold text-primary">₱{price?.toFixed(2)}</span>
           <button
             onClick={() => onAddToCart(product)}
             disabled={quantity === 0}

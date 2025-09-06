@@ -2,6 +2,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const path = require("path");
+const http = require("http");
 require("dotenv").config();
 
 const authRoutes = require("./routes/auth");
@@ -11,7 +12,11 @@ const reportRoutes = require("./routes/reports");
 const adminRoutes = require("./routes/admin");
 const adsRoutes = require("./routes/ads");
 
+// Import WebSocket service
+const websocketService = require("./services/websocketService");
+
 const app = express();
+const server = http.createServer(app);
 
 // List of specific allowed domains
 const allowedDomains = [
@@ -153,9 +158,14 @@ process.on('SIGINT', () => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, async () => {
+
+// Initialize WebSocket service
+websocketService.initialize(server);
+
+server.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
   console.log("Environment:", process.env.NODE_ENV || "development");
+  console.log("WebSocket service initialized");
   
   // Start automatic delivery status synchronization after server starts
   setTimeout(() => {

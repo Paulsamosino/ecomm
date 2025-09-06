@@ -107,6 +107,16 @@ const CartPage = () => {
                             Category: {item.category}
                           </p>
                         )}
+                        {(item.warrantyPeriod || item.warrantyDetails) && (
+                          <div className="mt-2 text-sm text-gray-600">
+                            {item.warrantyPeriod && (
+                              <div>Warranty: <span className="font-medium">{item.warrantyPeriod}</span></div>
+                            )}
+                            {item.warrantyDetails && (
+                              <div className="mt-1">{item.warrantyDetails}</div>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div className="mt-2 sm:mt-0 text-right">
                         <p className="font-bold text-primary">

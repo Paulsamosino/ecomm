@@ -58,16 +58,27 @@ router.post("/register", async (req, res) => {
       userData.sellerProfile = {
         businessName: sellerProfile?.businessName || "",
         description: sellerProfile?.description || "",
-        address: {
+        location: {
           street: sellerProfile?.address?.street || "",
           city: sellerProfile?.address?.city || "",
           state: sellerProfile?.address?.state || "",
           zipCode: sellerProfile?.address?.zipCode || "",
-          country: sellerProfile?.address?.country || "",
+          country: sellerProfile?.address?.country || "Philippines",
+          phone: sellerProfile?.phone || "",
         },
-        phone: sellerProfile?.phone || "",
-        rating: 0,
+        totalSales: 0,
+        completedOrders: 0,
+        ratings: {
+          average: 0,
+          count: 0,
+        },
         reviews: [],
+        statistics: {
+          totalOrders: 0,
+          totalRevenue: 0,
+          averageOrderValue: 0,
+          conversionRate: 0,
+        },
       };
     }
 

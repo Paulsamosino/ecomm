@@ -1,5 +1,6 @@
 const Order = require("../models/Order");
 const lalamoveService = require("../services/lalamoveService");
+const NotificationService = require("../services/notificationService");
 const crypto = require('crypto');
 
 // Event ordering cache (prevent duplicate/out-of-order processing)
@@ -70,6 +71,19 @@ const webhookController = {
 
       await order.save();
       
+      // Create delivery notification for buyer
+      try {
+        await NotificationService.createDeliveryNotification(
+          order.buyer._id,
+          order._id,
+          status
+        );
+        console.log(`✅ Delivery notification created for buyer: ${order._id} - ${status}`);
+      } catch (notificationError) {
+        console.error(`❌ Failed to create delivery notification:`, notificationError);
+        // Don't fail the webhook if notification fails
+      }
+      
       // Mark event as processed
       processedEvents.set(eventKey, Date.now());
       
@@ -130,6 +144,19 @@ const webhookController = {
       order.notes = `Delivery cancelled: ${reason}`;
       await order.save();
 
+      // Create delivery cancellation notification for buyer
+      try {
+        await NotificationService.createDeliveryNotification(
+          order.buyer._id,
+          order._id,
+          "cancelled"
+        );
+        console.log(`✅ Delivery cancellation notification created for buyer: ${order._id}`);
+      } catch (notificationError) {
+        console.error(`❌ Failed to create delivery cancellation notification:`, notificationError);
+        // Don't fail the webhook if notification fails
+      }
+
       // Emit cancellation event
       io.to(`order:${order._id}`).emit("deliveryCancelled", {
         orderId: order._id,
@@ -165,6 +192,19 @@ const webhookController = {
       };
       order.delivery.status = "assigned";
       await order.save();
+
+      // Create driver assignment notification for buyer
+      try {
+        await NotificationService.createDeliveryNotification(
+          order.buyer._id,
+          order._id,
+          "assigned"
+        );
+        console.log(`✅ Driver assignment notification created for buyer: ${order._id}`);
+      } catch (notificationError) {
+        console.error(`❌ Failed to create driver assignment notification:`, notificationError);
+        // Don't fail the webhook if notification fails
+      }
 
       // Emit driver assignment event
       io.to(`order:${order._id}`).emit("driverAssigned", {

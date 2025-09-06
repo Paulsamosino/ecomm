@@ -83,6 +83,17 @@ const OrderDetailsModal = ({ isOpen, onClose, order }) => {
                     <p className="text-sm text-gray-500">
                       Quantity: {item.quantity}
                     </p>
+                    {((item.warrantyPeriod || item.warrantyDetails) || (item.product && (item.product.warrantyPeriod || item.product.warrantyDetails))) && (
+                      <div className="mt-1 text-sm text-gray-600">
+                        {/* Prefer warranty snapshot stored on the order item; fallback to populated product warranty */}
+                        {(item.warrantyPeriod || item.product?.warrantyPeriod) && (
+                          <div>Warranty: <span className="font-medium">{item.warrantyPeriod || item.product?.warrantyPeriod}</span></div>
+                        )}
+                        {(item.warrantyDetails || item.product?.warrantyDetails) && (
+                          <div className="mt-1">{item.warrantyDetails || item.product?.warrantyDetails}</div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <p className="font-medium">
                     ₱{(item.price * item.quantity).toFixed(2)}

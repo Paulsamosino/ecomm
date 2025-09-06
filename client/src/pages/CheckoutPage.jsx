@@ -759,6 +759,8 @@ const CheckoutPage = () => {
     }
   }, [createOrder, platformFee, displayTotal, total]);
 
+  // ...existing code...
+
   const handlePaymentError = useCallback((error) => {
     if (!error?.message?.includes("Window closed")) {
       toast.error("Payment failed. Please try again.");
@@ -821,7 +823,49 @@ const CheckoutPage = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-          <h2 className="text-xl font-semibold mb-4">Order Summary</h2>            <OrderSummary
+          <h2 className="text-xl font-semibold mb-4">Items</h2>
+          <div className="divide-y divide-gray-100 mb-4">
+            {displayProducts.map((item) => (
+              <div key={item._id || item.product} className="p-4 flex items-center gap-4">
+                <div className="w-16 h-16 bg-amber-50 rounded-md overflow-hidden flex-shrink-0">
+                  <img
+                    src={item.images?.[0] || item.images || "/1f425.png"}
+                    alt={item.name}
+                    className="w-full h-full object-contain"
+                    onError={(e) => { e.target.src = "/1f425.png"; }}
+                  />
+                </div>
+
+                <div className="flex-1">
+                  <div className="flex justify-between">
+                    <div>
+                      <h3 className="font-medium text-gray-900">{item.name}</h3>
+                      {item.seller && (
+                        <p className="text-sm text-gray-500">Seller: {item.seller.name || "Unknown Seller"}</p>
+                      )}
+                      {(item.warrantyPeriod || item.warrantyDetails) && (
+                        <div className="mt-2 text-sm text-gray-600">
+                          {item.warrantyPeriod && (
+                            <div>Warranty: <span className="font-medium">{item.warrantyPeriod}</span></div>
+                          )}
+                          {item.warrantyDetails && (
+                            <div className="mt-1">{item.warrantyDetails}</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-primary">₱{(item.price * item.quantity).toFixed(2)}</p>
+                      <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <h2 className="text-xl font-semibold mb-4">Order Summary</h2>
+          <OrderSummary
               displayTotal={displayTotal}
               platformFee={platformFee}
               shippingFee={shippingFee}

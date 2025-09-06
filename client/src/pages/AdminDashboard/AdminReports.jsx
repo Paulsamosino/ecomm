@@ -95,7 +95,17 @@ const AdminReports = () => {
   const fetchReports = async () => {
     try {
       const data = await apiGetReports();
-      setReports(data);
+      console.debug("apiGetReports response:", data);
+
+      const reportsArray = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.reports)
+        ? data.reports
+        : Array.isArray(data?.data)
+        ? data.data
+        : [];
+
+      setReports(reportsArray);
       setLoading(false);
     } catch (error) {
       console.error("Error fetching reports:", error);
@@ -150,11 +160,13 @@ const AdminReports = () => {
     );
   }
 
+  const safeReports = Array.isArray(reports) ? reports : [];
+
   const reportStats = {
-    total: reports.length,
-    pending: reports.filter((r) => r.status === "pending").length,
-    investigating: reports.filter((r) => r.status === "investigating").length,
-    resolved: reports.filter((r) => r.status === "resolved").length,
+    total: safeReports.length,
+    pending: safeReports.filter((r) => r.status === "pending").length,
+    investigating: safeReports.filter((r) => r.status === "investigating").length,
+    resolved: safeReports.filter((r) => r.status === "resolved").length,
   };
 
   return (

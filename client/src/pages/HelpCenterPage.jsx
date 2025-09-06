@@ -65,7 +65,7 @@ const HelpCenterPage = () => {
     {
       question: "How is shipping handled?",
       answer:
-        "Shipping is handled by our verified sellers using specialized transport for poultry. Delivery times and costs vary by location. Free delivery is available for orders over $100.",
+        "Shipping is handled by our verified sellers using specialized transport for poultry. Delivery times and costs vary by location. Free delivery is available for orders over ₱100.",
     },
     {
       question: "What if I have issues with my order?",
