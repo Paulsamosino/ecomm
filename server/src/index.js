@@ -11,6 +11,7 @@ const sellerRoutes = require("./routes/seller");
 const reportRoutes = require("./routes/reports");
 const adminRoutes = require("./routes/admin");
 const adsRoutes = require("./routes/ads");
+const walletRoutes = require("./routes/wallet");
 
 // Import WebSocket service
 const websocketService = require("./services/websocketService");
@@ -103,6 +104,7 @@ app.use("/api/seller", sellerRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/ads", adsRoutes);
+app.use("/api/wallet", walletRoutes);
 
 // Connect to MongoDB with enhanced error handling
 mongoose

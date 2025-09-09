@@ -34,6 +34,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 
 const OrderTrackingStatus = ({ order }) => {
   const getStatusColor = (status) => {
@@ -218,7 +219,7 @@ const ReviewModal = ({ order, isOpen, onClose, onReviewSubmit }) => {
   );
 };
 
-const OrderCard = ({ order, onReviewSubmit }) => {
+const OrderCard = ({ order, onReviewSubmit, onCancel, onRequestRefund }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
 
@@ -242,6 +243,8 @@ const OrderCard = ({ order, onReviewSubmit }) => {
         return "bg-green-100 text-green-800";
       case "cancelled":
         return "bg-red-100 text-red-800";
+      case "refunded":
+        return "bg-gray-100 text-gray-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -415,6 +418,28 @@ const OrderCard = ({ order, onReviewSubmit }) => {
                 Leave Review
               </Button>
             )}
+            {/* Cancel order if still pending/processing/shipped */}
+            {['pending','processing','shipped'].includes(order.status) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onCancel && onCancel(order._id)}
+                className="text-red-600 border-red-200 hover:bg-red-50"
+              >
+                Cancel Order
+              </Button>
+            )}
+            {/* Request refund if delivered and not yet requested */}
+            {order.status === 'delivered' && !order.refundRequested && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => (typeof onOpenRefundModal === 'function' ? onOpenRefundModal(order._id) : onRequestRefund && onRequestRefund(order._id))}
+                className="text-blue-600 border-blue-200 hover:bg-blue-50"
+              >
+                Request Refund
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -444,6 +469,10 @@ const BuyerMyPurchase = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTab, setSelectedTab] = useState("all");
+  const [refundModalOpen, setRefundModalOpen] = useState(false);
+  const [refundOrderId, setRefundOrderId] = useState(null);
+  const [refundReasonText, setRefundReasonText] = useState("");
+  const [refundImageFile, setRefundImageFile] = useState(null);
 
   // Sync searchQuery with searchTerm
   useEffect(() => {
@@ -506,6 +535,40 @@ const BuyerMyPurchase = () => {
     }
   };
 
+  // Cancel order (buyer)
+  const handleCancelOrder = async (orderId, reason = "") => {
+    try {
+      await axiosInstance.post(`/orders/${orderId}/cancel`, { reason });
+      toast.success("Order cancelled successfully");
+      fetchOrders();
+    } catch (error) {
+      console.error("Error cancelling order:", error);
+      toast.error(error.response?.data?.message || "Failed to cancel order");
+    }
+  };
+
+  // Request refund (buyer)
+  const handleRequestRefund = async (orderId, reason = "", file = null) => {
+    try {
+      const form = new FormData();
+      form.append('reason', reason);
+      if (file) form.append('evidence', file);
+
+      await axiosInstance.post(`/orders/${orderId}/request-refund`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast.success("Refund request submitted");
+      setRefundModalOpen(false);
+      setRefundOrderId(null);
+      setRefundReasonText("");
+      setRefundImageFile(null);
+      fetchOrders();
+    } catch (error) {
+      console.error("Error requesting refund:", error);
+      toast.error(error.response?.data?.message || "Failed to request refund");
+    }
+  };
+
   // Filter orders based on status
   const filterOrders = useCallback(
     (status) => {
@@ -561,8 +624,16 @@ const BuyerMyPurchase = () => {
         key={order._id}
         order={order}
         onReviewSubmit={handleReviewSubmit}
+        onCancel={handleCancelOrder}
+  onRequestRefund={handleRequestRefund}
+  onOpenRefundModal={openRefundModal}
       />
     ));
+  };
+
+  const openRefundModal = (orderId) => {
+    setRefundOrderId(orderId);
+    setRefundModalOpen(true);
   };
 
   // Handle loading and error states
@@ -687,9 +758,21 @@ const BuyerMyPurchase = () => {
               >
                 Delivered
               </TabsTrigger>
+              <TabsTrigger
+                value="cancelled"
+                className="data-[state=active]:bg-orange-50 data-[state=active]:text-orange-600 data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-orange-500 rounded-none min-w-[100px] flex-shrink-0"
+              >
+                Cancelled
+              </TabsTrigger>
+              <TabsTrigger
+                value="refunded"
+                className="data-[state=active]:bg-orange-50 data-[state=active]:text-orange-600 data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-orange-500 rounded-none min-w-[100px] flex-shrink-0"
+              >
+                Refunded
+              </TabsTrigger>
             </TabsList>
           </div>
-
+ 
           <TabsContent value="all" className="pt-4">
             {renderOrderList(getFilteredOrders())}
           </TabsContent>
@@ -705,8 +788,41 @@ const BuyerMyPurchase = () => {
           <TabsContent value="delivered" className="pt-4">
             {renderOrderList(getFilteredOrders())}
           </TabsContent>
+          <TabsContent value="cancelled" className="pt-4">
+            {renderOrderList(getFilteredOrders())}
+          </TabsContent>
+          <TabsContent value="refunded" className="pt-4">
+            {renderOrderList(getFilteredOrders())}
+          </TabsContent>
         </div>
       </Tabs>
+      {/* Refund Request Modal */}
+      <Dialog open={refundModalOpen} onOpenChange={setRefundModalOpen}>
+        <DialogContent className="sm:max-w-[600px] bg-white rounded-2xl border border-orange-100">
+          <DialogHeader>
+            <DialogTitle className="text-center text-xl font-bold text-gray-800">Request a Refund</DialogTitle>
+            <DialogDescription className="text-center text-gray-600">Provide a reason and optional photo evidence for your refund request.</DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={async (e) => {
+            e.preventDefault();
+            if (!refundOrderId) return;
+            await handleRequestRefund(refundOrderId, refundReasonText, refundImageFile);
+          }}>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Reason</label>
+              <Textarea value={refundReasonText} onChange={(e) => setRefundReasonText(e.target.value)} rows={4} />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Photo (optional)</label>
+              <input type="file" accept="image/*" onChange={(e) => setRefundImageFile(e.target.files?.[0] || null)} className="mt-2" />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" type="button" onClick={() => { setRefundModalOpen(false); setRefundOrderId(null); setRefundReasonText(''); setRefundImageFile(null); }}>Cancel</Button>
+              <Button type="submit" className="bg-gradient-to-r from-orange-400 to-orange-600 text-white">Submit Request</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

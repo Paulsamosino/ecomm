@@ -311,6 +311,7 @@ connectWithRetry();
 const authRoutes = require("./src/routes/auth");
 const productRoutes = require("./src/routes/products");
 const sellerRoutes = require("./src/routes/seller");
+const walletRoutes = require("./src/routes/wallet");
 const uploadRoutes = require("./src/routes/upload");
 const adminRoutes = require("./src/routes/admin");
 const userRoutes = require("./src/routes/user");
@@ -341,6 +342,8 @@ app.use("/api/blog", blogRoutes);
 app.use("/api/social", socialRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/test", testNotificationRoutes);
+// Wallet routes (top-ups, balance)
+app.use("/api/wallet", walletRoutes);
 // PayMaya and Twilio integrations removed from this deployment.
 
 // Basic route for testing

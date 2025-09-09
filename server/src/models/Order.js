@@ -75,7 +75,7 @@ const orderSchema = new mongoose.Schema(
       method: {
         type: String,
         required: true,
-        enum: ["credit_card", "debit_card", "bank_transfer", "paypal", "cod"],
+        enum: ["credit_card", "debit_card", "bank_transfer", "paypal", "cod", "wallet"],
       },
       status: {
         type: String,
@@ -154,6 +154,44 @@ const orderSchema = new mongoose.Schema(
       },
       comment: String,
       createdAt: Date,
+    },
+    // Cancellation / Refund metadata
+    refundRequested: {
+      type: Boolean,
+      default: false,
+    },
+    refundRequestedAt: Date,
+    refundReason: String,
+    refundProcessed: {
+      type: Boolean,
+      default: false,
+    },
+    refundedAt: Date,
+    cancelReason: String,
+    cancelledAt: Date,
+    inventoryRestored: {
+      type: Boolean,
+      default: false,
+    },
+    // Evidence images for refund requests
+    refundEvidence: [
+      {
+        url: String,
+        publicId: String,
+      },
+    ],
+    refundDecision: {
+      status: {
+        type: String,
+        enum: ["pending", "approved", "declined"],
+        default: "pending",
+      },
+      decidedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      decidedAt: Date,
+      decisionReason: String,
     },
   },
   {
@@ -276,18 +314,55 @@ orderSchema.pre("save", async function (next) {
 
 // Handle refunds
 orderSchema.methods.refund = async function (refundId) {
+  // Idempotent refund processing
+  if (this.status === 'refunded' && this.refundProcessed) {
+    return this; // already refunded
+  }
+
   this.status = "refunded";
   this.paymentInfo.status = "refunded";
   this.paymentInfo.refundId = refundId;
+  this.refundProcessed = true;
+  this.refundedAt = new Date();
 
-  // Restore inventory
-  const Product = mongoose.model("Product");
-  for (const item of this.items) {
-    const product = await Product.findById(item.product);
-    if (product) {
-      product.quantity += item.quantity;
-      await product.save();
+  // Restore inventory only once
+  if (!this.inventoryRestored) {
+    const Product = mongoose.model("Product");
+    for (const item of this.items) {
+      const product = await Product.findById(item.product);
+      if (product) {
+        product.quantity += item.quantity;
+        await product.save();
+      }
     }
+    this.inventoryRestored = true;
+  }
+
+  return this.save();
+};
+
+// Cancel an order (buyer-initiated)
+orderSchema.methods.cancel = async function (reason) {
+  // Only allow cancelling if order is not already cancelled or refunded
+  if (this.status === 'cancelled') return this;
+  if (this.status === 'refunded') return this;
+
+  // Allowed transitions: pending, processing, shipped -> cancelled (pre-check done by validStatusTransitions on save)
+  this.status = 'cancelled';
+  this.cancelReason = reason || '';
+  this.cancelledAt = new Date();
+
+  // Restore inventory only once
+  if (!this.inventoryRestored) {
+    const Product = mongoose.model('Product');
+    for (const item of this.items) {
+      const product = await Product.findById(item.product);
+      if (product) {
+        product.quantity += item.quantity;
+        await product.save();
+      }
+    }
+    this.inventoryRestored = true;
   }
 
   return this.save();

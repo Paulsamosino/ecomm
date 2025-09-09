@@ -5,6 +5,7 @@ const Order = require("../models/Order");
 const Product = require("../models/Product");
 const User = require("../models/User");
 const deliveryController = require("../controllers/deliveryController");
+const { upload } = require("../config/cloudinary");
 const NotificationService = require("../services/notificationService");
 const {
   sendOrderConfirmationEmail,
@@ -119,7 +120,7 @@ router.post("/", protect, async (req, res) => {
           });
         }
 
-        const order = new Order({
+  const order = new Order({
           buyer: req.user._id,
           seller: sellerId,
           items: itemsWithWarranty,
@@ -143,6 +144,22 @@ router.post("/", protect, async (req, res) => {
 
         await order.save();
         createdOrders.push(order);
+
+        // If payment was by wallet, debit the buyer immediately for this seller order
+        try {
+          if (paymentInfo?.method === 'wallet') {
+            const buyerUser = await User.findById(req.user._id);
+            console.debug('Attempting to debit wallet for user:', req.user._id, 'amount:', order.totalAmount);
+            if (!buyerUser) throw new Error('Buyer not found when debiting wallet');
+            await buyerUser.debitWallet(order.totalAmount, 'purchase', { orderId: order._id, method: 'wallet' });
+            console.log(`✅ Debited buyer wallet ₱${order.totalAmount} for order ${order._id}`);
+          }
+        } catch (debitErr) {
+          console.error('Error debiting buyer wallet for order', order._id, debitErr);
+          // Rollback: remove saved order and bubble error
+          try { await Order.findByIdAndDelete(order._id); } catch(_) { console.error('Rollback delete failed for order', order._id); }
+          return res.status(400).json({ message: 'Failed to debit wallet balance', error: debitErr.message });
+        }
 
         // Note: Individual order notifications moved to consolidated section below
 
@@ -527,6 +544,24 @@ router.post("/:id/refund", protect, async (req, res) => {
 
     await order.refund(refundId);
 
+    // If original payment was from wallet or PayPal, credit the buyer's wallet
+    try {
+      if (["wallet", "paypal"].includes(order.paymentInfo?.method)) {
+        const buyerUser = await User.findById(order.buyer);
+        if (buyerUser) {
+          const shipping = order.delivery?.price?.amount || 0;
+          const refundAmount = order.totalAmount + (order.paymentInfo?.platformFee || 0) + shipping;
+          await buyerUser.creditWallet(refundAmount, 'refund', { orderId: order._id, reason, refundedVia: order.paymentInfo?.method });
+          console.log(`\u2705 Credited buyer wallet \u20b1${refundAmount} for refunded order ${order._id} (via ${order.paymentInfo?.method})`);
+        } else {
+          console.warn('Buyer not found to credit wallet for refund', order.buyer);
+        }
+      }
+    } catch (walletCreditErr) {
+      console.error('Error crediting buyer wallet for refund', walletCreditErr);
+      // continue, do not fail refund because wallet credit failed; notify admins separately
+    }
+
     // Create refund notification for buyer
     try {
       await NotificationService.createOrderNotification(
@@ -556,6 +591,145 @@ router.post("/:id/refund", protect, async (req, res) => {
     res.json({ message: "Refund processed successfully", order });
   } catch (error) {
     res.status(500).json({ message: "Error processing refund" });
+  }
+});
+
+// Buyer cancels an order
+router.post("/:id/cancel", protect, async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    // Verify buyer owns this order
+    if (order.buyer.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Not authorized to cancel this order" });
+    }
+
+    // Only allow cancelling orders that are not delivered/refunded/cancelled
+    if (['delivered', 'refunded', 'cancelled'].includes(order.status)) {
+      return res.status(400).json({ message: `Order cannot be cancelled from status ${order.status}` });
+    }
+
+    await order.cancel(reason);
+
+      // If original payment was from wallet or PayPal, credit the buyer's wallet on cancel
+      try {
+        if (["wallet", "paypal"].includes(order.paymentInfo?.method)) {
+          const buyerUser = await User.findById(order.buyer);
+          if (buyerUser) {
+            const shipping = order.delivery?.price?.amount || 0;
+            const refundAmount = order.totalAmount + (order.paymentInfo?.platformFee || 0) + shipping;
+            await buyerUser.creditWallet(refundAmount, 'refund', { orderId: order._id, reason: reason || 'cancelled', refundedVia: order.paymentInfo?.method });
+            console.log(`\u2705 Credited buyer wallet \u20b1${refundAmount} for cancelled order ${order._id} (via ${order.paymentInfo?.method})`);
+          } else {
+            console.warn('Buyer not found to credit wallet for cancel', order.buyer);
+          }
+        }
+      } catch (walletCreditErr) {
+        console.error('Error crediting buyer wallet for cancel', walletCreditErr);
+        // continue
+      }
+    // Notify seller and buyer
+    try {
+      await NotificationService.createOrderNotification(
+        order.seller,
+        order._id,
+        'order_cancelled'
+      );
+      await NotificationService.createOrderNotification(
+        order.buyer,
+        order._id,
+        'order_cancelled'
+      );
+    } catch (notificationError) {
+      console.error('Failed to create cancellation notifications:', notificationError);
+    }
+
+    // Cancel delivery if exists
+    if (order.delivery?.lalamoveOrderId) {
+      try {
+        await deliveryController.cancelDelivery(order._id);
+      } catch (deliveryError) {
+        console.error('Error cancelling delivery:', deliveryError);
+      }
+    }
+
+    res.json({ message: 'Order cancelled successfully', order });
+  } catch (error) {
+    console.error('Error cancelling order:', error);
+    res.status(500).json({ message: 'Error cancelling order' });
+  }
+});
+
+// Buyer requests a refund for a delivered order
+// Buyer requests a refund for a delivered order (accepts one evidence image)
+router.post('/:id/request-refund', protect, upload.single('evidence'), async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    if (order.buyer.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to request refund for this order' });
+    }
+
+    // Only allow refund requests on delivered orders
+    if (order.status !== 'delivered') {
+      return res.status(400).json({ message: 'Refund can only be requested for delivered orders' });
+    }
+
+    order.refundRequested = true;
+    order.refundRequestedAt = new Date();
+    order.refundReason = reason || '';
+
+    // If an evidence image was uploaded, store its URL and publicId
+    if (req.file && req.file.path) {
+      order.refundEvidence = order.refundEvidence || [];
+      order.refundEvidence.push({ url: req.file.path, publicId: req.file.filename });
+    }
+
+    await order.save();
+
+    // Notify seller about refund request
+    try {
+      await NotificationService.createSystemNotification(
+        order.seller,
+        'Refund Requested',
+        `Buyer has requested a refund for order ${order._id}`,
+        `/seller-dashboard/orders/${order._id}`,
+        'normal'
+      );
+    } catch (notificationError) {
+      console.error('Failed to notify seller about refund request:', notificationError);
+    }
+
+    // Notify all admins so they can review the refund with evidence
+    try {
+      const admins = await User.find({ role: 'admin' });
+      for (const admin of admins) {
+        await NotificationService.createSystemNotification(
+          admin._id,
+          'Refund Requested (Review)',
+          `Refund requested for order ${order._id}.`,
+          `/admin/orders/${order._id}`,
+          'high'
+        );
+      }
+    } catch (adminNotifyErr) {
+      console.error('Failed to notify admins about refund request:', adminNotifyErr);
+    }
+
+    res.json({ message: 'Refund request submitted', order });
+  } catch (error) {
+    console.error('Error requesting refund:', error);
+    res.status(500).json({ message: 'Error requesting refund' });
   }
 });
 

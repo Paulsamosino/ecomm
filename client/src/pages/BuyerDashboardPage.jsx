@@ -66,6 +66,17 @@ const BuyerDashboardPage = () => {
             <span className="truncate">Order History</span>
           </Link>
           <Link
+            to="/buyer-dashboard/wallet"
+            className="inline-flex items-center justify-center px-3 sm:px-4 py-2 rounded-lg bg-white text-orange-600 border border-orange-200 shadow-sm hover:shadow hover:bg-orange-50 transition-all duration-200 text-sm"
+          >
+            <svg className="h-4 w-4 mr-1.5 sm:mr-2 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="truncate">Wallet</span>
+          </Link>
+          <Link
             to="/buyer-dashboard/profile"
             className="inline-flex items-center justify-center px-3 sm:px-4 py-2 rounded-lg bg-white text-orange-600 border border-orange-200 shadow-sm hover:shadow hover:bg-orange-50 transition-all duration-200 text-sm"
           >

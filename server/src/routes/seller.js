@@ -519,6 +519,21 @@ router.post("/payments/:orderId/refund", protect, async (req, res) => {
     order.notes = `Refunded: ${reason}`;
     await order.save();
 
+    // If original payment came from wallet or PayPal, credit buyer's wallet
+    try {
+      if (["wallet", "paypal"].includes(order.paymentInfo?.method)) {
+        const buyerUser = await User.findById(order.buyer);
+        if (buyerUser) {
+          const shipping = order.delivery?.price?.amount || 0;
+          const refundAmount = order.totalAmount + (order.paymentInfo?.platformFee || 0) + shipping;
+          await buyerUser.creditWallet(refundAmount, 'refund', { orderId: order._id, reason, refundedVia: order.paymentInfo?.method });
+          console.log(`\u2705 Credited buyer wallet \u20b1${refundAmount} for refunded order ${order._id} (via ${order.paymentInfo?.method})`);
+        }
+      }
+    } catch (walletErr) {
+      console.error('Error crediting buyer wallet after seller refund', walletErr);
+    }
+
     res.json({ message: "Refund processed successfully", order });
   } catch (error) {
     console.error("Error processing refund:", error);

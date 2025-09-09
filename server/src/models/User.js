@@ -184,6 +184,30 @@ const userSchema = new mongoose.Schema(
     },
     resetPasswordToken: String,
     resetPasswordExpire: Date,
+    wallet: {
+      balance: {
+        type: Number,
+        default: 0,
+      },
+      currency: {
+        type: String,
+        default: "PHP",
+      },
+      transactions: [
+        {
+          type: {
+            type: String,
+            enum: ["topup", "refund", "purchase", "adjustment"],
+          },
+          amount: Number,
+          meta: mongoose.Schema.Types.Mixed,
+          createdAt: {
+            type: Date,
+            default: Date.now,
+          },
+        },
+      ],
+    },
   },
   {
     timestamps: true,
@@ -254,6 +278,26 @@ userSchema.methods.updateStatistics = async function () {
   };
 
   await this.save();
+};
+
+// Wallet helper methods (attached to schema to be available on instances)
+userSchema.methods.creditWallet = async function (amount, type = "topup", meta = {}) {
+  if (amount <= 0) throw new Error("Amount must be positive");
+  this.wallet = this.wallet || { balance: 0, currency: "PHP", transactions: [] };
+  this.wallet.balance = (this.wallet.balance || 0) + amount;
+  this.wallet.transactions.push({ type, amount, meta });
+  await this.save();
+  return this.wallet;
+};
+
+userSchema.methods.debitWallet = async function (amount, type = "purchase", meta = {}) {
+  if (amount <= 0) throw new Error("Amount must be positive");
+  this.wallet = this.wallet || { balance: 0, currency: "PHP", transactions: [] };
+  if ((this.wallet.balance || 0) < amount) throw new Error("Insufficient wallet balance");
+  this.wallet.balance = (this.wallet.balance || 0) - amount;
+  this.wallet.transactions.push({ type, amount: -amount, meta });
+  await this.save();
+  return this.wallet;
 };
 
 const User = mongoose.model("User", userSchema);

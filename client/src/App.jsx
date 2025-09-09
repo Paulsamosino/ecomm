@@ -54,6 +54,7 @@ import AdminHelp from "@/pages/AdminDashboard/AdminHelp";
 import AdminAdsPage from "@/pages/AdminDashboard/AdminAdsPage";
 import AdminMessages from "@/pages/AdminDashboard/AdminMessages";
 import AdminBlogManagement from "@/pages/AdminDashboard/AdminBlogManagement";
+import AdminRefunds from "@/pages/AdminDashboard/AdminRefunds";
 
 // Import Seller Route and Product Management
 import SellerRoute from "@/components/routes/SellerRoute";
@@ -69,6 +70,7 @@ import SellerChangePassword from "@/pages/SellerDashboard/SellerChangePassword";
 import BuyerMyPurchase from "@/pages/BuyerDashboard/BuyerMyPurchase";
 import BuyerManageProfile from "@/pages/BuyerDashboard/BuyerManageProfile";
 import NotificationsPage from "@/pages/BuyerDashboard/NotificationsPage";
+import BuyerWallet from "@/pages/BuyerDashboard/BuyerWallet";
 
 // Import Additional Pages
 import BreedingSimulatorPage from "@/pages/BreedingSimulatorPage";
@@ -142,6 +144,7 @@ const AppContent = () => {
           <Route path="/buyer-dashboard" element={<BuyerDashboardPage />}>
             <Route index element={<BuyerMyPurchase />} />
             <Route path="purchases" element={<BuyerMyPurchase />} />
+              <Route path="wallet" element={<BuyerWallet />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="profile" element={<BuyerManageProfile />} />
           </Route>
@@ -189,6 +192,7 @@ const AppContent = () => {
             <Route path="users" element={<AdminManageUsers />} />
             <Route path="listings" element={<AdminManageListings />} />
             <Route path="analytics" element={<AdminManageAnalytics />} />
+            <Route path="refunds" element={<AdminRefunds />} />
             <Route path="reports" element={<AdminReports />} />
             <Route path="ads" element={<AdminAdsPage />} />
             <Route path="blog" element={<AdminBlogManagement />} />

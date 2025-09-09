@@ -146,6 +146,76 @@ exports.getAllOrders = async (req, res) => {
   }
 };
 
+// Process refund decision (approve/decline) by admin
+exports.processRefundDecision = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, reason } = req.body; // status: 'approved' or 'declined'
+
+    if (!['approved', 'declined'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid decision status' });
+    }
+
+    const order = await Order.findById(id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    if (!order.refundRequested) {
+      return res.status(400).json({ message: 'No refund requested for this order' });
+    }
+
+    order.refundDecision = order.refundDecision || {};
+    order.refundDecision.status = status;
+    order.refundDecision.decidedBy = req.user._id;
+    order.refundDecision.decidedAt = new Date();
+    order.refundDecision.decisionReason = reason || '';
+
+    if (status === 'approved') {
+      // In this implementation we credit the buyer's internal wallet instead of calling external refund
+      const refundId = `refund_${Date.now()}`;
+      // call order.refund to restore inventory and mark refund metadata, but do not attempt external gateway
+      await order.refund(refundId);
+
+      // Credit buyer wallet with order.totalAmount (you may choose to refund full amount or amount-net-fees)
+      try {
+        const Buyer = require('../models/User');
+        const buyer = await Buyer.findById(order.buyer);
+        if (buyer) {
+          await buyer.creditWallet(order.totalAmount, 'refund', { orderId: order._id, refundId });
+        }
+      } catch (walletErr) {
+        console.error('Failed to credit buyer wallet:', walletErr);
+      }
+
+      // Clear refundRequested since processed
+      order.refundRequested = false;
+    } else {
+      // declined
+      order.refundRequested = false;
+      order.refundProcessed = false;
+    }
+
+    await order.save();
+
+    // Notify buyer about decision
+    try {
+      await require('../services/notificationService').createSystemNotification(
+        order.buyer,
+        'Refund Decision',
+        status === 'approved' ? `Your refund for order ${order._id} has been approved.` : `Your refund for order ${order._id} has been declined.`,
+        `/buyer-dashboard/orders/${order._id}`,
+        'high'
+      );
+    } catch (notifyErr) {
+      console.error('Failed to notify buyer about refund decision:', notifyErr);
+    }
+
+    res.json({ message: `Refund ${status}`, order });
+  } catch (error) {
+    console.error('Error processing refund decision:', error);
+    res.status(500).json({ message: 'Error processing refund decision' });
+  }
+};
+
 // Update product status
 exports.updateProductStatus = async (req, res) => {
   try {

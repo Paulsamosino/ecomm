@@ -266,6 +266,19 @@ const Navbar = () => {
                           My Account
                         </Link>
                       )}
+                      {!user?.isSeller && (
+                        <Link
+                          to="/buyer-dashboard/wallet"
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          <svg className="h-4 w-4 mr-2 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                          Wallet
+                        </Link>
+                      )}
                       <Link
                         to={
                           user?.isSeller
@@ -283,6 +296,7 @@ const Navbar = () => {
                       >
                         <LogOut className="h-4 w-4 mr-2" />
                         Sign out
+                      
                       </button>
                     </div>
                   </div>

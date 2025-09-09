@@ -14,6 +14,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { apiGetAdminStats, apiGetAllUsers, apiGetAllListings, apiGetAllOrders } from "@/api/admin";
+import { apiProcessRefundDecision } from "@/api/admin";
 import { toast } from "react-hot-toast";
 
 const SimpleStatCard = ({ title, value, icon: Icon, description, trend, color = "orange", isPositive = true }) => {
@@ -288,6 +289,58 @@ const AdminManageAnalytics = () => {
           trend={stats.totalOrders > 20 ? "22" : null}
           color="orange"
         />
+      </div>
+
+      {/* Refund Requests Panel */}
+      <div className="mt-8">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Refund Requests</h2>
+        {orders.filter(o => o.refundRequested).length === 0 ? (
+          <div className="bg-white rounded-xl p-6 border border-gray-100 text-gray-600">No refund requests at this time.</div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4">
+            {orders.filter(o => o.refundRequested).map(order => (
+              <div key={order._id} className="bg-white rounded-lg p-4 border border-gray-100">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="text-sm text-gray-600">Order #{order._id.slice(-6)} • {order.status}</div>
+                    <div className="font-medium text-gray-800">Buyer: {order.buyer?.name || order.buyer?.email}</div>
+                    <div className="text-sm text-gray-600">Seller: {order.seller?.name || order.seller?.email}</div>
+                    <div className="text-sm text-gray-600 mt-2">Reason: {order.refundReason || 'No reason provided'}</div>
+                  </div>
+                  <div className="text-right">
+                    <a href={`/admin/orders/${order._id}`} className="text-sm text-orange-600">View Order</a>
+                  </div>
+                </div>
+                {order.refundEvidence && order.refundEvidence.length > 0 && (
+                  <div className="mt-3 flex gap-3 overflow-x-auto">
+                    {order.refundEvidence.map((e, idx) => (
+                      <div key={idx} className="w-28 h-20 rounded overflow-hidden border border-gray-200 bg-gray-50">
+                        <img src={e.url} alt={`evidence-${idx}`} className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-3 flex gap-2">
+                  <button className="px-3 py-1 rounded bg-green-50 text-green-600 border border-green-100" onClick={async () => {
+                    if (!confirm('Approve refund for this order?')) return;
+                    await apiProcessRefundDecision(order._id, 'approved', 'Approved by admin');
+                    toast.success('Refund approved');
+                    // Refresh orders
+                    const updated = await apiGetAllOrders();
+                    setOrders(updated);
+                  }}>Approve</button>
+                  <button className="px-3 py-1 rounded bg-red-50 text-red-600 border border-red-100" onClick={async () => {
+                    const reason = prompt('Reason for declining refund:') || 'Declined by admin';
+                    await apiProcessRefundDecision(order._id, 'declined', reason);
+                    toast('Refund declined');
+                    const updated = await apiGetAllOrders();
+                    setOrders(updated);
+                  }}>Decline</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Charts Section */}

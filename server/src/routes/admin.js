@@ -29,6 +29,8 @@ router.delete("/products/:id", auth, isAdmin, adminController.deleteProduct);
 
 // Order management routes
 router.get("/orders", auth, isAdmin, adminController.getAllOrders);
+// Process refund decisions for orders (approve/decline)
+router.post('/orders/:id/refund-decision', auth, isAdmin, adminController.processRefundDecision);
 
 // Analytics routes
 router.get("/analytics", auth, isAdmin, adminController.getAnalytics);

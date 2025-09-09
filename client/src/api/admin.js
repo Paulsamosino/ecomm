@@ -95,6 +95,12 @@ export const apiGetReportStats = async () => {
   return response.data;
 };
 
+// Process refund decision for order by admin
+export const apiProcessRefundDecision = async (orderId, decision, reason = '') => {
+  const response = await axiosInstance.post(`/admin/orders/${orderId}/refund-decision`, { status: decision, reason });
+  return response.data;
+};
+
 // Advertisement Management APIs
 export const apiGetAds = async () => {
   const response = await axiosInstance.get("/admin/ads");

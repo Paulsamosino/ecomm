@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useCart } from "@/contexts/CartContext";
 import { PayPalButton } from "@/components/PayPalButton";
+import { getWallet } from "@/api/wallet";
 import { toast } from "sonner";
 import { Loader2, CreditCard, Banknote, Plus, MapPin, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,10 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 // Constants
 const PAYMENT_METHODS = [
   { value: "paypal", label: "PayPal", icon: CreditCard, color: "#0070ba" },
-  { value: "cod", label: "Cash on Delivery", icon: Banknote, color: "#16a34a" }
+  { value: "wallet", label: "C&P Wallet", icon: Banknote, color: "#f59e0b" },
+  { value: "cod", label: "Cash on Delivery", icon: Banknote, color: "#16a34a" },
+  // GCASH is planned but not yet available
+  { value: "gcash", label: "GCash (coming soon)", icon: Banknote, color: "#0ea5a4", comingSoon: true }
 ];
 
 // Location data based on deliveryController geocoding with ZIP codes
@@ -428,19 +432,22 @@ const PaymentMethodSelector = ({ paymentMethod, onPaymentMethodChange }) => (
     <div className="grid grid-cols-2 gap-3">
       {PAYMENT_METHODS.map((method) => {
         const Icon = method.icon;
+        const isComing = method.comingSoon;
         return (
           <button
             key={method.value}
             type="button"
-            onClick={() => onPaymentMethodChange(method.value)}
-            className={`p-4 border rounded-lg flex flex-col items-center justify-center gap-2 hover:border-orange-300 transition-colors ${
+            onClick={() => { if (!isComing) onPaymentMethodChange(method.value); }}
+            disabled={isComing}
+            className={`p-4 border rounded-lg flex flex-col items-center justify-center gap-2 transition-colors ${
               paymentMethod === method.value
                 ? "border-orange-500 bg-orange-50 ring-2 ring-orange-200"
                 : "border-gray-200"
-            }`}
+            } ${isComing ? 'opacity-60 cursor-not-allowed' : 'hover:border-orange-300'}`}
           >
             <Icon className="h-6 w-6" style={{ color: method.color }} />
             <span className="font-medium text-gray-900 text-sm">{method.label}</span>
+            {isComing && <span className="text-xs text-gray-500 mt-1">(coming soon)</span>}
           </button>
         );
       })}
@@ -471,6 +478,8 @@ const CheckoutPage = () => {
 
   // State management
   const [isProcessing, setIsProcessing] = useState(false);
+  const [wallet, setWallet] = useState({ balance: 0, currency: "PHP" });
+  const [isFetchingWallet, setIsFetchingWallet] = useState(false);
   const [isValidatingStock, setIsValidatingStock] = useState(false);
   const [stockError, setStockError] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState("paypal");
@@ -759,6 +768,62 @@ const CheckoutPage = () => {
     }
   }, [createOrder, platformFee, displayTotal, total]);
 
+  const handleWalletOrder = useCallback(async () => {
+    try {
+      setIsProcessing(true);
+
+      // Ensure wallet balance up-to-date
+  const w = await getWallet();
+  setWallet(w || { balance: 0, currency: "PHP" });
+
+      if ((w?.balance || 0) < total) {
+        toast.error("Insufficient wallet balance. Please top up your wallet.");
+        return;
+      }
+
+      const txId = `WALLET-${Date.now()}`;
+
+      await createOrder({
+        paymentInfo: {
+          method: "wallet",
+          status: "completed",
+          transactionId: txId,
+        },
+      });
+    } catch (error) {
+      console.error("Error creating wallet order:", error);
+      toast.error(error.message || "Failed to place order with wallet. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [createOrder, total]);
+
+  // Fetch wallet balance when the user selects Wallet or on mount (if logged in)
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        if (paymentMethod !== "wallet") return;
+        setIsFetchingWallet(true);
+        const w = await getWallet();
+        if (!mounted) return;
+        setWallet(w || { balance: 0, currency: "PHP" });
+      } catch (err) {
+        console.error("Failed to fetch wallet:", err);
+        toast.error("Could not load wallet balance");
+      } finally {
+        setIsFetchingWallet(false);
+      }
+    };
+
+    // Only attempt if user is logged in
+    if (localStorage.getItem("token")) {
+      load();
+    }
+
+    return () => { mounted = false; };
+  }, [paymentMethod]);
+
   // ...existing code...
 
   const handlePaymentError = useCallback((error) => {
@@ -900,6 +965,40 @@ const CheckoutPage = () => {
                     onError={handlePaymentError}
                     disabled={isProcessing || !isFormValid || stockError}
                   />
+                </div>
+              ) : paymentMethod === "wallet" ? (
+                <div>
+                  <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-600">Use your wallet balance to pay for this order.</p>
+                    <p className="text-lg font-semibold mt-2">Balance: {isFetchingWallet ? 'Loading...' : `₱ ${Number(wallet.balance || 0).toLocaleString()}`}</p>
+                    {(!isFetchingWallet && (wallet.balance || 0) < total) && (
+                      <p className="mt-2 text-sm text-red-600">Insufficient balance to pay ₱{total.toFixed(2)}. Please top up your wallet.</p>
+                    )}
+                  </div>
+                  <div className="grid gap-3">
+                    <Button
+                      className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+                      onClick={handleWalletOrder}
+                      disabled={isProcessing || !isFormValid || stockError || isFetchingWallet || (wallet.balance || 0) < total}
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        "Pay with Wallet"
+                      )}
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => navigate('/buyer-dashboard/wallet')}
+                    >
+                      Top up wallet
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div>

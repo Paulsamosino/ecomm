@@ -29,6 +29,7 @@ const AdminLayout = () => {
     { name: "Dashboard", path: "/admin", icon: LayoutDashboard },
     { name: "Users", path: "/admin/users", icon: Users },
     { name: "Listings", path: "/admin/listings", icon: Package },
+  { name: "Refunds", path: "/admin/refunds", icon: FileText },
     { name: "Reports", path: "/admin/reports", icon: Flag },
     { name: "Logs", path: "/admin/logs", icon: FileText },
     { name: "Ads", path: "/admin/ads", icon: MonitorPlay },

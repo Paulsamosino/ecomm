@@ -144,7 +144,7 @@ export const PayPalButton = ({
   }, []);
 
   return (
-    <div className="w-full space-y-4">
+    <div className="space-y-4">
       {isPending && (
         <div className="w-full h-12 flex items-center justify-center bg-gray-50 rounded-md">
           <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
@@ -152,24 +152,30 @@ export const PayPalButton = ({
         </div>
       )}
 
-      <PayPalButtons
-        style={{
-          layout: "vertical",
-          height: 48,
-          shape: "rect",
-        }}
-        disabled={disabled || isRetrying}
-        forceReRender={[amount]}
-        createOrder={handleCreateOrder}
-        onApprove={handleApprove}
-        onError={handleError}
-        onCancel={handleCancel}
-        onClick={() => {
-          // Reset states when starting a new payment attempt
-          setIsPending(false);
-          setIsRetrying(false);
-        }}
-      />
+      {/* make PayPal buttons span the available width so they fit the gray area */}
+      <div className="w-full relative z-10 flex items-center justify-center" style={{ minWidth: '100%' }}>
+        <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 520 }}>
+          <PayPalButtons
+            className="w-full"
+            style={{
+              layout: "horizontal",
+              height: 40,
+              shape: "rect",
+            }}
+            disabled={disabled || isRetrying}
+            forceReRender={[amount]}
+            createOrder={handleCreateOrder}
+            onApprove={handleApprove}
+            onError={handleError}
+            onCancel={handleCancel}
+            onClick={() => {
+              // Reset states when starting a new payment attempt
+              setIsPending(false);
+              setIsRetrying(false);
+            }}
+          />
+        </div>
+      </div>
     </div>
   );
 };
