@@ -171,6 +171,21 @@ router.post("/login", async (req, res) => {
       });
     }
 
+    // Prevent non-admin logins while maintenance mode is active
+    try {
+      const SiteConfig = require('../models/SiteConfig');
+      const cfg = await SiteConfig.findOne();
+      if (cfg && cfg.maintenance && user.role !== 'admin') {
+        return res.status(503).json({
+          success: false,
+          message: 'System is under maintenance. Only admins may login at this time.'
+        });
+      }
+    } catch (cfgErr) {
+      console.error('Failed to check SiteConfig during login:', cfgErr);
+      // don't block login if SiteConfig check fails - continue
+    }
+
     // Create token
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRE || "30d",

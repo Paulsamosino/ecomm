@@ -15,8 +15,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { validateVoucher as apiValidateVoucher } from '@/api/vouchers';
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
+// Local storage key used by Inventory page to show recent purchases
+const RECENT_KEY = "recent_purchases_v1";
 
 // Constants
 const PAYMENT_METHODS = [
@@ -144,12 +148,38 @@ const useFormValidation = (shippingDetails, phoneError, selectedAddressId, useNe
   }, [shippingDetails, phoneError, selectedAddressId, useNewAddress, savedAddresses]);
 };
 
-const useOrderCalculations = (displayTotal, shippingFee) => {
+const useOrderCalculations = (items = [], appliedVoucher = null, shippingFee) => {
   return useMemo(() => {
-    const platformFee = displayTotal * 0.02;
-    const total = displayTotal + platformFee + (shippingFee || 0);
-    return { platformFee, total };
-  }, [displayTotal, shippingFee]);
+    const round2 = (n) => Math.round((n || 0) * 100) / 100;
+
+    // Compute raw subtotal from items (price * quantity)
+    const subtotal = (items || []).reduce((s, it) => s + ((it.price || 0) * (it.quantity || 0)), 0);
+
+    // Voucher discount (ensure numeric)
+    const discountAmount = (appliedVoucher && typeof appliedVoucher.discount === 'number') ? appliedVoucher.discount : 0;
+
+    // Apply voucher first, but don't allow negative adjusted subtotal
+    const adjustedSubtotal = Math.max(0, subtotal - discountAmount);
+
+    // Platform fee: mirror BuyerMyPurchase logic — compute from raw subtotal (not adjusted subtotal)
+    // If in the future the server provides a platform fee value, prefer that (caller can pass it in if needed)
+    const platformFee = round2(subtotal * 0.02);
+
+    // Shipping (if null treat as 0 for computation)
+    const shipping = typeof shippingFee === 'number' ? shippingFee : 0;
+
+    // Total payable = adjusted subtotal (after voucher) + platform fee (based on raw subtotal) + shipping
+    const total = round2(adjustedSubtotal + platformFee + shipping);
+
+    return {
+      subtotal: round2(subtotal),
+      adjustedSubtotal: round2(adjustedSubtotal),
+      platformFee,
+      shippingFee: shipping,
+      discountAmount,
+      total,
+    };
+  }, [items, appliedVoucher, shippingFee]);
 };
 
 // Components
@@ -391,6 +421,7 @@ const OrderSummary = ({
   displayTotal, 
   platformFee, 
   shippingFee, 
+  discount = 0,
   total, 
   isFetchingShipping, 
   shippingError 
@@ -411,12 +442,18 @@ const OrderSummary = ({
           <span className="text-blue-500">Calculating...</span>
         ) : shippingError ? (
           <span className="text-amber-500" title={shippingError}>
-            {formatPrice(shippingFee || 50)}
+            {shippingError || "Unable to calculate shipping"}
           </span>
         ) : (
           <span>{shippingFee !== null ? formatPrice(shippingFee) : "-"}</span>
         )}
       </div>
+      {typeof discount === 'number' && discount > 0 && (
+        <div className="flex justify-between text-sm text-green-700">
+          <span>Discount</span>
+          <span>-{formatPrice(discount)}</span>
+        </div>
+      )}
       <div className="border-t border-gray-100 pt-3 mt-3"></div>
       <div className="flex justify-between font-semibold text-lg">
         <span>Total</span>
@@ -425,6 +462,9 @@ const OrderSummary = ({
     </div>
   );
 };
+
+// --- Voucher helpers within checkout page ---
+
 
 const PaymentMethodSelector = ({ paymentMethod, onPaymentMethodChange }) => (
   <div>
@@ -494,10 +534,24 @@ const CheckoutPage = () => {
   const [shippingFee, setShippingFee] = useState(null);
   const [isFetchingShipping, setIsFetchingShipping] = useState(false);
   const [shippingError, setShippingError] = useState(null);
+  // Voucher state
+  const [voucherCode, setVoucherCode] = useState("");
+  const [appliedVoucher, setAppliedVoucher] = useState(null);
+  const [isValidatingVoucher, setIsValidatingVoucher] = useState(false);
+  const [voucherError, setVoucherError] = useState(null);
 
   // Custom hooks
   const isFormValid = useFormValidation(shippingDetails, phoneError, selectedAddressId, useNewAddress, savedAddresses);
-  const { platformFee, total } = useOrderCalculations(displayTotal, shippingFee);
+
+  // Recompute order calculations from the actual items so we mirror BuyerMyPurchase logic
+  const {
+    subtotal,
+    adjustedSubtotal,
+    platformFee,
+    shippingFee: computedShippingFee,
+    discountAmount,
+    total,
+  } = useOrderCalculations(displayProducts, appliedVoucher, shippingFee);
 
   // Event handlers
   const handleInputChange = useCallback((e) => {
@@ -623,46 +677,165 @@ const CheckoutPage = () => {
     }
   }, [displayProducts]);
 
-  const fetchShippingFee = useCallback(async () => {
-    setIsFetchingShipping(true);
-    setShippingError(null);
-    
-    try {
-      // Get seller ID from the first item (assuming all items are from the same seller)
-      const sellerId = displayProducts[0]?.seller?._id;
-      
-      const response = await fetch(`${API_URL}/api/delivery/quote`, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("token")}`
-        },
-        body: JSON.stringify({
-          vehicleType: "MOTORCYCLE", // Default vehicle type
-          sellerId, // Include seller ID for pickup location
-          dropoff: {
-            ...shippingDetails,
-            fullAddress: `${shippingDetails.street}, ${shippingDetails.city}, ${shippingDetails.state} ${shippingDetails.zipCode}, ${shippingDetails.country}`
-          },
-        }),
-      });
-      
-      if (!response.ok) throw new Error("Failed to get shipping quote");
-      
-      const data = await response.json();
-      const fee = data.fee || data.price || 0;
-      setShippingFee(fee);
-      
-      if (fee === 0) {
-        setShippingError("Unable to calculate shipping fee. Please verify your address.");
+  // Robust recursive extractor for shipping fee from provider responses
+  const extractShippingFee = (q) => {
+    if (q === null || q === undefined) return null;
+
+    // Helper: prefer positive (>0) values and only accept 0 if nothing else found
+    if (Array.isArray(q)) {
+      let zeroFound = false;
+      for (const item of q) {
+        const v = extractShippingFee(item);
+        if (v !== null && Number.isFinite(v) && v > 0) return v;
+        if (v === 0) zeroFound = true;
       }
+      return zeroFound ? 0 : null;
+    }
+
+    if (typeof q === 'number' && Number.isFinite(q)) return q;
+
+    if (typeof q === 'string') {
+      const n = parseFloat(q.replace(/[^0-9.\-]/g, ''));
+      return Number.isFinite(n) ? n : null;
+    }
+
+    if (typeof q === 'object') {
+      // If there's a priceBreakdown with a total, prefer that (many providers include it)
+      if (q.priceBreakdown && (q.priceBreakdown.total || q.priceBreakdown.totalBeforeOptimization)) {
+        const pb = q.priceBreakdown;
+        const candidates = [pb.total, pb.totalBeforeOptimization, pb.totalExcludePriorityFee, pb.totalBeforeOptimization];
+        for (const c of candidates) {
+          if (c !== undefined && c !== null) {
+            const parsed = extractShippingFee(c);
+            if (parsed !== null && Number.isFinite(parsed) && parsed > 0) return parsed;
+          }
+        }
+      }
+
+      const tryKeys = ['total', 'totalFee', 'price', 'amount', 'cost', 'deliveryFee', 'shippingFee', 'fee'];
+      let zeroFound = false;
+      for (const k of tryKeys) {
+        if (k in q) {
+          const found = extractShippingFee(q[k]);
+          if (found !== null && Number.isFinite(found) && found > 0) return found;
+          if (found === 0) zeroFound = true;
+        }
+      }
+
+      // Fallback: search any nested values for a positive fee
+      for (const val of Object.values(q)) {
+        const found = extractShippingFee(val);
+        if (found !== null && Number.isFinite(found) && found > 0) return found;
+        if (found === 0) zeroFound = true;
+      }
+
+      return zeroFound ? 0 : null;
+    }
+
+    return null;
+  };
+
+  // Fetch shipping quote and set shippingFee state (now tolerant to response shapes)
+  const fetchShippingFee = useCallback(async () => {
+  setIsFetchingShipping(true);
+  setShippingError(null);
+
+    try {
+      if (!displayProducts || displayProducts.length === 0) {
+        setShippingFee(null);
+        return;
+      }
+
+      // Prepare payload for quote
+      const first = displayProducts[0] || {};
+      const sellerId = first?.seller?._id || first?.seller || null;
+
+      // Server expects { vehicleType, sellerId, dropoff: { street, city, state, zipCode, country, phone, fullAddress } }
+      const fullAddress = shippingDetails.fullAddress || `${shippingDetails.street}, ${shippingDetails.city}, ${shippingDetails.state} ${shippingDetails.zipCode}, ${shippingDetails.country}`;
+      const payload = {
+        vehicleType: 'MOTORCYCLE',
+        sellerId,
+        dropoff: {
+          street: shippingDetails.street,
+          city: shippingDetails.city,
+          state: shippingDetails.state,
+          zipCode: shippingDetails.zipCode,
+          country: shippingDetails.country,
+          phone: shippingDetails.phone,
+          fullAddress,
+          name: shippingDetails.name || undefined,
+        },
+        // Keep items for server-side debugging or future use
+        items: displayProducts.map((p) => ({ productId: p._id || p.product?._id || p.productId, quantity: p.quantity || 1 })),
+        // include full shippingDetails for server-side debugging if needed
+        rawShipping: shippingDetails,
+      };
+
+    console.debug('Fetching shipping quote', payload);
+
+      const response = await fetch(`${API_URL}/api/delivery/quote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      // read raw text so we can handle both JSON error bodies and non-JSON responses
+      const text = await response.text();
+      let data;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch (e) {
+        data = text;
+      }
+
+    console.debug('Delivery quote HTTP', { status: response.status, statusText: response.statusText, data });
+
+      if (!response.ok) {
+        const message = (data && typeof data === 'object' && data.message) ? data.message : (typeof data === 'string' ? data : JSON.stringify(data));
+        const short = String(message).slice(0, 500);
+        setShippingFee(null);
+        setShippingError(`Delivery quote failed (${response.status}): ${short}`);
+        console.error('Delivery quote error', response.status, response.statusText, data);
+        return;
+      }
+
+    const feeRaw = extractShippingFee(data);
+      const fee = Number.isFinite(Number(feeRaw)) ? Math.round(Number(feeRaw) * 100) / 100 : null;
+      console.debug('Shipping quote response', { data, feeRaw, fee });
+
+      // Treat null/NaN and zero as invalid quote (0 often indicates a failed quote)
+      if (fee !== null && Number.isFinite(fee) && fee > 0) {
+        setShippingFee(fee);
+        setShippingError(null);
+      } else {
+        setShippingFee(null);
+        const short = JSON.stringify(data, Object.keys(data || {}).slice(0, 5)).slice(0, 500);
+        setShippingError(fee === 0 ? 'Unable to calculate shipping fee (received 0). Please verify your address.' : `Unable to calculate shipping fee. Response: ${short}`);
+      }
+      // no-op: finished fetching
     } catch (err) {
-      setShippingError("Could not fetch shipping fee for this location");
-      setShippingFee(50); // Fallback
+      console.error('Error fetching shipping fee', err);
+      setShippingError(err.message || 'Could not fetch shipping fee for this location');
+      setShippingFee(null);
     } finally {
       setIsFetchingShipping(false);
     }
   }, [shippingDetails, displayProducts]);
+  
+
+  // Only trigger fetchShippingFee when the shipping details are all present (robust for non-strings)
+  useEffect(() => {
+    const allFilled = Object.values(shippingDetails).every((field) => {
+      if (field === null || field === undefined) return false;
+      return String(field).trim().length > 0;
+    });
+
+    if (allFilled) {
+      fetchShippingFee();
+    } else {
+      setShippingFee(null);
+    }
+  }, [fetchShippingFee, shippingDetails]);
 
   const saveAddressToProfile = useCallback(async (addressData) => {
     try {
@@ -682,6 +855,7 @@ const CheckoutPage = () => {
     }
   }, []);
 
+  // When creating the order, always send a numeric shipping fee rounded to 2 decimals
   const createOrder = useCallback(async (orderData) => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -696,51 +870,132 @@ const CheckoutPage = () => {
       return;
     }
 
-    const response = await fetch(`${API_URL}/api/orders`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        seller: firstItem.seller._id,
-        items: displayProducts.map((item) => ({
-          product: item._id,
-          seller: item.seller._id,
-          quantity: item.quantity,
-          price: item.price,
-        })),
-        totalAmount: total,
-        shippingAddress: shippingDetails,
-        delivery: { vehicleType: "MOTORCYCLE", shippingFee: shippingFee || 0 },
-        ...orderData,
-      }),
-    });
+    try {
+      setIsProcessing(true);
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to create order");
+      const shippingFeePayload = Number.isFinite(Number(shippingFee)) ? Math.round(Number(shippingFee) * 100) / 100 : 0;
+
+      // Build items payload expected by server (server expects `product` and `seller` keys)
+      const itemsPayload = (displayProducts || []).map(p => ({
+        product: p._id || p.product?._id || p.productId,
+        quantity: p.quantity || 1,
+        price: p.price || (p.product && p.product.price) || 0,
+        seller: p.seller?._id || p.seller || null,
+      }));
+
+      if (!itemsPayload || itemsPayload.length === 0) {
+        throw new Error('Order must contain at least one item');
+      }
+
+      // Build shippingAddress expected by server
+      const shippingAddress = {
+        street: shippingDetails.street || '',
+        city: shippingDetails.city || '',
+        state: shippingDetails.state || '',
+        zipCode: shippingDetails.zipCode || '',
+        country: shippingDetails.country || '',
+        phone: shippingDetails.phone || '',
+        fullAddress: shippingDetails.fullAddress || `${shippingDetails.street}, ${shippingDetails.city}, ${shippingDetails.state} ${shippingDetails.zipCode}, ${shippingDetails.country}`
+      };
+
+      // Client-side guard: match server's required shipping fields
+      if (!shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.zipCode || !shippingAddress.country || !shippingAddress.phone) {
+        const msg = 'Please complete your shipping address before placing an order.';
+        toast.error(msg);
+        throw new Error(msg);
+      }
+
+      const response = await fetch(`${API_URL}/api/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ...orderData,
+          voucherCode: appliedVoucher?.voucher?.code || voucherCode || undefined,
+          delivery: { vehicleType: 'MOTORCYCLE', shippingFee: shippingFeePayload },
+          items: itemsPayload,
+          sellerId: itemsPayload[0]?.seller || undefined,
+          shippingAddress,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to create order");
+      }
+
+      if (saveNewAddress && (useNewAddress || savedAddresses.length === 0)) {
+        await saveAddressToProfile(shippingDetails);
+      }
+
+      toast.success("Order placed successfully!");
+      // Persist a lightweight recent purchases list to localStorage so Inventory page can offer quick-add
+      try {
+        const recent = (displayProducts || []).map(p => ({
+          name: p.name || (p.product && p.product.name) || 'Item',
+          qty: p.quantity || 1,
+          category: p.category || (p.product && p.product.category) || undefined,
+        }));
+        localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
+      } catch (e) {
+        // ignore storage errors
+        console.warn('Failed to save recent purchases to localStorage', e);
+      }
+
+      if (!isBuyNow) clearCart();
+      navigate("/success-payment");
+    } catch (err) {
+      console.error("Error creating order:", err);
+      toast.error(err.message || "Failed to create order. Please try again.");
+    } finally {
+      setIsProcessing(false);
     }
+  }, [shippingFee, appliedVoucher, voucherCode]);
 
-    if (saveNewAddress && (useNewAddress || savedAddresses.length === 0)) {
-      await saveAddressToProfile(shippingDetails);
+  // Voucher actions
+  const applyVoucher = useCallback(async () => {
+    if (!voucherCode) return toast.error('Enter voucher code');
+    setIsValidatingVoucher(true);
+    setVoucherError(null);
+    try {
+      // Validate voucher against the items subtotal (not including platform fee / shipping)
+      const res = await apiValidateVoucher(voucherCode, subtotal);
+      setAppliedVoucher(res);
+      localStorage.setItem('appliedVoucher', JSON.stringify(res));
+      toast.success(`Voucher applied: -₱${res.discount.toFixed(2)}`);
+    } catch (err) {
+      console.error('Voucher validation failed', err);
+      setAppliedVoucher(null);
+      localStorage.removeItem('appliedVoucher');
+      const msg = err?.message || 'Invalid voucher';
+      setVoucherError(msg);
+      toast.error(msg);
+    } finally {
+      setIsValidatingVoucher(false);
     }
+  }, [voucherCode, subtotal]);
 
-    toast.success("Order placed successfully!");
-    if (!isBuyNow) clearCart();
-    navigate("/success-payment");
-  }, [displayProducts, total, shippingDetails, shippingFee, saveNewAddress, useNewAddress, savedAddresses, saveAddressToProfile, isBuyNow, clearCart, navigate]);
+  const clearVoucher = useCallback(() => {
+    setVoucherCode("");
+    setAppliedVoucher(null);
+    setVoucherError(null);
+    localStorage.removeItem('appliedVoucher');
+    toast.success('Voucher cleared');
+  }, []);
 
   const handlePaymentSuccess = useCallback(async (order) => {
     try {
       setIsProcessing(true);
       await createOrder({
-        paymentInfo: {
-          method: "paypal",
-          status: "completed",
-          transactionId: order.purchase_units[0].payments.captures[0].id,
-        },
-      });
+          paymentInfo: {
+            method: "paypal",
+            status: "completed",
+            transactionId: order.purchase_units[0].payments.captures[0].id,
+            details: { subtotal: adjustedSubtotal, platformFee, total }
+          },
+        });
     } catch (error) {
       console.error("Error creating order:", error);
       toast.error(error.message || "Failed to create order. Please try again.");
@@ -757,7 +1012,8 @@ const CheckoutPage = () => {
           method: "cod",
           status: "pending",
           transactionId: `COD-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
-          details: { codFee: 0, platformFee, subtotal: displayTotal, total },
+          // Use adjusted subtotal (items after voucher) so server and order management see the same values
+    details: { codFee: 0, platformFee, subtotal: adjustedSubtotal, total },
         },
       });
     } catch (error) {
@@ -766,7 +1022,7 @@ const CheckoutPage = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [createOrder, platformFee, displayTotal, total]);
+  }, [createOrder, platformFee, adjustedSubtotal, total]);
 
   const handleWalletOrder = useCallback(async () => {
     try {
@@ -788,6 +1044,7 @@ const CheckoutPage = () => {
           method: "wallet",
           status: "completed",
           transactionId: txId,
+          details: { subtotal: adjustedSubtotal, platformFee, total }
         },
       });
     } catch (error) {
@@ -824,8 +1081,6 @@ const CheckoutPage = () => {
     return () => { mounted = false; };
   }, [paymentMethod]);
 
-  // ...existing code...
-
   const handlePaymentError = useCallback((error) => {
     if (!error?.message?.includes("Window closed")) {
       toast.error("Payment failed. Please try again.");
@@ -843,6 +1098,20 @@ const CheckoutPage = () => {
   useEffect(() => {
     fetchSavedAddresses();
   }, [fetchSavedAddresses]);
+
+  // Load voucher saved from navbar (persisted in localStorage)
+  useEffect(() => {
+    const stored = localStorage.getItem("appliedVoucher");
+    if (stored) {
+      try {
+        const v = JSON.parse(stored);
+        setAppliedVoucher(v);
+        setVoucherCode(v?.voucher?.code || "");
+      } catch (e) {
+        // ignore parse errors
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (Object.values(shippingDetails).every(field => field?.trim())) {
@@ -931,9 +1200,10 @@ const CheckoutPage = () => {
 
           <h2 className="text-xl font-semibold mb-4">Order Summary</h2>
           <OrderSummary
-              displayTotal={displayTotal}
+              displayTotal={subtotal}
               platformFee={platformFee}
-              shippingFee={shippingFee}
+              shippingFee={computedShippingFee}
+              discount={discountAmount ?? 0}
               total={total}
               isFetchingShipping={isFetchingShipping}
               shippingError={shippingError}
@@ -957,10 +1227,42 @@ const CheckoutPage = () => {
                 onPaymentMethodChange={setPaymentMethod}
               />
 
+                {/* Voucher input */}
+                <div className="mt-4 p-4 border rounded-lg bg-white">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Have a voucher code?</label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Enter voucher code"
+                      value={voucherCode}
+                      onChange={(e) => setVoucherCode(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button onClick={applyVoucher} disabled={isValidatingVoucher}>
+                      {isValidatingVoucher ? <Loader2 className="animate-spin" /> : 'Apply'}
+                    </Button>
+                    <Button variant="outline" onClick={clearVoucher}>Clear</Button>
+                  </div>
+
+                  {voucherError && (
+                    <div className="mt-2 text-sm text-red-600">
+                      {voucherError}
+                    </div>
+                  )}
+
+                  {appliedVoucher && (
+                    <div className="mt-3 text-sm text-green-700">
+                      <div>Applied: <strong>{appliedVoucher.voucher.code}</strong></div>
+                      <div>Discount: <strong>₱{(appliedVoucher.discount || 0).toFixed(2)}</strong></div>
+                      <div>Final total: <strong>{formatPrice(total)}</strong></div>
+                    </div>
+                  )}
+                </div>
+
               {paymentMethod === "paypal" ? (
                 <div className="rounded-lg overflow-hidden bg-[#f7f9fa] p-4">
                   <PayPalButton
                     amount={total}
+                    recentItems={displayProducts}
                     onSuccess={handlePaymentSuccess}
                     onError={handlePaymentError}
                     disabled={isProcessing || !isFormValid || stockError}

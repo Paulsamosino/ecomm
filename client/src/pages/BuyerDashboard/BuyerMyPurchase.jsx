@@ -279,6 +279,11 @@ const OrderCard = ({ order, onReviewSubmit, onCancel, onRequestRefund }) => {
               >
                 {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
               </span>
+              {order.refundDecision?.status === 'declined' && (
+                <span className="ml-2 px-2 py-0.5 text-xs rounded-full font-medium bg-red-50 text-red-600">
+                  Refund Declined
+                </span>
+              )}
               {order.reviewed && (
                 <span className="bg-green-100 text-green-800 px-2 py-0.5 text-xs rounded-full">
                   Reviewed
@@ -289,14 +294,52 @@ const OrderCard = ({ order, onReviewSubmit, onCancel, onRequestRefund }) => {
               <Clock className="h-3 w-3 mr-1 text-orange-400" />
               Ordered on {formatDate(order.createdAt)}
             </p>
+            {order.refundDecision?.status === 'declined' && (
+              <p className="text-sm text-red-600 mt-1">Reason: {order.refundDecision.decisionReason || 'No reason provided'}</p>
+            )}
           </div>
           <div className="text-right">
-            <p className="font-bold text-gray-900">
-              ₱{order.totalAmount.toLocaleString()}
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              {order.items.length} items
-            </p>
+            {/* Compute breakdown to mirror checkout: subtotal + platform fee + shipping share. If it differs from stored totalAmount, show discount difference. */}
+            {(() => {
+              const subtotal = order.items.reduce((s, it) => s + ((it.price || 0) * (it.quantity || 0)), 0);
+              const platformFee = (order.paymentInfo && typeof order.paymentInfo.platformFee === 'number')
+                ? order.paymentInfo.platformFee
+                : Math.round(subtotal * 0.02 * 100) / 100;
+              const shippingShare = (order.delivery && order.delivery.price && typeof order.delivery.price.amount === 'number')
+                ? Number(order.delivery.price.amount)
+                : 0;
+
+              // Computed total based on line items, platform fee and shipping (before any voucher/discount)
+              const computedTotal = Math.round((subtotal + platformFee + shippingShare) * 100) / 100;
+              const storedTotal = Number(order.totalAmount || 0);
+
+              // If the order record has a stored total amount (paid amount), prefer showing that as the main total.
+              // Show the computed total as the "before discount" value when it differs from the stored amount.
+              const hasPaidTotal = storedTotal && storedTotal > 0;
+              const displayTotal = hasPaidTotal ? storedTotal : computedTotal;
+
+              // Positive discount means computedTotal > storedTotal
+              const discount = Math.round((computedTotal - storedTotal) * 100) / 100;
+
+              return (
+                <>
+                  <p className="font-bold text-gray-900">₱{displayTotal.toLocaleString()}</p>
+                  <p className="text-xs text-gray-500 mt-1">{order.items.length} items</p>
+                  {/* Breakdown */}
+                  <div className="text-right text-xs text-gray-500 mt-1">
+                    <div>Subtotal: ₱{subtotal.toLocaleString()}</div>
+                    <div>Platform Fee: ₱{platformFee.toLocaleString()}</div>
+                    <div>Shipping: ₱{shippingShare.toLocaleString()}</div>
+
+                    {discount > 0 && (
+                      <div className="text-green-700">Discount: -₱{discount.toLocaleString()}</div>
+                    )}
+
+                    {/* 'Before discount' removed per request */}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
 
@@ -437,7 +480,7 @@ const OrderCard = ({ order, onReviewSubmit, onCancel, onRequestRefund }) => {
                 onClick={() => (typeof onOpenRefundModal === 'function' ? onOpenRefundModal(order._id) : onRequestRefund && onRequestRefund(order._id))}
                 className="text-blue-600 border-blue-200 hover:bg-blue-50"
               >
-                Request Refund
+                {order.refundDecision?.status === 'declined' ? 'Request Refund Again' : 'Request Refund'}
               </Button>
             )}
             <Button

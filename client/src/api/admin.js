@@ -179,6 +179,18 @@ export const apiGetBlogStats = async () => {
   return response.data;
 };
 
+// Maintenance endpoints
+export const apiGetMaintenance = async () => {
+  const response = await axiosInstance.get('/admin/maintenance');
+  return response.data;
+};
+
+// body: { maintenance: boolean, graceMinutes?: number }
+export const apiSetMaintenance = async (body) => {
+  const response = await axiosInstance.post('/admin/maintenance', body);
+  return response.data;
+};
+
 export const apiUpdatePostStatus = async (postId, status) => {
   const response = await axiosInstance.put(`/blog/${postId}`, { status });
   return response.data;
@@ -191,5 +203,27 @@ export const apiDeletePost = async (postId) => {
 
 export const apiGetPostById = async (postId) => {
   const response = await axiosInstance.get(`/blog/post/${postId}`);
+  return response.data;
+};
+
+// Transactions
+export const apiGetTransactions = async (params = {}) => {
+  const response = await axiosInstance.get('/admin/transactions', { params });
+  return response.data;
+};
+
+export const apiGetTransaction = async (id) => {
+  const response = await axiosInstance.get(`/admin/transactions/${id}`);
+  return response.data;
+};
+
+// User credential management
+export const apiResetUserCredentials = async (userId) => {
+  const response = await axiosInstance.post(`/admin/users/${userId}/reset-credentials`);
+  return response.data;
+};
+
+export const apiUpdateUserCredentials = async (userId, payload) => {
+  const response = await axiosInstance.patch(`/admin/users/${userId}/credentials`, payload);
   return response.data;
 };

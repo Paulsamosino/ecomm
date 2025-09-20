@@ -4,14 +4,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard,
   Users,
-  Package,
+  Box,
   Settings,
-  HelpCircle,
+  MessageCircle,
   BarChart,
   LogOut,
   Flag,
   MonitorPlay,
   FileText,
+  CreditCard,
 } from "lucide-react";
 
 const AdminLayout = () => {
@@ -28,14 +29,15 @@ const AdminLayout = () => {
   const navigation = [
     { name: "Dashboard", path: "/admin", icon: LayoutDashboard },
     { name: "Users", path: "/admin/users", icon: Users },
-    { name: "Listings", path: "/admin/listings", icon: Package },
-  { name: "Refunds", path: "/admin/refunds", icon: FileText },
-    { name: "Reports", path: "/admin/reports", icon: Flag },
-    { name: "Logs", path: "/admin/logs", icon: FileText },
+    { name: "Listings", path: "/admin/listings", icon: Box },
+    { name: "Vouchers", path: "/admin/vouchers", icon: Box },
+  { name: "Refunds", path: "/admin/refunds", icon: CreditCard },
+  { name: "Reports", path: "/admin/reports", icon: Flag },
     { name: "Ads", path: "/admin/ads", icon: MonitorPlay },
-    { name: "Analytics", path: "/admin/analytics", icon: BarChart },
-    { name: "Blog", path: "/admin/blog", icon: FileText },
-    { name: "Messages", path: "/admin/messages", icon: HelpCircle },
+  { name: "Analytics", path: "/admin/analytics", icon: BarChart },
+  { name: "Maintenance", path: "/admin/maintenance", icon: Settings },
+  { name: "Blog", path: "/admin/blog", icon: FileText },
+  { name: "Messages", path: "/admin/messages", icon: MessageCircle },
   ];
 
   if (!user || user.role !== "admin") {
@@ -109,4 +111,3 @@ const AdminLayout = () => {
 };
 
 export default AdminLayout;
-

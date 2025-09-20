@@ -28,39 +28,7 @@ const Footer = () => {
 
   return (
     <footer className="bg-white border-t border-gray-200">
-      {/* Newsletter Section */}
-      <div className="bg-primary/5 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-2 gap-8 items-center">
-            <div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                Subscribe to our newsletter
-              </h3>
-              <p className="text-gray-600">
-                Get the latest products, promotions, and farming tips delivered
-                to your inbox.
-              </p>
-            </div>
-            <div>
-              <form className="flex flex-col sm:flex-row gap-3">
-                <input
-                  type="email"
-                  placeholder="Your email address"
-                  className="flex-grow px-4 py-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary"
-                  required
-                />
-                <button
-                  type="submit"
-                  className="bg-primary text-white px-6 py-3 rounded-md hover:bg-primary/90 transition flex items-center justify-center"
-                >
-                  <span>Subscribe</span>
-                  <Send className="ml-2 h-4 w-4" />
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Newsletter Section removed per request */}
 
       {/* Trust Badges */}
       <div className="border-t border-b border-gray-200 py-10">

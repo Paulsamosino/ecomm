@@ -164,7 +164,7 @@ const deliveryController = {
         
         if (hasValidLocation) {
           const sellerFullAddress = `${sellerLocation.street}, ${sellerLocation.city}, ${sellerLocation.state} ${sellerLocation.zipCode}, ${sellerLocation.country}`;
-          const pickupCoords = await this._geocodeAddress(sellerFullAddress);
+          const pickupCoords = await deliveryController._geocodeAddress(sellerFullAddress);
           
           // Get valid phone number (try seller location phone, then seller phone, then default)
           let sellerPhone = sellerLocation.phone || order.seller?.phone;
@@ -181,7 +181,7 @@ const deliveryController = {
             address: sellerFullAddress,
             contact: {
               name: order.seller?.name || "Store Manager",
-              phone: this._formatPhoneNumber(sellerPhone),
+              phone: deliveryController._formatPhoneNumber(sellerPhone),
             },
           };
           console.log("✅ Pickup location set from seller profile");
@@ -217,7 +217,7 @@ const deliveryController = {
           address: "SM Megamall, Mandaluyong, Metro Manila (Default Store Location)",
           contact: {
             name: order.seller?.name || "Store Manager",
-            phone: this._formatPhoneNumber(sellerPhone),
+            phone: deliveryController._formatPhoneNumber(sellerPhone),
           },
         };
         console.log("⚠️ Using default pickup location");
@@ -233,7 +233,7 @@ const deliveryController = {
         "Greenbelt 1, Makati, Metro Manila"; // Fallback address
 
       console.log("📍 Customer delivery address:", customerFullAddress);
-      const dropoffCoords = await this._geocodeAddress(customerFullAddress);
+  const dropoffCoords = await deliveryController._geocodeAddress(customerFullAddress);
 
       // Get valid customer phone number
       let customerPhone = order.shippingAddress?.phone || order.buyer?.phone;
@@ -248,7 +248,7 @@ const deliveryController = {
         address: customerFullAddress,
         contact: {
           name: order.buyer?.name || "Customer",
-          phone: this._formatPhoneNumber(customerPhone),
+          phone: deliveryController._formatPhoneNumber(customerPhone),
         },
       };
 
@@ -269,7 +269,7 @@ const deliveryController = {
           contacts: [
             {
               name: pickupLocation.contact.name,
-              phone: this._formatPhoneNumber(pickupLocation.contact.phone),
+              phone: deliveryController._formatPhoneNumber(pickupLocation.contact.phone),
             },
           ],
         },
@@ -283,7 +283,7 @@ const deliveryController = {
           contacts: [
             {
               name: dropoffLocation.contact.name,
-              phone: this._formatPhoneNumber(dropoffLocation.contact.phone),
+              phone: deliveryController._formatPhoneNumber(dropoffLocation.contact.phone),
             },
           ],
         },
@@ -311,24 +311,33 @@ const deliveryController = {
       });
 
       // Then create the order using the quotation ID
-      const deliveryOrder = await lalamoveService.createOrder({
+        // Include order financials in metadata and recipient remarks so Lalamove shows the correct amount
+        const orderFinancials = {
+          itemsTotal: Number(order.totalAmount || 0),
+          platformFee: Number(order.paymentInfo?.platformFee || 0),
+          shipping: Number(order.delivery?.price?.amount || 0),
+        };
+
+        const deliveryOrder = await lalamoveService.createOrder({
         quotationId: quote.quotationId,
         sender: {
           stopId: quote.stops[0].stopId,
           name: pickupLocation.contact.name,
-          phone: this._formatPhoneNumber(pickupLocation.contact.phone),
+          phone: deliveryController._formatPhoneNumber(pickupLocation.contact.phone),
         },
         recipients: [
           {
             stopId: quote.stops[1].stopId,
-            name: dropoffLocation.contact.name,
-            phone: this._formatPhoneNumber(dropoffLocation.contact.phone),
-            remarks: `Order #${order._id}`,
+              name: dropoffLocation.contact.name,
+              phone: deliveryController._formatPhoneNumber(dropoffLocation.contact.phone),
+              // Add visible remark including order id and total amount
+              remarks: `Order #${order._id} - ₱${(orderFinancials.itemsTotal + orderFinancials.platformFee + orderFinancials.shipping).toFixed(2)}`,
           },
         ],
         metadata: {
-          orderId: order._id.toString(),
-          reference: `ORDER-${order._id}`,
+            orderId: order._id.toString(),
+            reference: `ORDER-${order._id}`,
+            financials: orderFinancials,
         },
       });
 
@@ -598,7 +607,7 @@ const deliveryController = {
         if (seller?.sellerProfile?.location) {
           const sellerLocation = seller.sellerProfile.location;
           const sellerFullAddress = `${sellerLocation.street}, ${sellerLocation.city}, ${sellerLocation.state} ${sellerLocation.zipCode}, ${sellerLocation.country}`;
-          const pickupCoords = await this._geocodeAddress(sellerFullAddress);
+            const pickupCoords = await deliveryController._geocodeAddress(sellerFullAddress);
           
           pickupLocation = {
             lat: pickupCoords.lat,
@@ -606,7 +615,7 @@ const deliveryController = {
             address: sellerFullAddress,
             contact: {
               name: seller.name || "Store Manager",
-              phone: this._formatPhoneNumber(
+              phone: deliveryController._formatPhoneNumber(
                 sellerLocation.phone || seller.phone || process.env.LALAMOVE_API_USER || "+639171234567"
               ),
             },
@@ -622,7 +631,7 @@ const deliveryController = {
           address: "SM Megamall, Mandaluyong, Metro Manila (Default Store Location)",
           contact: {
             name: "Store Manager",
-            phone: this._formatPhoneNumber(
+            phone: deliveryController._formatPhoneNumber(
               process.env.LALAMOVE_API_USER || "+639171234567"
             ),
           },
@@ -647,7 +656,7 @@ const deliveryController = {
         `${dropoff.street}, ${dropoff.city}, ${dropoff.state} ${dropoff.zipCode}, ${dropoff.country}`;
       
       // Get coordinates for the dropoff address
-      const dropoffCoords = await this._geocodeAddress(fullAddress);
+        const dropoffCoords = await deliveryController._geocodeAddress(fullAddress);
       
       const dropoffLocation = {
         lat: dropoffCoords.lat,
@@ -655,7 +664,7 @@ const deliveryController = {
         address: fullAddress,
         contact: {
           name: dropoff.name || "Customer",
-          phone: this._formatPhoneNumber(dropoff.phone),
+          phone: deliveryController._formatPhoneNumber(dropoff.phone),
         },
       };
 
@@ -669,7 +678,7 @@ const deliveryController = {
           contacts: [
             {
               name: pickupLocation.contact.name,
-              phone: this._formatPhoneNumber(pickupLocation.contact.phone),
+              phone: deliveryController._formatPhoneNumber(pickupLocation.contact.phone),
             },
           ],
         },
@@ -682,7 +691,7 @@ const deliveryController = {
           contacts: [
             {
               name: dropoffLocation.contact.name,
-              phone: this._formatPhoneNumber(dropoffLocation.contact.phone),
+                phone: deliveryController._formatPhoneNumber(dropoffLocation.contact.phone),
             },
           ],
         },
@@ -695,6 +704,8 @@ const deliveryController = {
         language: "en_PH",
         stops,
       });
+
+      console.log('Raw lalamove quote result:', JSON.stringify(quote, null, 2));
 
       res.json({
         fee: quote.totalFee || quote.price || 0,

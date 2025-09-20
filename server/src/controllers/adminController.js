@@ -3,6 +3,7 @@ const Product = require("../models/Product");
 const Order = require("../models/Order");
 const Report = require("../models/Report");
 const Ad = require("../models/Ad");
+const maintenanceScheduler = require('../utils/maintenanceScheduler');
 
 // Get all users
 exports.getAllUsers = async (req, res) => {
@@ -350,6 +351,45 @@ exports.getSettings = async (req, res) => {
   } catch (error) {
     console.error("Error fetching settings:", error);
     res.status(500).json({ message: "Error fetching settings" });
+  }
+};
+
+// Get maintenance state
+exports.getMaintenance = async (req, res) => {
+  try {
+    const cfg = await maintenanceScheduler.getConfig();
+    res.json({
+      maintenance: cfg.maintenance,
+      maintenanceScheduledAt: cfg.maintenanceScheduledAt,
+      maintenanceActivatedAt: cfg.maintenanceActivatedAt,
+      tokenInvalidBefore: cfg.tokenInvalidBefore
+    });
+  } catch (err) {
+    console.error('Error fetching maintenance state:', err);
+    res.status(500).json({ message: 'Failed to fetch maintenance state' });
+  }
+};
+
+// Set maintenance state
+// body: { maintenance: boolean, graceMinutes?: number }
+exports.setMaintenance = async (req, res) => {
+  try {
+    const { maintenance, graceMinutes } = req.body;
+    let cfg;
+    if (maintenance) {
+      if (graceMinutes && Number(graceMinutes) > 0) {
+        cfg = await maintenanceScheduler.scheduleMaintenanceInMinutes(Number(graceMinutes));
+      } else {
+        cfg = await maintenanceScheduler.activateMaintenanceNow();
+      }
+    } else {
+      cfg = await maintenanceScheduler.disableMaintenance();
+    }
+
+    res.json({ success: true, maintenance: cfg.maintenance, maintenanceScheduledAt: cfg.maintenanceScheduledAt });
+  } catch (err) {
+    console.error('Error setting maintenance state:', err);
+    res.status(500).json({ message: 'Failed to update maintenance state' });
   }
 };
 

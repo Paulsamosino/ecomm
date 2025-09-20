@@ -55,6 +55,10 @@ import AdminAdsPage from "@/pages/AdminDashboard/AdminAdsPage";
 import AdminMessages from "@/pages/AdminDashboard/AdminMessages";
 import AdminBlogManagement from "@/pages/AdminDashboard/AdminBlogManagement";
 import AdminRefunds from "@/pages/AdminDashboard/AdminRefunds";
+import AdminMaintenance from "@/pages/AdminDashboard/AdminMaintenance";
+import AdminTransactions from "@/pages/AdminDashboard/AdminTransactions";
+import AdminUserCredentials from "@/pages/AdminDashboard/AdminUserCredentials";
+import AdminVouchers from "@/pages/AdminDashboard/AdminVouchers";
 
 // Import Seller Route and Product Management
 import SellerRoute from "@/components/routes/SellerRoute";
@@ -71,15 +75,15 @@ import BuyerMyPurchase from "@/pages/BuyerDashboard/BuyerMyPurchase";
 import BuyerManageProfile from "@/pages/BuyerDashboard/BuyerManageProfile";
 import NotificationsPage from "@/pages/BuyerDashboard/NotificationsPage";
 import BuyerWallet from "@/pages/BuyerDashboard/BuyerWallet";
-
-// Import Additional Pages
-import BreedingSimulatorPage from "@/pages/BreedingSimulatorPage";
+import InventoryPage from "@/pages/InventoryPage";
+// Breeding simulator kept on disk but removed from routes for now
 import BlogList from "@/pages/Blog/BlogList";
 import BlogPostView from "@/pages/Blog/BlogPostView";
 import BlogEditor from "@/pages/Blog/BlogEditor";
 import Feed from "@/pages/Feed/Feed";
 import BlogLayout from "@/pages/Blog/BlogLayout";
 import SellerBlogLayout from "@/pages/Blog/SellerBlogLayout";
+import ToolsHubPage from "@/pages/ToolsHubPage";
 
 const AppContent = () => {
   const location = useLocation();
@@ -102,7 +106,7 @@ const AppContent = () => {
           <Route path="seller/:sellerId" element={<SellerStorePage />} />
           <Route path="help-center" element={<HelpCenterPage />} />
           <Route path="contact" element={<ContactUsPage />} />
-          <Route path="breeding-simulator" element={<BreedingSimulatorPage />} />
+          {/* Breeding simulator route removed temporarily */}
           <Route path="blog" element={<BlogLayout />}>
             {/* Default landing: Explore; BlogLayout will redirect to Feed if logged-in */}
             <Route index element={<BlogList />} />
@@ -118,9 +122,11 @@ const AppContent = () => {
             </Route>
             <Route path=":slug" element={<BlogPostView />} />
           </Route>
+
           <Route path="cart" element={<ProtectedRoute restrictTo="buyer" />}>
             <Route index element={<CartPage />} />
           </Route>
+          <Route path="tools" element={<ToolsHubPage />} />
           <Route
             path="checkout"
             element={<ProtectedRoute restrictTo="buyer" />}
@@ -142,8 +148,8 @@ const AppContent = () => {
           }
         >
           <Route path="/buyer-dashboard" element={<BuyerDashboardPage />}>
-            <Route index element={<BuyerMyPurchase />} />
-            <Route path="purchases" element={<BuyerMyPurchase />} />
+              <Route index element={<BuyerMyPurchase />} />
+              <Route path="purchases" element={<BuyerMyPurchase />} />
               <Route path="wallet" element={<BuyerWallet />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="profile" element={<BuyerManageProfile />} />
@@ -195,9 +201,13 @@ const AppContent = () => {
             <Route path="refunds" element={<AdminRefunds />} />
             <Route path="reports" element={<AdminReports />} />
             <Route path="ads" element={<AdminAdsPage />} />
+            <Route path="transactions" element={<AdminTransactions />} />
+            <Route path="vouchers" element={<AdminVouchers />} />
+            <Route path="users/actions" element={<AdminUserCredentials />} />
             <Route path="blog" element={<AdminBlogManagement />} />
             <Route path="messages" element={<AdminMessages />} />
             <Route path="settings" element={<AdminSettings />} />
+            <Route path="maintenance" element={<AdminMaintenance />} />
             <Route path="help" element={<AdminHelp />} />
           </Route>
         </Route>
@@ -206,6 +216,8 @@ const AppContent = () => {
         <Route path="/" element={<ProtectedRoute />}>
           <Route path="dashboard" element={<RedirectBasedOnRole />} />
         </Route>
+
+        {/* Inventory route removed temporarily - page retained on disk */}
 
         {/* Redirect to home if no route matches */}
         <Route path="*" element={<Navigate to="/" replace />} />

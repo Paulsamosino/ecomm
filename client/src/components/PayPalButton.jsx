@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 export const PayPalButton = ({
   amount,
   shippingAddress,
+  recentItems = [],
   onSuccess,
   onError,
   disabled,
@@ -80,6 +81,15 @@ export const PayPalButton = ({
 
         if (order.status === "COMPLETED") {
           toast.success("Payment successful!");
+          // Persist recent items locally for Inventory quick-add (lightweight)
+          try {
+            const recent = (recentItems || []).map(i => ({ name: i.name || (i.product && i.product.name) || 'Item', qty: i.quantity || i.qty || 1, category: i.category || (i.product && i.product.category) }));
+            if (recent.length > 0) {
+              localStorage.setItem('recent_purchases_v1', JSON.stringify(recent));
+            }
+          } catch (e) {
+            console.warn('Failed to persist recent items', e);
+          }
           onSuccess?.(order);
         } else {
           throw new Error(`Payment not completed. Status: ${order.status}`);

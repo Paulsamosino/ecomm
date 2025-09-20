@@ -127,4 +127,8 @@ router.post("/delivery-sync/manual", auth, isAdmin, async (req, res) => {
   }
 });
 
+// Maintenance routes
+router.get('/maintenance', auth, isAdmin, adminController.getMaintenance);
+router.post('/maintenance', auth, isAdmin, adminController.setMaintenance);
+
 module.exports = router;

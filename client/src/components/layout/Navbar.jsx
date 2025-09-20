@@ -55,6 +55,10 @@ const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
+
+
+
+
   // Handle scroll effect
   React.useEffect(() => {
     const handleScroll = () => {
@@ -184,6 +188,13 @@ const Navbar = () => {
               </Link>
             )}
 
+            {/* Tools hub shortcut (Inventory + Breeding + Records) */}
+            {isAuthenticated && (
+              <Link to="/tools" className="relative group">
+                <Package className="h-6 w-6 text-white" />
+              </Link>
+            )}
+
             {/* Notifications - Only for authenticated buyers */}
             {/* Notifications - Only for authenticated buyers */}
             {isAuthenticated && !user?.isSeller && (
@@ -250,12 +261,13 @@ const Navbar = () => {
                         <PenSquare className="h-4 w-4 mr-2 text-orange-500" />
                         Write Post
                       </Link>
+                      {/* Tools hub entry in user dropdown */}
                       <Link
-                        to="/breeding-simulator"
+                        to="/tools"
                         className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       >
-                        <Egg className="h-4 w-4 mr-2 text-orange-500" />
-                        Breeding Simulator
+                        <Package className="h-4 w-4 mr-2 text-orange-500" />
+                        Tools
                       </Link>
                       {!user?.isSeller && (
                         <Link
@@ -354,6 +366,13 @@ const Navbar = () => {
                     {wishlistCount}
                   </span>
                 )}
+              </Link>
+            )}
+
+            {/* Tools hub shortcut on mobile */}
+            {isAuthenticated && (
+              <Link to="/tools" className="relative">
+                <Package className="h-6 w-6 text-white" />
               </Link>
             )}
 

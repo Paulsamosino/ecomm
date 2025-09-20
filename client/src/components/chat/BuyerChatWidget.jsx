@@ -30,6 +30,7 @@ const BuyerChatWidget = () => {
   const emittedTypingRef = useRef(false);
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
+  // (tools widget removed) keep only chat UI
 
   const otherName = useMemo(() => {
     if (!active?.participants || !user?._id) return "Conversation";
@@ -363,14 +364,17 @@ const BuyerChatWidget = () => {
   return (
     <>
       {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 rounded-full bg-orange-500 text-white w-14 h-14 shadow-lg z-[1000]"
-          title="Chat with support or sellers"
-          aria-label="Open chat"
-        >
-          💬
-        </button>
+        <div className="fixed bottom-6 right-6 flex flex-col items-end gap-2 z-[1000]">
+          {/* Chat open button always visible to buyers */}
+          <button
+            onClick={() => { setOpen(true); }}
+            className="rounded-full bg-orange-500 text-white w-14 h-14 shadow-lg"
+            title="Chat with support or sellers"
+            aria-label="Open chat"
+          >
+            💬
+          </button>
+        </div>
       )}
       {open && (
         <div className="fixed bottom-6 right-6 w-96 max-w-[90vw] h-[60vh] bg-white border rounded-xl shadow-xl flex flex-col overflow-hidden z-[1000]">

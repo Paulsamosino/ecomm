@@ -278,12 +278,22 @@ orderSchema.pre("save", async function (next) {
 // Calculate total amount and platform fee before saving
 orderSchema.pre("save", async function (next) {
   if (this.isModified("items")) {
-    this.totalAmount = this.items.reduce((total, item) => {
+    // compute items-only subtotal
+    const itemsSubtotal = this.items.reduce((total, item) => {
       return total + item.price * item.quantity;
     }, 0);
 
-    // Calculate platform fee (2%)
-    this.paymentInfo.platformFee = this.totalAmount * 0.02;
+    // Only set totalAmount from items if a final total wasn't already provided
+    // Route may compute final total (items + platform fee + shipping share). Preserve that if present.
+    if (!this.totalAmount || Number(this.totalAmount) === 0) {
+      this.totalAmount = itemsSubtotal;
+    }
+
+    // Do not overwrite a platformFee that was explicitly set earlier (per-seller proportional fee).
+    this.paymentInfo = this.paymentInfo || {};
+    if (!this.paymentInfo.platformFee || Number(this.paymentInfo.platformFee) === 0) {
+      this.paymentInfo.platformFee = itemsSubtotal * 0.02;
+    }
   }
 
   // Update inventory if order is being created

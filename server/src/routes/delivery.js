@@ -7,8 +7,8 @@ const deliveryStatusSyncService = require("../services/deliveryStatusSyncService
 // Check Lalamove configuration
 router.get("/config", deliveryController.checkDeliveryConfig);
 
-// Get delivery quotation
-router.post("/quote", protect, deliveryController.getQuotation);
+// Get delivery quotation (public — allow checkout users to get a quote without logging in)
+router.post("/quote", deliveryController.getQuotation);
 
 // Create delivery order
 router.post("/create", protect, deliveryController.createDeliveryOrder);

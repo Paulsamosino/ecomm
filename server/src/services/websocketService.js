@@ -18,11 +18,11 @@ class WebSocketService {
       transports: ['websocket', 'polling']
     });
 
-    this.io.on('connection', (socket) => {
+  this.io.on('connection', (socket) => {
       console.log('Client connected:', socket.id);
 
       // Handle authentication and room joining
-      socket.on('join_room', async (data) => {
+  socket.on('join_room', async (data) => {
         try {
           const { userId, userType } = data;
           
@@ -31,8 +31,8 @@ class WebSocketService {
             return;
           }
 
-          // Store user-socket mapping
-          this.userSockets.set(userId, socket.id);
+          // Store user-socket mapping; keep userType for role-based actions
+          this.userSockets.set(userId, { socketId: socket.id, userType });
           
           // Join user-specific room
           const roomName = `user:${userId}`;
@@ -61,8 +61,8 @@ class WebSocketService {
         console.log('Client disconnected:', socket.id);
         
         // Remove from user-socket mapping
-        for (const [userId, socketId] of this.userSockets.entries()) {
-          if (socketId === socket.id) {
+        for (const [userId, entry] of this.userSockets.entries()) {
+          if (entry && entry.socketId === socket.id) {
             this.userSockets.delete(userId);
             console.log(`Removed user ${userId} from socket mapping`);
             break;
@@ -93,6 +93,43 @@ class WebSocketService {
     });
 
     console.log(`Notification sent to user ${userId}:`, notification.title);
+  }
+
+  // Emit an event to all non-admin users
+  emitToNonAdmins(event, payload) {
+    if (!this.io) return;
+    for (const [userId, entry] of this.userSockets.entries()) {
+      try {
+        if (!entry) continue;
+        const { socketId, userType } = entry;
+        if (userType !== 'admin') {
+          this.io.to(socketId).emit(event, payload);
+        }
+      } catch (err) {
+        console.error('emitToNonAdmins error for user', userId, err);
+      }
+    }
+  }
+
+  // Disconnect all non-admin sockets with an optional reason
+  disconnectNonAdmins(reason) {
+    if (!this.io) return;
+    for (const [userId, entry] of this.userSockets.entries()) {
+      try {
+        if (!entry) continue;
+        const { socketId, userType } = entry;
+        if (userType !== 'admin') {
+          const sock = this.io.sockets.sockets.get(socketId);
+          if (sock) {
+            sock.emit('force_logout', { reason });
+            sock.disconnect(true);
+            console.log(`Disconnected non-admin socket for user ${userId}`);
+          }
+        }
+      } catch (err) {
+        console.error('disconnectNonAdmins error for user', userId, err);
+      }
+    }
   }
 
   // Update unread count for user

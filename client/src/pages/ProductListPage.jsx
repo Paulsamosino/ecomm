@@ -940,7 +940,22 @@ const FarmProductCard = ({
     discount,
   } = product;
 
-  const reviewCount = product.reviews?.length || 0;
+  // Prefer server-provided aggregated fields, fall back to computing from reviews or legacy `rating`
+  const reviewCount =
+    typeof product.numReviews === 'number'
+      ? product.numReviews
+      : product.reviews && Array.isArray(product.reviews)
+      ? product.reviews.length
+      : 0;
+  // Derive average rating consistently: prefer `averageRating`, then `rating`, then compute from reviews
+  const avgRating =
+    typeof product.averageRating === 'number' && product.averageRating > 0
+      ? product.averageRating
+      : typeof rating === 'number' && rating > 0
+      ? rating
+      : product.reviews && Array.isArray(product.reviews) && product.reviews.length > 0
+      ? product.reviews.reduce((s, r) => s + (r.rating || 0), 0) / product.reviews.length
+      : 0;
   const discountedPrice = discount ? price - (price * discount) / 100 : null;
 
   return (
@@ -1048,7 +1063,7 @@ const FarmProductCard = ({
         <div className="flex items-center mt-3 bg-[#fff8ef] px-3 py-1.5 rounded-full w-fit">
           <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
           <span className="text-sm text-gray-700 ml-1 font-medium">
-            {rating?.toFixed(1) || "New"}
+            {avgRating > 0 ? avgRating.toFixed(1) : "New"}
           </span>
           {reviewCount > 0 && (
             <span className="text-xs text-gray-500 ml-1">({reviewCount})</span>
@@ -1106,9 +1121,19 @@ const FarmProductListItem = ({ product, onAddToCart, onAddToWishlist }) => {
     discount,
   } = product;
 
-  // Get review count safely
-  const reviewCount =
-    product.reviewCount || (product.reviews ? product.reviews.length : 0);
+  // Prefer server-provided aggregated fields, fall back to computing from reviews or legacy `reviewCount`
+  const reviewCountListItem =
+    typeof product.numReviews === 'number'
+      ? product.numReviews
+      : product.reviewCount || (product.reviews ? product.reviews.length : 0);
+  const avgRatingListItem =
+    typeof product.averageRating === 'number' && product.averageRating > 0
+      ? product.averageRating
+      : typeof rating === 'number' && rating > 0
+      ? rating
+      : product.reviews && Array.isArray(product.reviews) && product.reviews.length > 0
+      ? product.reviews.reduce((s, r) => s + (r.rating || 0), 0) / product.reviews.length
+      : 0;
 
   const discountedPrice = discount ? price - (price * discount) / 100 : null;
 
@@ -1141,20 +1166,20 @@ const FarmProductListItem = ({ product, onAddToCart, onAddToWishlist }) => {
           )}
           <div className="flex items-center gap-2 mb-2">
             <div className="flex items-center">
-              {rating > 0 ? (
+              {avgRatingListItem > 0 ? (
                 <>
                   <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
                   <span className="ml-1 text-sm text-gray-600">
-                    {rating.toFixed(1)}
+                    {avgRatingListItem.toFixed(1)}
                   </span>
                 </>
               ) : (
                 <span className="text-xs text-gray-500">No ratings yet</span>
               )}
             </div>
-            {reviewCount > 0 && (
+            {reviewCountListItem > 0 && (
               <span className="text-xs text-gray-500">
-                ({reviewCount} reviews)
+                ({reviewCountListItem} reviews)
               </span>
             )}
             {location && (

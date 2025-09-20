@@ -20,7 +20,10 @@ const {
 // Create a new order
 router.post("/", protect, async (req, res) => {
   try {
-    const { items, paymentInfo, totalAmount, shippingAddress, delivery } = req.body;
+  const { items, paymentInfo, totalAmount, shippingAddress, delivery, voucherCode } = req.body;
+  // Calculate grand total from items (sum of item.price * quantity) to avoid using client-side total which may include fees
+  const grandItemsTotal = (items || []).reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 0), 0);
+  let voucherApplied = null;
 
     // Validate required fields
     if (!items?.length) {
@@ -100,11 +103,18 @@ router.post("/", protect, async (req, res) => {
           return res.status(404).json({ message: `Seller ${sellerId} not found` });
         }
 
-        // Calculate total for this seller's items
-        const sellerTotal = sellerItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-        
-        // Calculate proportional platform fee based on this seller's total
-        const sellerPlatformFee = (sellerTotal / totalAmount) * (totalAmount * 0.02);
+    // Calculate total for this seller's items
+    const sellerTotal = sellerItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+  // Calculate proportional platform fee based on items-only grand total (2% of items total)
+  const totalPlatformFee = grandItemsTotal * 0.02;
+  const sellerPlatformFee = grandItemsTotal > 0 ? (sellerTotal / grandItemsTotal) * totalPlatformFee : 0;
+
+  // Proportion of grand items total for this seller (used for shipping/voucher share)
+  const proportion = grandItemsTotal > 0 ? (sellerTotal / grandItemsTotal) : 0;
+  // Compute overall shipping fee total (if provided) and seller's share of it
+  const shippingFeeTotal = (delivery && delivery.shippingFee) ? Number(delivery.shippingFee || 0) : 0;
+  const sellerShippingShare = Math.round((shippingFeeTotal * proportion) * 100) / 100;
 
         // Build items with snapshot of warranty fields
         const itemsWithWarranty = [];
@@ -138,11 +148,57 @@ router.post("/", protect, async (req, res) => {
             }
           } : undefined,
           status: "pending",
+          // Initially set to seller items subtotal (may be adjusted below for voucher/shipping/platform fee)
           totalAmount: sellerTotal,
           shippingAddress,
         });
 
-        await order.save();
+  // If there is a voucher code and this is the first created order loop, validate and apply discount proportionally
+  if (!voucherApplied && voucherCode) {
+          try {
+            const Voucher = require('../models/Voucher');
+            const v = await Voucher.findOne({ code: (voucherCode || '').toUpperCase() });
+            if (v) {
+              // pass buyer id to check if this user already used the voucher
+                // Validate against server-computed items-only total (grandItemsTotal)
+                const valid = v.isValid(grandItemsTotal, req.user && (req.user._id || req.user.id));
+              if (valid.valid) {
+                // apply proportionally to this sellerTotal based on share of items-only grand total
+                const proportion = grandItemsTotal > 0 ? (sellerTotal / grandItemsTotal) : 0;
+                const applied = v.applyTo(grandItemsTotal);
+                const sellerDiscount = Math.round((applied.discount * proportion) * 100) / 100;
+                console.log(`Voucher apply debug - code=${v.code} grandItemsTotal=${grandItemsTotal} appliedDiscount=${applied.discount} proportion=${proportion} sellerDiscount=${sellerDiscount}`);
+                // compute seller's share of shipping (if any)
+                const shippingFeeTotal = (delivery && delivery.shippingFee) ? Number(delivery.shippingFee || 0) : 0;
+                const sellerShippingShare = Math.round((shippingFeeTotal * proportion) * 100) / 100;
+                // final order total for buyer for this seller: seller items - discount + platform fee share + shipping share
+                const finalSellerTotal = Math.max(0, Math.round(((order.totalAmount - sellerDiscount + sellerPlatformFee + sellerShippingShare) * 100)) / 100);
+                console.log(`Order calc debug - seller=${sellerId} sellerItems=${order.totalAmount} sellerDiscount=${sellerDiscount} sellerPlatformFee=${sellerPlatformFee} sellerShippingShare=${sellerShippingShare} finalSellerTotal=${finalSellerTotal}`);
+                order.totalAmount = finalSellerTotal;
+                // store the delivery.price.amount as seller shipping share
+                if (order.delivery && order.delivery.price) order.delivery.price.amount = sellerShippingShare;
+                voucherApplied = v;
+                // mark voucher for redemption after orders are saved
+              }
+            }
+          } catch (vcErr) {
+            console.error('Voucher validation error:', vcErr);
+          }
+        }
+
+        // If no voucher was applied, include platform fee and seller shipping share in the saved totalAmount
+        if (!voucherApplied) {
+          try {
+            const computedFinal = Math.max(0, Math.round(((order.totalAmount + sellerPlatformFee + sellerShippingShare) * 100)) / 100);
+            order.totalAmount = computedFinal;
+            if (order.delivery && order.delivery.price) order.delivery.price.amount = sellerShippingShare;
+          } catch (err) {
+            console.error('Error computing final seller total (no voucher):', err);
+          }
+        }
+
+  await order.save();
+  console.log(`Saved order ${order._id} totalAmount=${order.totalAmount} seller=${order.seller}`);
         createdOrders.push(order);
 
         // If payment was by wallet, debit the buyer immediately for this seller order
@@ -175,7 +231,8 @@ router.post("/", protect, async (req, res) => {
           seller: seller.name,
           sellerId: seller._id,
           items: sellerItems.length,
-          total: sellerTotal,
+          // total should reflect the final charged amount (includes platform fee & shipping share and voucher deduction)
+          total: order.totalAmount,
           status: order.status
         });
 
@@ -200,6 +257,25 @@ router.post("/", protect, async (req, res) => {
       await buyer.save();
     }
 
+    // Create platform logs for purchases so admins can see them in Logs
+    try {
+      const PlatformLog = require('../models/PlatformLog');
+      for (const order of createdOrders) {
+        await PlatformLog.create({
+          actor: req.user._id,
+          type: 'purchase',
+          amount: order.totalAmount,
+          currency: 'PHP',
+          relatedOrder: order._id,
+          details: { orderId: order._id, seller: order.seller, items: order.items.length },
+          ip: req.ip,
+          userAgent: req.get('User-Agent')
+        });
+      }
+    } catch (logErr) {
+      console.error('Failed to write platform logs for orders:', logErr);
+    }
+
     // Create consolidated notifications for the buyer (prevents duplicates for multi-seller purchases)
     try {
       if (createdOrders.length === 1) {
@@ -214,10 +290,9 @@ router.post("/", protect, async (req, res) => {
         console.log(`✅ Order notification created for buyer: ${order._id}`);
 
         // Create payment notification for non-cash payments
-        if (paymentInfo.method !== 'cash') {
-          const shippingCost = delivery?.shippingFee || 0;
-          const platformFee = order.paymentInfo.platformFee || 0;
-          const totalPaidAmount = order.totalAmount + platformFee + shippingCost;
+          if (paymentInfo.method !== 'cash') {
+          // order.totalAmount already includes platform fee share and shipping share
+          const totalPaidAmount = order.totalAmount;
           
           await NotificationService.createPaymentNotification(
             req.user._id,
@@ -246,10 +321,9 @@ router.post("/", protect, async (req, res) => {
 
         // Create consolidated payment notification for non-cash payments
         if (paymentInfo.method !== 'cash') {
-          const shippingCost = delivery?.shippingFee || 0;
-          const totalPlatformFees = createdOrders.reduce((sum, order) => sum + (order.paymentInfo.platformFee || 0), 0);
-          const totalPaidAmount = totalAmount + totalPlatformFees + shippingCost;
-          
+          // compute actual paid amount from created orders (they include platform & shipping shares)
+          const totalPaidAmount = createdOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+
           await NotificationService.createSystemNotification(
             req.user._id,
             "Payment Processed",
@@ -266,6 +340,34 @@ router.post("/", protect, async (req, res) => {
     }
 
     // Process each order for emails and delivery
+    // Redeem voucher (if applied) and apply wallet bonus for wallet payments
+    try {
+      if (voucherApplied) {
+        try {
+          // pass buyer id so the voucher records who used it (prevents reuse by same buyer)
+          await voucherApplied.redeem(req.user && (req.user._id || req.user.id));
+          console.log(`✅ Voucher ${voucherApplied.code} redeemed (usesLeft: ${voucherApplied.usesLeft})`);
+        } catch (redeemErr) {
+          console.error('Failed to redeem voucher after order creation:', redeemErr);
+        }
+      }
+
+  // Wallet bonus: if buyer paid with wallet and items-only grand total >= 2000, credit small bonus (e.g., 200)
+  if (paymentInfo?.method === 'wallet' && Number(grandItemsTotal || 0) >= 2000) {
+        try {
+          const Buyer = await User.findById(req.user._id);
+          if (Buyer) {
+            await Buyer.creditWallet(200, 'bonus', { reason: 'Wallet purchase bonus', threshold: 2000 });
+            console.log(`✅ Wallet bonus credited to buyer ${Buyer._id}: ₱200`);
+          }
+        } catch (bonusErr) {
+          console.error('Failed to credit wallet bonus:', bonusErr);
+        }
+      }
+    } catch (outerErr) {
+      console.error('Error during post-order voucher/wallet processing:', outerErr);
+    }
+
     for (const order of createdOrders) {
       try {
         // Populate order with buyer, seller, and product information for emails and delivery
@@ -362,11 +464,18 @@ router.post("/", protect, async (req, res) => {
       }
     }
 
+    // Compute canonical grand total from persisted orders.
+    // `order.totalAmount` is stored as the final charged amount for that seller (items after discount + platform fee + shipping share),
+    // so sum those values directly to get the canonical grand total.
+    const canonicalGrandTotal = createdOrders.reduce((sum, o) => {
+      return sum + Number(o.totalAmount || 0);
+    }, 0);
+
     res.status(201).json({
       message: `Orders created successfully for ${createdOrders.length} seller(s)`,
       orders: orderResponses,
       totalOrders: createdOrders.length,
-      grandTotal: totalAmount,
+      grandTotal: canonicalGrandTotal,
     });
   } catch (error) {
     console.error("Order creation error:", error);
@@ -485,18 +594,16 @@ router.put("/:id/status", protect, async (req, res) => {
     // Send payment notification for cash orders only when completed
     if (order.paymentInfo.method === 'cash' && status === 'completed') {
       try {
-        // Calculate total paid amount including platform fee and shipping for cash orders
-        const shippingCost = order.delivery?.price?.amount || 0;
-        const platformFee = order.paymentInfo.platformFee || 0;
-        const totalPaidAmount = order.totalAmount + platformFee + shippingCost;
-        
+        // order.totalAmount already includes platform fee and shipping share
+        const totalPaidAmount = order.totalAmount || 0;
+
         await NotificationService.createPaymentNotification(
           order.buyer._id,
           order._id,
           'payment_processed',
           totalPaidAmount
         );
-        console.log(`✅ Cash payment notification created for buyer: ${order._id} - ₱${totalPaidAmount} (Order: ₱${order.totalAmount} + Platform Fee: ₱${platformFee} + Shipping: ₱${shippingCost})`);
+        console.log(`✅ Cash payment notification created for buyer: ${order._id} - ₱${totalPaidAmount}`);
       } catch (notificationError) {
         console.error(`❌ Failed to create cash payment notification:`, notificationError);
         // Don't fail the update if notification fails
@@ -549,8 +656,8 @@ router.post("/:id/refund", protect, async (req, res) => {
       if (["wallet", "paypal"].includes(order.paymentInfo?.method)) {
         const buyerUser = await User.findById(order.buyer);
         if (buyerUser) {
-          const shipping = order.delivery?.price?.amount || 0;
-          const refundAmount = order.totalAmount + (order.paymentInfo?.platformFee || 0) + shipping;
+          // order.totalAmount already includes platform fee and shipping share
+          const refundAmount = order.totalAmount || 0;
           await buyerUser.creditWallet(refundAmount, 'refund', { orderId: order._id, reason, refundedVia: order.paymentInfo?.method });
           console.log(`\u2705 Credited buyer wallet \u20b1${refundAmount} for refunded order ${order._id} (via ${order.paymentInfo?.method})`);
         } else {
@@ -621,8 +728,7 @@ router.post("/:id/cancel", protect, async (req, res) => {
         if (["wallet", "paypal"].includes(order.paymentInfo?.method)) {
           const buyerUser = await User.findById(order.buyer);
           if (buyerUser) {
-            const shipping = order.delivery?.price?.amount || 0;
-            const refundAmount = order.totalAmount + (order.paymentInfo?.platformFee || 0) + shipping;
+            const refundAmount = order.totalAmount || 0;
             await buyerUser.creditWallet(refundAmount, 'refund', { orderId: order._id, reason: reason || 'cancelled', refundedVia: order.paymentInfo?.method });
             console.log(`\u2705 Credited buyer wallet \u20b1${refundAmount} for cancelled order ${order._id} (via ${order.paymentInfo?.method})`);
           } else {

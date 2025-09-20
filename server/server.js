@@ -321,6 +321,7 @@ const blogRoutes = require("./src/routes/blog");
 const socialRoutes = require("./src/routes/social");
 const notificationRoutes = require("./src/routes/notifications");
 const testNotificationRoutes = require("./src/routes/testNotification");
+const voucherRoutes = require("./src/routes/vouchers");
 
 // Serve static files from the React app
 if (process.env.NODE_ENV === "production") {
@@ -342,6 +343,7 @@ app.use("/api/blog", blogRoutes);
 app.use("/api/social", socialRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/test", testNotificationRoutes);
+app.use("/api/vouchers", voucherRoutes);
 // Wallet routes (top-ups, balance)
 app.use("/api/wallet", walletRoutes);
 // PayMaya and Twilio integrations removed from this deployment.

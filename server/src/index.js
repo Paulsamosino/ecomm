@@ -15,6 +15,7 @@ const walletRoutes = require("./routes/wallet");
 
 // Import WebSocket service
 const websocketService = require("./services/websocketService");
+const maintenanceScheduler = require('./utils/maintenanceScheduler');
 
 const app = express();
 const server = http.createServer(app);
@@ -163,6 +164,9 @@ const PORT = process.env.PORT || 5000;
 
 // Initialize WebSocket service
 websocketService.initialize(server);
+
+// Initialize maintenance scheduler (re-schedule any pending maintenance)
+maintenanceScheduler.initScheduler();
 
 server.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);

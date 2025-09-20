@@ -27,6 +27,31 @@ const auth = async (req, res, next) => {
         return res.status(401).json({ message: "User not found" });
       }
 
+      // Enforce maintenance rules only when maintenance is active.
+      try {
+        const SiteConfig = require('../models/SiteConfig');
+        const cfg = await SiteConfig.findOne();
+
+        if (cfg && cfg.maintenance) {
+          // If tokenInvalidBefore is set, invalidate tokens issued before it for non-admins
+          if (cfg.tokenInvalidBefore) {
+            // decoded.iat is in seconds
+            if (decoded.iat && decoded.iat < cfg.tokenInvalidBefore && (!user.role || user.role !== 'admin')) {
+              console.log('Token was issued before tokenInvalidBefore - rejecting for non-admin');
+              return res.status(401).json({ message: 'Session expired due to system maintenance. Please login again.' });
+            }
+          }
+
+          // If maintenance is active and user is not admin, refuse access
+          if (!user.role || user.role !== 'admin') {
+            return res.status(503).json({ message: 'System is under maintenance' });
+          }
+        }
+        // If maintenance is not active, do not enforce tokenInvalidBefore so users are not accidentally blocked
+      } catch (cfgErr) {
+        console.error('Failed to check SiteConfig in auth middleware:', cfgErr);
+      }
+
       // Set user and user ID
       req.user = user;
       req.user.id = user._id;
