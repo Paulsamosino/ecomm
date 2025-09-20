@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { logInventoryChange } from "@/utils/changeLogger";
 
 const STORAGE_KEY = "inventory_v2";
 const RECENT_KEY = "recent_purchases_v1";
@@ -43,6 +44,8 @@ export default function InventoryPage() {
   const [qty, setQty] = useState(1);
   const [showArchived, setShowArchived] = useState(false);
   // lightweight UI mode: card/grid toggle could be added later
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -74,9 +77,13 @@ export default function InventoryPage() {
     setInventory((prev) => {
       const found = prev.find((p) => p.name.toLowerCase() === trimmed.toLowerCase());
       if (found) {
-        return prev.map((p) => (p.name.toLowerCase() === trimmed.toLowerCase() ? { ...p, qty: formatNumber(p.qty) + formatNumber(q), category: c || p.category } : p));
+        const updatedItem = { ...found, qty: formatNumber(found.qty) + formatNumber(q), category: c || found.category };
+        logInventoryChange('update', updatedItem, { previousQty: found.qty, addedQty: q });
+        return prev.map((p) => (p.name.toLowerCase() === trimmed.toLowerCase() ? updatedItem : p));
       }
-      return [...prev, { id: Date.now().toString(), name: trimmed, qty: formatNumber(q), category: c || "Uncategorized", createdAt: new Date().toISOString() }];
+      const newItem = { id: Date.now().toString(), name: trimmed, qty: formatNumber(q), category: c || "Uncategorized", createdAt: new Date().toISOString() };
+      logInventoryChange('add', newItem);
+      return [...prev, newItem];
     });
   };
 
@@ -84,14 +91,28 @@ export default function InventoryPage() {
     const it = inventory.find((p) => p.id === id);
     if (!it) return;
     if (!window.confirm(`Remove "${it.name}" from inventory?`)) return;
+    logInventoryChange('delete', it);
     setInventory((prev) => prev.filter((p) => p.id !== id));
     setSelected((prev) => prev.filter((x) => x !== id));
   };
-  const updateQty = (id, newQty) => setInventory((prev) => prev.map((p) => (p.id === id ? { ...p, qty: formatNumber(newQty) } : p)));
+  const updateQty = (id, newQty) => {
+    const item = inventory.find(p => p.id === id);
+    if (!item) return;
+    const previousQty = item.qty;
+    const updatedItem = { ...item, qty: formatNumber(newQty) };
+    logInventoryChange('update', updatedItem, { previousQty, newQty });
+    setInventory((prev) => prev.map((p) => (p.id === id ? updatedItem : p)));
+  };
 
   const adjustQty = (id, adjustment) => {
+    const item = inventory.find(p => p.id === id);
+    if (!item) return;
+    const previousQty = item.qty;
+    const newQty = Math.max(0, formatNumber(item.qty) + adjustment);
+    const updatedItem = { ...item, qty: newQty };
+    logInventoryChange('update', updatedItem, { previousQty, adjustment, newQty });
     setInventory((prev) => prev.map((p) =>
-      p.id === id ? { ...p, qty: Math.max(0, formatNumber(p.qty) + adjustment) } : p
+      p.id === id ? updatedItem : p
     ));
   };
 
@@ -102,22 +123,30 @@ export default function InventoryPage() {
       name: `${item.name} (Copy)`,
       createdAt: new Date().toISOString()
     };
+    logInventoryChange('duplicate', newItem, { originalItem: item });
     setInventory((prev) => [...prev, newItem]);
   };
 
   const archiveItem = (id) => {
+    const item = inventory.find(p => p.id === id);
+    if (!item) return;
+    logInventoryChange('archive', { ...item, archived: true });
     setInventory((prev) => prev.map((p) =>
       p.id === id ? { ...p, archived: true } : p
     ));
   };
 
   const restoreItem = (id) => {
+    const item = inventory.find(p => p.id === id);
+    if (!item) return;
+    logInventoryChange('restore', { ...item, archived: false });
     setInventory((prev) => prev.map((p) =>
       p.id === id ? { ...p, archived: false } : p
     ));
   };
 
   const exportJSON = () => {
+    logInventoryChange('export', { itemCount: inventory.length, filename: `inventory-${new Date().toISOString()}.json` });
     const blob = new Blob([JSON.stringify(inventory, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -149,18 +178,23 @@ export default function InventoryPage() {
               if (!it || !it.name) return;
               const existing = merged.find((m) => m.name.toLowerCase() === String(it.name).toLowerCase());
               if (existing) {
+                const previousQty = existing.qty;
                 existing.qty = formatNumber(existing.qty) + formatNumber(it.qty);
                 existing.category = it.category || existing.category;
+                logInventoryChange('update', existing, { previousQty, addedQty: it.qty, source: 'import' });
               } else {
-                merged.push({
+                const newItem = {
                   id: it.id || Date.now().toString() + Math.random(),
                   name: it.name,
                   qty: formatNumber(it.qty || 0),
                   category: it.category || 'Uncategorized',
                   createdAt: it.createdAt || new Date().toISOString(),
-                });
+                };
+                merged.push(newItem);
+                logInventoryChange('add', newItem, { source: 'import' });
               }
             });
+            logInventoryChange('import', { importedCount: imported.length, totalItems: merged.length });
             return merged;
           });
           alert('Import successful');
@@ -210,15 +244,24 @@ export default function InventoryPage() {
   );
   const [selected, setSelected] = useState([]);
 
+  // Pagination calculations
+  const totalPages = Math.ceil(activeVisible.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedItems = activeVisible.slice(startIndex, endIndex);
+
   const toggleSelect = (id) => {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
-  const selectAllVisible = () => setSelected(activeVisible.map((v) => v.id));
+  const selectAllVisible = () => setSelected(paginatedItems.map((v) => v.id));
   const clearSelection = () => setSelected([]);
   const bulkRemove = () => {
     if (selected.length === 0) return;
     if (!window.confirm(`Remove ${selected.length} selected items from inventory?`)) return;
+    const itemsToRemove = inventory.filter(p => selected.includes(p.id));
+    itemsToRemove.forEach(item => logInventoryChange('delete', item, { source: 'bulk_delete' }));
+    logInventoryChange('delete', { count: selected.length }, { source: 'bulk_operation', itemIds: selected });
     setInventory((prev) => prev.filter((p) => !selected.includes(p.id)));
     setSelected([]);
   };
@@ -636,7 +679,7 @@ export default function InventoryPage() {
                       <th className="px-6 py-4 text-left">
                         <input
                           type="checkbox"
-                          checked={selected.length === activeVisible.length && activeVisible.length > 0}
+                          checked={selected.length === paginatedItems.length && paginatedItems.length > 0}
                           onChange={selectAllVisible}
                           className="w-5 h-5 text-[#ffb761] bg-orange-50 border-2 border-orange-300 rounded focus:ring-[#ffb761] focus:ring-2 transition-all duration-200"
                         />
@@ -650,7 +693,7 @@ export default function InventoryPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {activeVisible.map((it) => (
+                    {paginatedItems.map((it) => (
                       <tr key={it.id} className={`border-b border-orange-100 hover:bg-orange-50/50 transition-all duration-200 ${
                         selected.includes(it.id) ? 'bg-[#ffb761]/5 border-[#ffb761]/20' : ''
                       }`}>
@@ -778,7 +821,7 @@ export default function InventoryPage() {
                 </table>
               </div>
 
-              {activeVisible.length === 0 && (
+              {paginatedItems.length === 0 && (
                 <div className="p-16 text-center">
                   <div className="bg-gradient-to-r from-orange-200 to-orange-300 p-6 rounded-full w-fit mx-auto mb-6 shadow-lg">
                     <Package className="text-orange-500" size={48} />
@@ -802,6 +845,115 @@ export default function InventoryPage() {
                 </div>
               )}
             </Card>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-orange-200">
+                <div className="flex items-center gap-4 text-sm text-orange-700">
+                  <span>Showing {startIndex + 1} to {Math.min(endIndex, activeVisible.length)} of {activeVisible.length} entries</span>
+                  <div className="flex items-center gap-2">
+                    <label className="text-orange-700">Show:</label>
+                    <select
+                      value={itemsPerPage}
+                      onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                      className="text-sm border border-orange-300 rounded-md px-2 py-1 bg-white text-orange-900 focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="border-orange-300 text-orange-700 hover:bg-orange-50 hover:border-orange-400 disabled:opacity-50 disabled:cursor-not-allowed px-3 py-2 rounded-md transition-all duration-200"
+                  >
+                    ← Previous
+                  </Button>
+
+                  <div className="flex items-center gap-1 mx-2">
+                    {(() => {
+                      const pages = [];
+                      const showEllipsis = totalPages > 7;
+
+                      if (!showEllipsis) {
+                        // Show all pages if 7 or fewer
+                        for (let i = 1; i <= totalPages; i++) {
+                          pages.push(i);
+                        }
+                      } else {
+                        // Always show first page
+                        pages.push(1);
+
+                        if (currentPage > 4) {
+                          pages.push('...');
+                        }
+
+                        // Show pages around current page
+                        const start = Math.max(2, currentPage - 1);
+                        const end = Math.min(totalPages - 1, currentPage + 1);
+
+                        for (let i = start; i <= end; i++) {
+                          if (!pages.includes(i)) {
+                            pages.push(i);
+                          }
+                        }
+
+                        if (currentPage < totalPages - 3) {
+                          pages.push('...');
+                        }
+
+                        // Always show last page
+                        if (!pages.includes(totalPages)) {
+                          pages.push(totalPages);
+                        }
+                      }
+
+                      return pages.map((pageNum, index) => {
+                        if (pageNum === '...') {
+                          return (
+                            <span key={`ellipsis-${index}`} className="px-2 py-2 text-orange-400">
+                              ...
+                            </span>
+                          );
+                        }
+
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={currentPage === pageNum ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`px-3 py-2 rounded-md transition-all duration-200 ${
+                              currentPage === pageNum
+                                ? "bg-orange-500 text-white shadow-md hover:bg-orange-600"
+                                : "border-orange-300 text-orange-700 hover:bg-orange-50 hover:border-orange-400"
+                            }`}
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      });
+                    })()}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="border-orange-300 text-orange-700 hover:bg-orange-50 hover:border-orange-400 disabled:opacity-50 disabled:cursor-not-allowed px-3 py-2 rounded-md transition-all duration-200"
+                  >
+                    Next →
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Archived Items Section */}
             {showArchived && (

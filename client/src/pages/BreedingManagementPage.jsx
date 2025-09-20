@@ -13,11 +13,22 @@ import {
   Eye,
   EyeOff,
   Copy,
-  Archive
+  Archive,
+  Edit,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { logBreedingChange } from "@/utils/changeLogger";
 
 const STORAGE_KEY = "breeding_records_v2";
 const PRESETS_KEY = "breeding_presets_v2";
@@ -92,6 +103,10 @@ export default function BreedingManagementPage() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [selected, setSelected] = useState([]);
+  const [editingRecord, setEditingRecord] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
 
   // Load data from localStorage
   useEffect(() => {
@@ -126,13 +141,32 @@ export default function BreedingManagementPage() {
       id: Date.now().toString(),
       parent1: { ...p1, name: p1Name },
       parent2: { ...p2, name: p2Name },
-      offspring: { size: avgSize, eggProd: avgEgg, feather, color },
+      offspring: { size: avgSize, eggProd: avgEgg, feather, color, name: '', description: '' },
       createdAt: new Date().toISOString(),
-      notes: `Breeding record created on ${new Date().toLocaleDateString()}`
+      notes: `Breeding record created on ${new Date().toLocaleDateString()}`,
+      archived: false
     };
 
+    logBreedingChange('create', newRecord);
     setBreedingRecords(prev => [newRecord, ...prev]);
     setResult({ size: avgSize, eggProd: avgEgg, feather, color, details: { parents: [p1, p2] } });
+  };
+
+  const openEditModal = (record) => {
+    setEditingRecord({ ...record });
+    setIsEditModalOpen(true);
+  };
+
+  const saveEditedRecord = () => {
+    if (!editingRecord) return;
+
+    const originalRecord = breedingRecords.find(r => r.id === editingRecord.id);
+    logBreedingChange('edit', editingRecord, { originalRecord });
+    setBreedingRecords(prev =>
+      prev.map(r => r.id === editingRecord.id ? editingRecord : r)
+    );
+    setIsEditModalOpen(false);
+    setEditingRecord(null);
   };
 
   const sizeLabel = (v) => {
@@ -440,7 +474,12 @@ export default function BreedingManagementPage() {
             {/* Records Section */}
             <div className="border-t border-orange-100 pt-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">Breeding Records</h3>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">Breeding Records</h3>
+                  <p className="text-sm text-gray-500">
+                    {breedingRecords.filter(r => !r.archived).length} active • {breedingRecords.filter(r => r.archived).length} archived
+                  </p>
+                </div>
                 <div className="flex items-center gap-2">
                   <Input
                     placeholder="Search records..."
@@ -452,9 +491,10 @@ export default function BreedingManagementPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => setShowArchived(!showArchived)}
-                    className="border-orange-300 hover:border-[#ffb761] hover:bg-[#ffb761]/5"
+                    className={`border-orange-300 hover:border-[#ffb761] hover:bg-[#ffb761]/5 ${showArchived ? 'bg-orange-50' : ''}`}
                   >
                     {showArchived ? <EyeOff size={16} /> : <Eye size={16} />}
+                    <span className="ml-1 text-xs">{showArchived ? 'Hide Archived' : 'Show Archived'}</span>
                   </Button>
                 </div>
               </div>
@@ -467,28 +507,38 @@ export default function BreedingManagementPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-orange-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">
-                          <input
-                            type="checkbox"
-                            checked={selected.length === breedingRecords.filter(r => showArchived || !r.archived).length && breedingRecords.filter(r => showArchived || !r.archived).length > 0}
-                            onChange={() => {
-                              const visibleRecords = breedingRecords.filter(r => showArchived || !r.archived);
-                              setSelected(selected.length === visibleRecords.length ? [] : visibleRecords.map(r => r.id));
-                            }}
-                            className="w-4 h-4 text-[#ffb761] bg-orange-50 border-orange-300 rounded focus:ring-[#ffb761]"
-                          />
-                        </th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Date</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Offspring</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {breedingRecords.filter(r => showArchived || !r.archived).map((record) => (
-                        <tr key={record.id} className={`border-b border-orange-100 hover:bg-orange-50/50 transition ${selected.includes(record.id) ? 'bg-[#ffb761]/5' : ''}`}>
+                  {(() => {
+                    const visibleRecords = breedingRecords.filter(r => showArchived || !r.archived);
+                    const totalPages = Math.ceil(visibleRecords.length / itemsPerPage);
+                    const startIndex = (currentPage - 1) * itemsPerPage;
+                    const endIndex = startIndex + itemsPerPage;
+                    const paginatedRecords = visibleRecords.slice(startIndex, endIndex);
+
+                    return (
+                      <>
+                        <table className="w-full">
+                          <thead className="bg-orange-50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">
+                                <input
+                                  type="checkbox"
+                                  checked={selected.length === visibleRecords.length && visibleRecords.length > 0}
+                                  onChange={() => {
+                                    setSelected(selected.length === visibleRecords.length ? [] : visibleRecords.map(r => r.id));
+                                  }}
+                                  className="w-4 h-4 text-[#ffb761] bg-orange-50 border-orange-300 rounded focus:ring-[#ffb761]"
+                                />
+                              </th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Date</th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Parents</th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Offspring</th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Status</th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {paginatedRecords.map((record) => (
+                        <tr key={record.id} className={`border-b border-orange-100 hover:bg-orange-50/50 transition ${selected.includes(record.id) ? 'bg-[#ffb761]/5' : ''} ${record.archived ? 'opacity-75' : ''}`}>
                           <td className="px-4 py-3">
                             <input
                               type="checkbox"
@@ -506,17 +556,45 @@ export default function BreedingManagementPage() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="text-sm">
-                              <div className="font-medium text-gray-900">Size: {record.offspring.size}% • Eggs: {record.offspring.eggProd}%</div>
+                              <div className="font-medium text-gray-900">{record.parent1.name || 'Parent 1'}</div>
+                              <div className="text-gray-600">{record.parent2.name || 'Parent 2'}</div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="text-sm">
+                              <div className="font-medium text-gray-900">
+                                {record.offspring.name || `Offspring ${breedingRecords.filter(r => r.createdAt < record.createdAt).length + 1}`}
+                              </div>
+                              <div className="text-gray-600">Size: {record.offspring.size}% • Eggs: {record.offspring.eggProd}%</div>
                               <div className="text-gray-600 capitalize">{record.offspring.feather} • {record.offspring.color}</div>
                             </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              record.archived
+                                ? 'bg-gray-100 text-gray-600'
+                                : 'bg-green-100 text-green-600'
+                            }`}>
+                              {record.archived ? 'Archived' : 'Active'}
+                            </span>
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1">
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                onClick={() => openEditModal(record)}
+                                className="text-purple-500 hover:text-purple-700 hover:bg-purple-50 h-8 w-8 p-0"
+                                title="Edit Record"
+                              >
+                                <Edit size={14} />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => {
                                   const newRecord = { ...record, id: Date.now().toString() + '_copy' };
+                                  logBreedingChange('duplicate', newRecord, { originalRecord: record });
                                   setBreedingRecords(prev => [newRecord, ...prev]);
                                 }}
                                 className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 h-8 w-8 p-0"
@@ -528,11 +606,18 @@ export default function BreedingManagementPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => {
+                                  const action = record.archived ? 'restore' : 'archive';
+                                  const updatedRecord = { ...record, archived: !record.archived };
+                                  logBreedingChange(action, updatedRecord, { originalRecord: record });
                                   setBreedingRecords(prev => prev.map(r =>
-                                    r.id === record.id ? { ...r, archived: !r.archived } : r
+                                    r.id === record.id ? updatedRecord : r
                                   ));
                                 }}
-                                className="text-orange-500 hover:text-orange-700 hover:bg-orange-50 h-8 w-8 p-0"
+                                className={`h-8 w-8 p-0 ${
+                                  record.archived
+                                    ? 'text-green-500 hover:text-green-700 hover:bg-green-50'
+                                    : 'text-orange-500 hover:text-orange-700 hover:bg-orange-50'
+                                }`}
                                 title={record.archived ? "Unarchive" : "Archive"}
                               >
                                 <Archive size={14} />
@@ -542,6 +627,7 @@ export default function BreedingManagementPage() {
                                 size="sm"
                                 onClick={() => {
                                   if (window.confirm('Delete this record?')) {
+                                    logBreedingChange('delete', record);
                                     setBreedingRecords(prev => prev.filter(r => r.id !== record.id));
                                   }
                                 }}
@@ -556,6 +642,84 @@ export default function BreedingManagementPage() {
                       ))}
                     </tbody>
                   </table>
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-orange-200">
+                      <div className="flex items-center gap-4 text-sm text-orange-700">
+                        <div className="text-sm text-orange-700">
+                          Showing {startIndex + 1} to {Math.min(endIndex, visibleRecords.length)} of {visibleRecords.length} entries
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="text-orange-700">Show:</label>
+                          <select
+                            value={itemsPerPage}
+                            onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                            className="text-sm border border-orange-300 rounded-md px-2 py-1 bg-white text-orange-900 focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+                          >
+                            <option value={5}>5</option>
+                            <option value={10}>10</option>
+                            <option value={25}>25</option>
+                            <option value={50}>50</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={currentPage === 1}
+                          className="border-orange-300 text-orange-700 hover:bg-orange-50 disabled:opacity-50"
+                        >
+                          Previous
+                        </Button>
+
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                            let pageNum;
+                            if (totalPages <= 5) {
+                              pageNum = i + 1;
+                            } else if (currentPage <= 3) {
+                              pageNum = i + 1;
+                            } else if (currentPage >= totalPages - 2) {
+                              pageNum = totalPages - 4 + i;
+                            } else {
+                              pageNum = currentPage - 2 + i;
+                            }
+
+                            return (
+                              <Button
+                                key={pageNum}
+                                variant={currentPage === pageNum ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setCurrentPage(pageNum)}
+                                className={currentPage === pageNum
+                                  ? "bg-orange-500 text-white"
+                                  : "border-orange-300 text-orange-700 hover:bg-orange-50"
+                                }
+                              >
+                                {pageNum}
+                              </Button>
+                            );
+                          })}
+                        </div>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          disabled={currentPage === totalPages}
+                          className="border-orange-300 text-orange-700 hover:bg-orange-50 disabled:opacity-50"
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                    )}
+                </>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -567,15 +731,29 @@ export default function BreedingManagementPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      if (!window.confirm(`Archive ${selected.length} selected records?`)) return;
-                      setBreedingRecords(prev => prev.map(r =>
-                        selected.includes(r.id) ? { ...r, archived: true } : r
-                      ));
+                      const selectedRecords = breedingRecords.filter(r => selected.includes(r.id));
+                      const hasArchived = selectedRecords.some(r => r.archived);
+                      const hasActive = selectedRecords.some(r => !r.archived);
+                      const action = hasArchived && hasActive ? 'toggle' : hasArchived ? 'unarchive' : 'archive';
+                      const confirmMessage = action === 'archive' ? `Archive ${selected.length} selected records?` :
+                                           action === 'unarchive' ? `Unarchive ${selected.length} selected records?` :
+                                           `Toggle archive status for ${selected.length} selected records?`;
+
+                      if (!window.confirm(confirmMessage)) return;
+
+                      setBreedingRecords(prev => prev.map(r => {
+                        if (selected.includes(r.id)) {
+                          const updatedRecord = { ...r, archived: !r.archived };
+                          logBreedingChange(r.archived ? 'restore' : 'archive', updatedRecord, { originalRecord: r, source: 'bulk_operation' });
+                          return updatedRecord;
+                        }
+                        return r;
+                      }));
                       setSelected([]);
                     }}
                     className="border-orange-300 hover:border-orange-500 hover:bg-orange-50 text-orange-600"
                   >
-                    Archive Selected
+                    Toggle Archive Status
                   </Button>
                   <Button
                     variant="outline"
@@ -591,6 +769,259 @@ export default function BreedingManagementPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit Record Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="flex items-center gap-3 text-xl">
+              <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-orange-600 rounded-full flex items-center justify-center">
+                <Edit className="text-white" size={20} />
+              </div>
+              <span className="bg-gradient-to-r from-orange-600 to-orange-700 bg-clip-text text-transparent font-bold">
+                Edit Breeding Record
+              </span>
+            </DialogTitle>
+          </DialogHeader>
+
+          {editingRecord && (
+            <div className="space-y-6">
+              {/* Record Info Header */}
+              <div className="bg-white/80 backdrop-blur-sm p-4 rounded-xl border border-orange-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <Calendar className="text-orange-500" size={16} />
+                  <h3 className="font-semibold text-gray-800">Record Information</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500">Created:</span>
+                    <span className="font-medium text-gray-700">{new Date(editingRecord.createdAt).toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500">Status:</span>
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                      editingRecord.archived
+                        ? 'bg-gray-100 text-gray-600'
+                        : 'bg-green-100 text-green-600'
+                    }`}>
+                      {editingRecord.archived ? 'Archived' : 'Active'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Parent Information */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Parent 1 */}
+                <div className="bg-white/80 backdrop-blur-sm p-5 rounded-xl border border-orange-200 shadow-sm">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-orange-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                      {editingRecord.parent1?.name?.charAt(0)?.toUpperCase() || "1"}
+                    </div>
+                    <h3 className="font-semibold text-gray-800">Parent 1</h3>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                      <Input
+                        value={editingRecord.parent1?.name || ''}
+                        onChange={(e) => setEditingRecord(prev => ({
+                          ...prev,
+                          parent1: { ...prev.parent1, name: e.target.value }
+                        }))}
+                        placeholder="Enter parent name"
+                        className="border-orange-200 focus:border-orange-500 focus:ring-orange-500"
+                      />
+                    </div>
+
+                    <div className="bg-orange-50/50 p-3 rounded-lg">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Genetic Traits</h4>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Size:</span>
+                          <span className="font-medium">{editingRecord.parent1?.size}%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Eggs:</span>
+                          <span className="font-medium">{editingRecord.parent1?.eggProd}%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Feather:</span>
+                          <span className="font-medium capitalize">{editingRecord.parent1?.feather}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Color:</span>
+                          <span className="font-medium capitalize">{editingRecord.parent1?.color}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Parent 2 */}
+                <div className="bg-white/80 backdrop-blur-sm p-5 rounded-xl border border-orange-200 shadow-sm">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-8 h-8 bg-gradient-to-r from-orange-600 to-orange-700 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                      {editingRecord.parent2?.name?.charAt(0)?.toUpperCase() || "2"}
+                    </div>
+                    <h3 className="font-semibold text-gray-800">Parent 2</h3>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                      <Input
+                        value={editingRecord.parent2?.name || ''}
+                        onChange={(e) => setEditingRecord(prev => ({
+                          ...prev,
+                          parent2: { ...prev.parent2, name: e.target.value }
+                        }))}
+                        placeholder="Enter parent name"
+                        className="border-orange-200 focus:border-orange-500 focus:ring-orange-500"
+                      />
+                    </div>
+
+                    <div className="bg-orange-50/50 p-3 rounded-lg">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Genetic Traits</h4>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Size:</span>
+                          <span className="font-medium">{editingRecord.parent2?.size}%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Eggs:</span>
+                          <span className="font-medium">{editingRecord.parent2?.eggProd}%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Feather:</span>
+                          <span className="font-medium capitalize">{editingRecord.parent2?.feather}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Color:</span>
+                          <span className="font-medium capitalize">{editingRecord.parent2?.color}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Offspring Information */}
+              <div className="bg-white/80 backdrop-blur-sm p-5 rounded-xl border border-green-200 shadow-sm">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-green-600 rounded-full flex items-center justify-center">
+                    <Heart className="text-white" size={16} />
+                  </div>
+                  <h3 className="font-semibold text-gray-800">Predicted Offspring</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Offspring Name</label>
+                      <Input
+                        value={editingRecord.offspring?.name || ''}
+                        onChange={(e) => setEditingRecord(prev => ({
+                          ...prev,
+                          offspring: { ...prev.offspring, name: e.target.value }
+                        }))}
+                        placeholder="Name your offspring"
+                        className="border-green-200 focus:border-green-500 focus:ring-green-500"
+                      />
+                    </div>
+
+                    <div className="bg-green-50/50 p-3 rounded-lg">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Predicted Traits</h4>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Size:</span>
+                          <span className="font-medium">{editingRecord.offspring?.size}% ({sizeLabel(editingRecord.offspring?.size)})</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Eggs:</span>
+                          <span className="font-medium">{editingRecord.offspring?.eggProd}% ({eggLabel(editingRecord.offspring?.eggProd)})</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Feather:</span>
+                          <span className="font-medium capitalize">{editingRecord.offspring?.feather}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Color:</span>
+                          <span className="font-medium capitalize">{editingRecord.offspring?.color}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Description & Notes</label>
+                      <Textarea
+                        value={editingRecord.notes || ''}
+                        onChange={(e) => setEditingRecord(prev => ({
+                          ...prev,
+                          notes: e.target.value
+                        }))}
+                        placeholder="Add observations, special notes, or any additional information about this breeding..."
+                        rows={6}
+                        className="resize-none border-green-200 focus:border-green-500 focus:ring-green-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Archive Status */}
+              <div className="bg-white/80 backdrop-blur-sm p-4 rounded-xl border border-gray-200 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Archive className="text-gray-500" size={16} />
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700">Archive Status</h4>
+                      <p className="text-xs text-gray-500">Hide this record from active view</p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editingRecord.archived || false}
+                      onChange={(e) => setEditingRecord(prev => ({
+                        ...prev,
+                        archived: e.target.checked
+                      }))}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-6 border-t border-orange-200">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    setEditingRecord(null);
+                  }}
+                  className="px-6 py-2 border-gray-300 hover:border-gray-400 hover:bg-gray-50"
+                >
+                  <X className="mr-2" size={16} />
+                  Cancel
+                </Button>
+                <Button
+                  onClick={saveEditedRecord}
+                  className="px-6 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium shadow-md hover:shadow-lg transition-all"
+                >
+                  <Edit className="mr-2" size={16} />
+                  Save Changes
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
