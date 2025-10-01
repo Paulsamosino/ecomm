@@ -214,13 +214,18 @@ router.put("/orders/:id/status", protect, async (req, res) => {
     }
 
     // Update order
-    order.status = status;
-    if (trackingNumber) {
-      order.trackingNumber = trackingNumber;
+    // If status is being changed to 'cancelled', use the cancel() method to restore inventory
+    if (status === 'cancelled') {
+      await order.cancel('Cancelled by seller');
+    } else {
+      order.status = status;
+      if (trackingNumber) {
+        order.trackingNumber = trackingNumber;
+      }
+      await order.save();
     }
 
-    // Save and populate
-    await order.save();
+    // Populate order details after update
     const updatedOrder = await Order.findById(order._id)
       .populate("buyer", "name email")
       .populate("items.product");

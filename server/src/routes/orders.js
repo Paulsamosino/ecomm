@@ -548,16 +548,21 @@ router.put("/:id/status", protect, async (req, res) => {
     }
 
     // Update order details
-    order.status = status;
-    if (notes) order.notes = notes;
+    // If status is being changed to 'cancelled', use the cancel() method to restore inventory
+    if (status === 'cancelled') {
+      await order.cancel(notes || 'Cancelled by seller');
+    } else {
+      order.status = status;
+      if (notes) order.notes = notes;
 
-    try {
-      await order.save();
-    } catch (error) {
-      if (error.message.includes("Invalid status transition")) {
-        return res.status(400).json({ message: error.message });
+      try {
+        await order.save();
+      } catch (error) {
+        if (error.message.includes("Invalid status transition")) {
+          return res.status(400).json({ message: error.message });
+        }
+        throw error;
       }
-      throw error;
     }
 
     // Send status update email to buyer

@@ -139,9 +139,12 @@ class DeliveryStatusSyncService {
           order.status = 'shipped';
           console.log(`   📦 Order marked as SHIPPED (package picked up)`);
         } else if (['EXPIRED', 'CANCELLED', 'REJECTED', 'DRIVER_CANCELLED', 'SYSTEM_CANCELLED'].includes(mappedStatus) && order.status !== 'cancelled') {
-          order.status = 'cancelled';
+          // Cancel the order and restore inventory
+          await order.cancel(`Delivery ${mappedStatus.toLowerCase()}`);
           order.delivery.cancelledAt = new Date();
-          console.log(`   ❌ Order marked as CANCELLED (delivery ${mappedStatus.toLowerCase()})`);
+          console.log(`   ❌ Order marked as CANCELLED (delivery ${mappedStatus.toLowerCase()}) - inventory restored`);
+          // order.cancel() already saves, so skip the save below
+          return true;
         }
         
         await order.save();

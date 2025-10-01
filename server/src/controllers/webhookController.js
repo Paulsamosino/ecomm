@@ -140,9 +140,13 @@ const webhookController = {
         return res.status(404).json({ message: "Order not found" });
       }
 
+      // Update delivery status
       order.delivery.status = "cancelled";
-      order.notes = `Delivery cancelled: ${reason}`;
-      await order.save();
+      
+      // Cancel the order and restore inventory
+      await order.cancel(`Delivery cancelled: ${reason}`);
+      
+      // The order.cancel() already saves, so we don't need order.save() here
 
       // Create delivery cancellation notification for buyer
       try {

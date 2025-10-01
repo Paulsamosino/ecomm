@@ -450,9 +450,10 @@ const deliveryController = {
         order.delivery.completedAt = new Date();
         console.log(`Order ${orderId} marked as delivered - Lalamove delivery completed`);
       } else if (['EXPIRED', 'CANCELLED', 'REJECTED', 'DRIVER_CANCELLED', 'SYSTEM_CANCELLED'].includes(normalizedStatus) && order.status !== 'cancelled') {
-        order.status = 'cancelled';
+        // Cancel the order and restore inventory
+        await order.cancel(`Lalamove delivery ${normalizedStatus.toLowerCase()}`);
         order.delivery.cancelledAt = new Date();
-        console.log(`Order ${orderId} marked as cancelled - Lalamove delivery ${normalizedStatus.toLowerCase()}`);
+        console.log(`Order ${orderId} marked as cancelled - Lalamove delivery ${normalizedStatus.toLowerCase()} - inventory restored`);
       }
 
       if (status.driver) {
@@ -772,9 +773,10 @@ const deliveryController = {
         order.delivery.completedAt = new Date();
         console.log(`Order ${orderId} marked as delivered - Lalamove delivery completed`);
       } else if (['EXPIRED', 'CANCELLED', 'REJECTED', 'DRIVER_CANCELLED', 'SYSTEM_CANCELLED'].includes(normalizedStatus) && order.status !== 'cancelled') {
-        order.status = 'cancelled';
+        // Cancel the order and restore inventory
+        await order.cancel(`Lalamove delivery ${normalizedStatus.toLowerCase()}`);
         order.delivery.cancelledAt = new Date();
-        console.log(`Order ${orderId} marked as cancelled - Lalamove delivery ${normalizedStatus.toLowerCase()}`);
+        console.log(`Order ${orderId} marked as cancelled - Lalamove delivery ${normalizedStatus.toLowerCase()} - inventory restored`);
       }
 
       if (latestStatus.driver) {
@@ -895,9 +897,10 @@ const deliveryController = {
         order.delivery.completedAt = new Date();
         console.log(`Order ${order._id} marked as delivered via webhook`);
       } else if (['EXPIRED', 'CANCELLED', 'REJECTED', 'DRIVER_CANCELLED', 'SYSTEM_CANCELLED'].includes(normalizedStatus) && order.status !== 'cancelled') {
-        order.status = 'cancelled';
+        // Cancel the order and restore inventory
+        await order.cancel(`Delivery ${normalizedStatus.toLowerCase()} via webhook`);
         order.delivery.cancelledAt = new Date();
-        console.log(`Order ${order._id} marked as cancelled via webhook - delivery ${normalizedStatus.toLowerCase()}`);
+        console.log(`Order ${order._id} marked as cancelled via webhook - delivery ${normalizedStatus.toLowerCase()} - inventory restored`);
       }
 
       // Update driver info if provided
