@@ -368,101 +368,102 @@ router.post("/", protect, async (req, res) => {
       console.error('Error during post-order voucher/wallet processing:', outerErr);
     }
 
-    for (const order of createdOrders) {
-      try {
-        // Populate order with buyer, seller, and product information for emails and delivery
-        const populatedOrder = await Order.findById(order._id)
-          .populate("buyer", "name phone email")
-          .populate({
-            path: "seller", 
-            select: "name phone email address sellerProfile",
-            populate: {
-              path: "sellerProfile.location",
-              select: "street city state zipCode country phone"
+    // ⚡ PERFORMANCE OPTIMIZATION: Move time-consuming operations to background
+    // This allows the API to respond immediately while processing continues asynchronously
+    console.log(`⚡ Queueing background processing for ${createdOrders.length} orders...`);
+    
+    // Process all orders in background (non-blocking)
+    setImmediate(async () => {
+      console.log(`🔄 Starting background processing for ${createdOrders.length} orders...`);
+      
+      // Process all orders in parallel for maximum speed
+      await Promise.allSettled(
+        createdOrders.map(async (order) => {
+          try {
+            // Populate order with buyer, seller, and product information for emails and delivery
+            const populatedOrder = await Order.findById(order._id)
+              .populate("buyer", "name phone email")
+              .populate({
+                path: "seller", 
+                select: "name phone email address sellerProfile",
+                populate: {
+                  path: "sellerProfile.location",
+                  select: "street city state zipCode country phone"
+                }
+              })
+              .populate("items.product");
+
+            if (!populatedOrder) {
+              console.error(`❌ Order ${order._id} not found during background processing`);
+              return;
             }
-          })
-          .populate("items.product");
 
-        // Debug logging for delivery creation
-        console.log(`🚚 Preparing delivery for order: ${order._id} (Seller: ${populatedOrder.seller?.name})`);
-        console.log("📦 Order details:", {
-          buyer: populatedOrder.buyer?.name,
-          seller: populatedOrder.seller?.name,
-          sellerProfile: populatedOrder.seller?.sellerProfile ? 'Present' : 'Missing',
-          sellerLocation: populatedOrder.seller?.sellerProfile?.location ? 'Present' : 'Missing',
-          shippingAddress: populatedOrder.shippingAddress ? 'Present' : 'Missing'
-        });
+            console.log(`🔄 Processing order ${order._id} in background (Seller: ${populatedOrder.seller?.name})`);
 
-        // Send confirmation emails
-        console.log(`📧 Attempting to send confirmation emails for order: ${order._id}`);
-        try {
-          console.log("📤 Sending buyer confirmation email...");
-          await sendOrderConfirmationEmail(populatedOrder);
-          console.log("📤 Sending seller notification email...");
-          await sendSellerOrderNotification(populatedOrder);
-          console.log("✅ Both confirmation emails sent successfully");
-        } catch (emailError) {
-          console.error("❌ Error sending confirmation email:", emailError);
-          console.error("Email error stack:", emailError.stack);
-          // Don't fail the order if email fails
-        }
+            // Run email, SMS, and delivery creation in parallel
+            const [emailResult, smsResult, deliveryResult] = await Promise.allSettled([
+              // Email notifications
+              (async () => {
+                try {
+                  await Promise.all([
+                    sendOrderConfirmationEmail(populatedOrder),
+                    sendSellerOrderNotification(populatedOrder)
+                  ]);
+                  console.log(`✅ Emails sent for order ${order._id}`);
+                } catch (emailError) {
+                  console.error(`❌ Email error for order ${order._id}:`, emailError.message);
+                }
+              })(),
 
-        // Send SMS notifications
-        console.log(`📱 Attempting to send SMS notifications for order: ${order._id}`);
-        try {
-          // Send SMS to seller - get phone from seller profile
-          const sellerPhone = populatedOrder.seller?.sellerProfile?.location?.phone;
-          if (sellerPhone) {
-            console.log("📱 Sending seller SMS notification...");
-            const smsResult = await sendPurchaseNotification(sellerPhone, populatedOrder);
-            console.log("📱 Seller SMS notification result:", smsResult);
-          } else {
-            console.log("⚠️ Seller phone number not found in profile - skipping seller SMS");
+              // SMS notifications
+              (async () => {
+                try {
+                  const smsPromises = [];
+                  
+                  const sellerPhone = populatedOrder.seller?.sellerProfile?.location?.phone;
+                  if (sellerPhone) {
+                    smsPromises.push(sendPurchaseNotification(sellerPhone, populatedOrder));
+                  }
+                  
+                  const buyerPhone = populatedOrder.shippingAddress?.phone;
+                  if (buyerPhone) {
+                    smsPromises.push(sendOrderStatusSMS(buyerPhone, populatedOrder, 'confirmed'));
+                  }
+                  
+                  if (smsPromises.length > 0) {
+                    await Promise.all(smsPromises);
+                    console.log(`✅ SMS sent for order ${order._id}`);
+                  }
+                } catch (smsError) {
+                  console.error(`❌ SMS error for order ${order._id}:`, smsError.message);
+                }
+              })(),
+
+              // Delivery creation
+              (async () => {
+                try {
+                  const deliveryResult = await deliveryController.autoCreateDelivery(populatedOrder);
+                  if (deliveryResult) {
+                    console.log(`✅ Delivery created for order ${order._id}`);
+                  } else {
+                    console.warn(`⚠️ Delivery creation returned null for order ${order._id}`);
+                  }
+                } catch (deliveryError) {
+                  console.error(`❌ Delivery error for order ${order._id}:`, deliveryError.message);
+                }
+              })()
+            ]);
+
+            console.log(`✅ Background processing completed for order ${order._id}`);
+
+          } catch (processingError) {
+            console.error(`❌ Error in background processing for order ${order._id}:`, processingError);
           }
-          
-          // You can also send SMS to buyer if they have a phone number
-          const buyerPhone = populatedOrder.shippingAddress?.phone;
-          if (buyerPhone) {
-            console.log("📱 Sending buyer SMS confirmation...");
-            const buyerSmsResult = await sendOrderStatusSMS(buyerPhone, populatedOrder, 'confirmed');
-            console.log("📱 Buyer SMS confirmation result:", buyerSmsResult);
-          } else {
-            console.log("⚠️ Buyer phone number not available - skipping buyer SMS");
-          }
-          
-          console.log("✅ SMS notifications completed");
-        } catch (smsError) {
-          console.error("❌ Error sending SMS notifications:", smsError);
-          console.error("SMS error stack:", smsError.stack);
-          // Don't fail the order if SMS fails
-        }
+        })
+      );
 
-        // Automatically create delivery order with enhanced logging
-        console.log(`🚚 Starting automatic delivery creation for order ${order._id}...`);
-        try {
-          const deliveryResult = await deliveryController.autoCreateDelivery(populatedOrder);
-          if (deliveryResult) {
-            console.log(`✅ Delivery created successfully for order ${order._id}:`, deliveryResult.id);
-          } else {
-            console.warn(`⚠️ Delivery creation returned null for order ${order._id} (likely config issue)`);
-          }
-        } catch (deliveryError) {
-          console.error(`❌ Error creating delivery for order ${order._id}:`, deliveryError);
-          console.error("Delivery error details:", {
-            message: deliveryError.message,
-            stack: deliveryError.stack,
-            orderId: order._id,
-            seller: populatedOrder.seller?.name
-          });
-          // Don't fail the order if delivery creation fails
-          // It can be retried manually if needed
-        }
-
-      } catch (processingError) {
-        console.error(`❌ Error processing order ${order._id}:`, processingError);
-        // Continue processing other orders even if one fails
-      }
-    }
+      console.log(`✅ Background processing finished for all ${createdOrders.length} orders`);
+    });
 
     // Compute canonical grand total from persisted orders.
     // `order.totalAmount` is stored as the final charged amount for that seller (items after discount + platform fee + shipping share),
