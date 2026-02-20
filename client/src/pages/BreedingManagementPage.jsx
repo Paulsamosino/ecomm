@@ -194,6 +194,15 @@ export default function BreedingManagementPage() {
     return 'High';
   };
 
+  // Convert 0-100% egg production to a realistic weekly egg range
+  // Based on: 100% = 7 eggs/wk (daily layer), 0% = 0 eggs/wk
+  const eggRange = (pct) => {
+    const base = Math.round(pct / 100 * 7);
+    const low  = Math.max(0, base - 1);
+    const high = Math.min(7, base + 1);
+    return low === high ? `~${low}/wk` : `${low}–${high}/wk`;
+  };
+
   const featherOptions = [
     { label: 'Smooth', value: 'smooth' },
     { label: 'Curly', value: 'curly' },
@@ -302,6 +311,7 @@ export default function BreedingManagementPage() {
   const pretty = useMemo(() => ({
     sizeLabel,
     eggLabel,
+    eggRange,
   }), []);
 
   // Helper: compute a usable outline color (fallback to orange for very light swatches)
@@ -369,7 +379,7 @@ export default function BreedingManagementPage() {
                 </div>
                 <div className="space-y-3 pl-10">
                   <Slider label={`Size: ${pretty.sizeLabel(p1.size)}`} minLabel="Small" maxLabel="Large" value={p1.size} onChange={(v) => setP1((s)=>({ ...s, size: v }))} />
-                  <Slider label={`Egg Production: ${pretty.eggLabel(p1.eggProd)}`} minLabel="Low" maxLabel="High" value={p1.eggProd} onChange={(v) => setP1((s)=>({ ...s, eggProd: v }))} />
+                  <Slider label={`Egg Production: ${pretty.eggLabel(p1.eggProd)} (${pretty.eggRange(p1.eggProd)})`} minLabel="Low" maxLabel="High" value={p1.eggProd} onChange={(v) => setP1((s)=>({ ...s, eggProd: v }))} />
                   <ToggleGroup label="Feather Type" options={featherOptions} value={p1.feather} onChange={(v)=> setP1((s)=>({...s, feather: v }))} />
                   <div className="space-y-2">
                     <div className="text-sm font-medium text-gray-700">Color</div>
@@ -400,7 +410,7 @@ export default function BreedingManagementPage() {
                 </div>
                 <div className="space-y-3 pl-10">
                   <Slider label={`Size: ${pretty.sizeLabel(p2.size)}`} minLabel="Small" maxLabel="Large" value={p2.size} onChange={(v) => setP2((s)=>({ ...s, size: v }))} />
-                  <Slider label={`Egg Production: ${pretty.eggLabel(p2.eggProd)}`} minLabel="Low" maxLabel="High" value={p2.eggProd} onChange={(v) => setP2((s)=>({ ...s, eggProd: v }))} />
+                  <Slider label={`Egg Production: ${pretty.eggLabel(p2.eggProd)} (${pretty.eggRange(p2.eggProd)})`} minLabel="Low" maxLabel="High" value={p2.eggProd} onChange={(v) => setP2((s)=>({ ...s, eggProd: v }))} />
                   <ToggleGroup label="Feather Type" options={featherOptions} value={p2.feather} onChange={(v)=> setP2((s)=>({...s, feather: v }))} />
                   <div className="space-y-2">
                     <div className="text-sm font-medium text-gray-700">Color</div>
@@ -466,7 +476,7 @@ export default function BreedingManagementPage() {
                         <span className="text-sm font-medium text-gray-900 truncate">{preset.name}</span>
                       </div>
                       <div className="text-xs text-gray-600">
-                        Size: {preset.size}% • Eggs: {preset.eggProd}%
+                        Size: {preset.size}% • Eggs: {preset.eggProd}% ({eggRange(preset.eggProd)})
                       </div>
                     </button>
                   ))}
@@ -504,6 +514,7 @@ export default function BreedingManagementPage() {
                       <div className="bg-orange-50 rounded-lg p-3">
                         <p className="text-gray-500 text-xs mb-1">Egg Production</p>
                         <p className="font-semibold text-gray-900">{previewPreset.eggProd}% <span className="font-normal text-gray-500">({previewPreset.eggProd < 33 ? 'Low' : previewPreset.eggProd < 66 ? 'Moderate' : 'High'})</span></p>
+                        <p className="text-xs text-orange-600 font-medium mt-0.5">{eggRange(previewPreset.eggProd)}</p>
                       </div>
                       <div className="bg-orange-50 rounded-lg p-3">
                         <p className="text-gray-500 text-xs mb-1">Feather Type</p>
@@ -549,7 +560,7 @@ export default function BreedingManagementPage() {
                   </div>
                   <div>
                     <span className="text-gray-600">Egg Production:</span>
-                    <span className="font-medium ml-1">{result.eggProd}% ({eggLabel(result.eggProd)})</span>
+                    <span className="font-medium ml-1">{result.eggProd}% ({eggLabel(result.eggProd)} · {eggRange(result.eggProd)})</span>
                   </div>
                   <div>
                     <span className="text-gray-600">Feather:</span>

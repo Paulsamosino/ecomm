@@ -21,6 +21,13 @@ function timeAgo(dateStr) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+function eggRange(pct) {
+  const base = Math.round((pct ?? 0) / 100 * 7);
+  const low  = Math.max(0, base - 1);
+  const high = Math.min(7, base + 1);
+  return low === high ? `~${low}/wk` : `${low}–${high}/wk`;
+}
+
 // ─── Global Logs Tab ──────────────────────────────────────────────────────────
 function GlobalLogsTab() {
   const [breedingLogs, setBreedingLogs] = useState([]);
@@ -204,7 +211,7 @@ function GlobalLogsTab() {
                           <span className="text-gray-400 mx-1.5">→</span>
                           <span className="text-emerald-700">
                             Size {log.offspring?.size ?? "?"}%
-                            {" · "}Eggs {log.offspring?.eggProd ?? "?"}%
+                            {" · "}Eggs {log.offspring?.eggProd ?? "?"}% ({eggRange(log.offspring?.eggProd)})
                             {" · "}{log.offspring?.feather || "smooth"}
                             {" · "}{log.offspring?.color || "white"}
                           </span>
