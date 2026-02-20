@@ -19,12 +19,14 @@ import {
   Copy,
   Archive,
   Eye,
-  EyeOff
+  EyeOff,
+  Share2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { logInventoryChange } from "@/utils/changeLogger";
+import { createInventoryLog } from "@/api/inventoryLog";
 
 const STORAGE_KEY = "inventory_v2";
 const RECENT_KEY = "recent_purchases_v1";
@@ -95,6 +97,16 @@ export default function InventoryPage() {
     setInventory((prev) => prev.filter((p) => p.id !== id));
     setSelected((prev) => prev.filter((x) => x !== id));
   };
+
+  const postItemToGlobalLog = (item) => {
+    createInventoryLog({
+      itemName: item.name,
+      category: item.category,
+      qty: item.qty,
+      action: "posted",
+    }).catch(err => console.warn("[InventoryLog] Post failed:", err?.response?.data || err?.message));
+  };
+
   const updateQty = (id, newQty) => {
     const item = inventory.find(p => p.id === id);
     if (!item) return;
@@ -774,6 +786,15 @@ export default function InventoryPage() {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => postItemToGlobalLog(it)}
+                              className="text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 transition-all duration-200 h-8 w-8 p-0 rounded-full"
+                              title="Post to Global Logs"
+                            >
+                              <Share2 size={14} />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"

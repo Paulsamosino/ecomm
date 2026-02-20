@@ -108,6 +108,7 @@ app.use("/api/ads", adsRoutes);
 app.use("/api/wallet", walletRoutes);
 app.use("/api/upload", require("./routes/upload"));
 app.use("/api/breeding-logs", require("./routes/breedingLogs"));
+app.use("/api/inventory-logs", require("./routes/inventoryLogs"));
 
 // Connect to MongoDB with enhanced error handling
 mongoose

@@ -46,6 +46,7 @@ app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/test-notifications", require("./routes/testAllNotifications"));
 app.use("/api/upload", require("./routes/upload"));
 app.use("/api/breeding-logs", require("./routes/breedingLogs"));
+app.use("/api/inventory-logs", require("./routes/inventoryLogs"));
 
 // Webhook Routes (no /api prefix for external service webhooks)
 app.use("/webhook", webhookRoutes);

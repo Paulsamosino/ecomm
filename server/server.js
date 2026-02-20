@@ -346,8 +346,9 @@ app.use("/api/test", testNotificationRoutes);
 app.use("/api/vouchers", voucherRoutes);
 // Wallet routes (top-ups, balance)
 app.use("/api/wallet", walletRoutes);
-// Breeding logs — global community feed
+// Global activity logs
 app.use("/api/breeding-logs", require("./src/routes/breedingLogs"));
+app.use("/api/inventory-logs", require("./src/routes/inventoryLogs"));
 // PayMaya and Twilio integrations removed from this deployment.
 
 // Basic route for testing

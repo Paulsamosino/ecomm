@@ -1,17 +1,14 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import InventoryPage from "@/pages/InventoryPage";
 import BreedingManagementPage from "@/pages/BreedingManagementPage";
 import ChangeHistoryPage from "@/pages/ChangeHistoryPage";
 import { getAllBreedingLogs } from "@/api/breedingLog";
-import { Package, Heart, History, Settings, Activity, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { getAllInventoryLogs } from "@/api/inventoryLog";
+import { Package, Heart, History, Settings, Globe2, RefreshCw, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-const COLOR_CHIP_MAP = {
-  black: "#0F172A", brown: "#7F2A2A", red: "#E11D48",
-  white: "#F8FAFC", gold: "#F59E0B",
-};
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -24,140 +21,241 @@ function timeAgo(dateStr) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function TraitBadge({ label, value }) {
-  return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-50 border border-orange-100 rounded-full text-xs text-gray-700">
-      <span className="text-gray-400">{label}:</span>
-      <span className="font-medium">{value}</span>
-    </span>
-  );
-}
-
-function LogCard({ log }) {
-  const offspringColor = COLOR_CHIP_MAP[log.offspring?.color?.toLowerCase()] || "#F8FAFC";
-  return (
-    <div className="bg-white rounded-2xl border border-orange-100 p-5 shadow-sm hover:shadow-md transition">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-sm shadow">
-          {log.sellerName?.charAt(0)?.toUpperCase() || "?"}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-900 truncate">{log.sellerName || "Anonymous"}</p>
-          <p className="text-xs text-gray-400">{timeAgo(log.createdAt)}</p>
-        </div>
-        <span className="flex items-center gap-1 text-xs text-orange-500 font-medium bg-orange-50 px-2.5 py-1 rounded-full">
-          <Heart size={12} /> Breeding
-        </span>
-      </div>
-      <div className="flex items-center gap-3 mb-4">
-        <div className="flex-1 bg-amber-50 rounded-xl p-3 min-w-0">
-          <p className="text-xs text-gray-400 mb-1">Parent 1</p>
-          <p className="font-semibold text-gray-800 text-sm truncate">{log.parent1?.name || "Parent 1"}</p>
-          <div className="flex flex-wrap gap-1 mt-1.5">
-            <TraitBadge label="Size" value={`${log.parent1?.size ?? 50}%`} />
-            <TraitBadge label="Eggs" value={`${log.parent1?.eggProd ?? 50}%`} />
-          </div>
-        </div>
-        <span className="text-orange-400 font-light text-xl">×</span>
-        <div className="flex-1 bg-amber-50 rounded-xl p-3 min-w-0">
-          <p className="text-xs text-gray-400 mb-1">Parent 2</p>
-          <p className="font-semibold text-gray-800 text-sm truncate">{log.parent2?.name || "Parent 2"}</p>
-          <div className="flex flex-wrap gap-1 mt-1.5">
-            <TraitBadge label="Size" value={`${log.parent2?.size ?? 50}%`} />
-            <TraitBadge label="Eggs" value={`${log.parent2?.eggProd ?? 50}%`} />
-          </div>
-        </div>
-      </div>
-      <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-100 rounded-xl p-3">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-3.5 h-3.5 rounded-full border shadow-sm" style={{ background: offspringColor }} />
-          <p className="text-xs font-semibold text-green-700 uppercase tracking-wide">Predicted Offspring</p>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          <TraitBadge label="Size" value={`${log.offspring?.size ?? 50}%`} />
-          <TraitBadge label="Eggs" value={`${log.offspring?.eggProd ?? 50}%`} />
-          <TraitBadge label="Feather" value={log.offspring?.feather || "smooth"} />
-          <TraitBadge label="Color" value={log.offspring?.color || "white"} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function BreederLogsTab() {
-  const [logs, setLogs] = useState([]);
+// ─── Global Logs Tab ──────────────────────────────────────────────────────────
+function GlobalLogsTab() {
+  const [breedingLogs, setBreedingLogs] = useState([]);
+  const [inventoryLogs, setInventoryLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const PAGE_SIZE = 15;
 
-  const fetchLogs = useCallback(async (p = 1) => {
+  const fetchAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getAllBreedingLogs(p, 10);
-      setLogs(data.logs || []);
-      setTotalPages(data.pages || 1);
-      setPage(p);
+      const [bData, iData] = await Promise.all([
+        getAllBreedingLogs(1, 100),
+        getAllInventoryLogs(1, 100),
+      ]);
+      setBreedingLogs((bData.logs || []).map(l => ({ ...l, _type: "breeding" })));
+      setInventoryLogs((iData.logs || []).map(l => ({ ...l, _type: "inventory" })));
     } catch (err) {
-      console.error("[BreederLogs] Fetch failed:", err?.response?.data || err?.message || err);
-      setError("Could not load breeding logs. Please try refreshing.");
+      console.error("[GlobalLogs] Fetch failed:", err?.response?.data || err?.message || err);
+      setError("Could not load logs. Please try refreshing.");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchLogs(1); }, [fetchLogs]);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const allLogs = useMemo(() =>
+    [...breedingLogs, ...inventoryLogs].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+    [breedingLogs, inventoryLogs]
+  );
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return allLogs.filter(l => {
+      if (typeFilter !== "all" && l._type !== typeFilter) return false;
+      if (!q) return true;
+      if (l.sellerName?.toLowerCase().includes(q)) return true;
+      if (l._type === "breeding") {
+        return (
+          l.parent1?.name?.toLowerCase().includes(q) ||
+          l.parent2?.name?.toLowerCase().includes(q) ||
+          l.offspring?.color?.toLowerCase().includes(q) ||
+          l.offspring?.feather?.toLowerCase().includes(q)
+        );
+      }
+      if (l._type === "inventory") {
+        return (
+          l.itemName?.toLowerCase().includes(q) ||
+          l.category?.toLowerCase().includes(q) ||
+          l.action?.toLowerCase().includes(q)
+        );
+      }
+      return false;
+    });
+  }, [allLogs, search, typeFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const breedingCount = allLogs.filter(l => l._type === "breeding").length;
+  const inventoryCount = allLogs.filter(l => l._type === "inventory").length;
+  const handleTypeFilter = (f) => { setTypeFilter(f); setPage(1); };
+  const handleSearch = (v) => { setSearch(v); setPage(1); };
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h3 className="text-lg font-bold text-gray-900">Global Breeder Logs</h3>
-          <p className="text-sm text-gray-500">Live feed of breeding activity across all sellers</p>
+      {/* Controls */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          {[
+            { key: "all", label: `All (${allLogs.length})` },
+            { key: "breeding", label: `Breeding (${breedingCount})` },
+            { key: "inventory", label: `Inventory (${inventoryCount})` },
+          ].map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => handleTypeFilter(key)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
+                typeFilter === key
+                  ? "bg-emerald-500 text-white border-emerald-500"
+                  : "bg-white text-gray-600 border-gray-200 hover:border-emerald-300 hover:text-emerald-600"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
-        <Button variant="outline" size="sm" onClick={() => fetchLogs(page)} disabled={loading}
-          className="border-orange-200 hover:border-orange-400 gap-1.5">
-          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-60">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Input
+              value={search}
+              onChange={e => handleSearch(e.target.value)}
+              placeholder="Search seller, item, breed..."
+              className="pl-8 h-8 text-sm border-gray-200 focus:border-emerald-400"
+            />
+          </div>
+          <Button variant="outline" size="sm" onClick={fetchAll} disabled={loading}
+            className="border-emerald-200 hover:border-emerald-400 gap-1.5 h-8">
+            <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
-      {loading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[...Array(4)].map((_, i) => <div key={i} className="bg-gray-100 rounded-2xl h-44 animate-pulse" />)}
-        </div>
+      {/* Error */}
+      {error && !loading && (
+        <div className="text-center py-10 text-sm text-red-500">{error}</div>
       )}
-      {!loading && error && (
-        <div className="text-center py-16">
-          <Activity className="text-orange-300 mx-auto mb-3" size={48} />
-          <p className="text-gray-600">{error}</p>
-        </div>
-      )}
-      {!loading && !error && logs.length === 0 && (
-        <div className="text-center py-16">
-          <Heart className="text-orange-300 mx-auto mb-4" size={56} />
-          <h4 className="text-xl font-semibold text-gray-800 mb-2">No breeding activity yet</h4>
-          <p className="text-gray-500">Run a prediction in the Breeding Management tab to appear here.</p>
-        </div>
-      )}
-      {!loading && !error && logs.length > 0 && (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {logs.map((log) => <LogCard key={log._id} log={log} />)}
+
+      {/* Table */}
+      {!error && (
+        <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-4 py-3 text-left font-semibold text-gray-600 w-32">Type</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-600 w-36">Seller</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-600">Details</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-600 w-24">Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && [...Array(6)].map((_, i) => (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="px-4 py-3"><div className="h-5 w-20 bg-gray-100 rounded-full animate-pulse" /></td>
+                    <td className="px-4 py-3"><div className="h-5 w-24 bg-gray-100 rounded animate-pulse" /></td>
+                    <td className="px-4 py-3"><div className="h-5 w-full bg-gray-100 rounded animate-pulse" /></td>
+                    <td className="px-4 py-3"><div className="h-5 w-16 bg-gray-100 rounded animate-pulse" /></td>
+                  </tr>
+                ))}
+                {!loading && paginated.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-14 text-center">
+                      <Globe2 size={36} className="mx-auto mb-3 text-gray-300" />
+                      <p className="text-gray-400 text-sm">
+                        {search || typeFilter !== "all"
+                          ? "No logs match your search or filter."
+                          : "No activity yet. Post an inventory item or run a breeding prediction."}
+                      </p>
+                    </td>
+                  </tr>
+                )}
+                {!loading && paginated.map((log) => (
+                  <tr key={`${log._type}-${log._id}`}
+                    className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                    {/* Type */}
+                    <td className="px-4 py-3">
+                      {log._type === "breeding" ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-600 border border-rose-100">
+                          <Heart size={10} /> Breeding
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-100">
+                          <Package size={10} /> Inventory
+                        </span>
+                      )}
+                    </td>
+                    {/* Seller */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                          {log.sellerName?.charAt(0)?.toUpperCase() || "?"}
+                        </div>
+                        <span className="font-medium text-gray-800 truncate">{log.sellerName || "Anonymous"}</span>
+                      </div>
+                    </td>
+                    {/* Details */}
+                    <td className="px-4 py-3 text-gray-700">
+                      {log._type === "breeding" ? (
+                        <span>
+                          <span className="font-semibold text-gray-900">{log.parent1?.name || "P1"}</span>
+                          <span className="text-gray-400 mx-1">×</span>
+                          <span className="font-semibold text-gray-900">{log.parent2?.name || "P2"}</span>
+                          <span className="text-gray-400 mx-1.5">→</span>
+                          <span className="text-emerald-700">
+                            Size {log.offspring?.size ?? "?"}%
+                            {" · "}Eggs {log.offspring?.eggProd ?? "?"}%
+                            {" · "}{log.offspring?.feather || "smooth"}
+                            {" · "}{log.offspring?.color || "white"}
+                          </span>
+                        </span>
+                      ) : (
+                        <span>
+                          <span className="font-semibold text-gray-900">{log.itemName}</span>
+                          <span className="text-gray-400 mx-1.5">·</span>
+                          <span className="text-blue-700 font-medium">{log.qty} units</span>
+                          <span className="text-gray-400 mx-1.5">·</span>
+                          <span className="text-gray-500">{log.category}</span>
+                          {log.action && log.action !== "posted" && (
+                            <span className="ml-2 text-xs px-1.5 py-0.5 bg-gray-100 rounded text-gray-400 capitalize">{log.action}</span>
+                          )}
+                          {log.note && (
+                            <span className="ml-2 text-xs text-gray-400 italic">{log.note}</span>
+                          )}
+                        </span>
+                      )}
+                    </td>
+                    {/* Time */}
+                    <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
+                      {timeAgo(log.createdAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-3">
-              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => fetchLogs(page - 1)} className="border-orange-200">
-                <ChevronLeft size={16} />
-              </Button>
-              <span className="text-sm text-gray-600">Page {page} of {totalPages}</span>
-              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => fetchLogs(page + 1)} className="border-orange-200">
-                <ChevronRight size={16} />
-              </Button>
-            </div>
-          )}
-        </>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!loading && !error && totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
+          <span className="text-xs text-gray-400">
+            {filtered.length} entries · Page {safePage} of {totalPages}
+          </span>
+          <div className="flex items-center gap-1.5">
+            <Button variant="outline" size="sm" disabled={safePage <= 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              className="h-7 px-2 border-gray-200">
+              <ChevronLeft size={14} />
+            </Button>
+            <Button variant="outline" size="sm" disabled={safePage >= totalPages}
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              className="h-7 px-2 border-gray-200">
+              <ChevronRight size={14} />
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -198,10 +296,10 @@ export default function ToolsHubPage() {
       activeBg: "bg-gradient-to-r from-[#ff9500] to-[#ffb761]",
     },
     {
-      id: "breeder-logs",
-      label: "Breeder Logs",
-      icon: Activity,
-      description: "Global feed of breeding activity from all sellers",
+      id: "global-logs",
+      label: "Global Logs",
+      icon: Globe2,
+      description: "Live activity feed of all sellers' breeding & inventory",
       color: "from-[#10b981] to-[#059669]",
       bgColor: "bg-gradient-to-br from-[#10b981]/10 to-[#059669]/10",
       borderColor: "border-[#10b981]/30",
@@ -224,7 +322,7 @@ export default function ToolsHubPage() {
               Tools Hub
             </h1>
             <p className="text-base text-orange-100 max-w-2xl mx-auto leading-relaxed">
-              Inventory, Breeding Management, Record Keeping &amp; Breeder Logs
+              Inventory, Breeding Management, Record Keeping &amp; Global Logs
             </p>
           </div>
         </div>
@@ -297,7 +395,7 @@ export default function ToolsHubPage() {
               {tab === "inventory" && <InventoryPage />}
               {tab === "breeding" && <BreedingManagementPage />}
               {tab === "records" && <ChangeHistoryPage />}
-              {tab === "breeder-logs" && <BreederLogsTab />}
+              {tab === "global-logs" && <GlobalLogsTab />}
             </div>
           </div>
         </div>
