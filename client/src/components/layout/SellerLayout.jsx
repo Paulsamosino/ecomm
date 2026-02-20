@@ -24,6 +24,7 @@ import {
   User,
   Mail,
   Key,
+  Wrench,
 } from "lucide-react";
 import SellerNavbar from "./SellerNavbar";
 
@@ -104,6 +105,13 @@ const SellerLayout = () => {
       label: "Community",
       items: [
   { name: "Blog", path: "/seller/blog", icon: Bird },
+      ],
+    },
+    {
+      group: "tools",
+      label: "Tools",
+      items: [
+        { name: "Tools Hub", path: "/seller/tools", icon: Wrench },
       ],
     },
     {

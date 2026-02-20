@@ -106,6 +106,8 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/ads", adsRoutes);
 app.use("/api/wallet", walletRoutes);
+app.use("/api/upload", require("./routes/upload"));
+app.use("/api/breeding-logs", require("./routes/breedingLogs"));
 
 // Connect to MongoDB with enhanced error handling
 mongoose

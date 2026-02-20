@@ -84,6 +84,7 @@ import Feed from "@/pages/Feed/Feed";
 import BlogLayout from "@/pages/Blog/BlogLayout";
 import SellerBlogLayout from "@/pages/Blog/SellerBlogLayout";
 import ToolsHubPage from "@/pages/ToolsHubPage";
+import AdminToolsHubPage from "@/pages/AdminDashboard/AdminToolsHubPage";
 
 const AppContent = () => {
   const location = useLocation();
@@ -179,7 +180,9 @@ const AppContent = () => {
             <Route path="change-name" element={<SellerChangeName />} />
             <Route path="change-email" element={<SellerChangeEmail />} />
             <Route path="change-password" element={<SellerChangePassword />} />
-            {/* Blog routes for sellers with SellerBlogLayout */}
+            {/* Seller Tools Hub */}
+            <Route path="tools" element={<ToolsHubPage />} />
+            {/* Blog routes for sellers with SellerBlogLayout */}}
             <Route path="blog" element={<SellerBlogLayout />}>
               <Route index element={<BlogList />} />
               <Route path="explore" element={<BlogList />} />
@@ -208,6 +211,7 @@ const AppContent = () => {
             <Route path="messages" element={<AdminMessages />} />
             <Route path="settings" element={<AdminSettings />} />
             <Route path="maintenance" element={<AdminMaintenance />} />
+            <Route path="tools" element={<AdminToolsHubPage />} />
             <Route path="help" element={<AdminHelp />} />
           </Route>
         </Route>

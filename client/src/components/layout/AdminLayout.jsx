@@ -13,6 +13,7 @@ import {
   MonitorPlay,
   FileText,
   CreditCard,
+  Wrench,
 } from "lucide-react";
 
 const AdminLayout = () => {
@@ -37,6 +38,7 @@ const AdminLayout = () => {
   { name: "Analytics", path: "/admin/analytics", icon: BarChart },
   { name: "Maintenance", path: "/admin/maintenance", icon: Settings },
   { name: "Blog", path: "/admin/blog", icon: FileText },
+  { name: "Tools Hub", path: "/admin/tools", icon: Wrench },
   { name: "Messages", path: "/admin/messages", icon: MessageCircle },
   ];
 

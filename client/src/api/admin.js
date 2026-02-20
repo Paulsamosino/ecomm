@@ -227,3 +227,43 @@ export const apiUpdateUserCredentials = async (userId, payload) => {
   const response = await axiosInstance.patch(`/admin/users/${userId}/credentials`, payload);
   return response.data;
 };
+
+// ─── Breeding Preset Management ──────────────────────────────────────────────
+
+// Used by BreedingManagementPage (public — any logged-in user)
+export const apiGetPublicBreedingPresets = async () => {
+  const response = await axiosInstance.get("/admin/presets/public");
+  return response.data;
+};
+
+// Admin-only preset management
+export const apiGetBreedingPresets = async () => {
+  const response = await axiosInstance.get("/admin/presets");
+  return response.data;
+};
+
+export const apiCreateBreedingPreset = async (data) => {
+  const response = await axiosInstance.post("/admin/presets", data);
+  return response.data;
+};
+
+export const apiUpdateBreedingPreset = async (id, data) => {
+  const response = await axiosInstance.put(`/admin/presets/${id}`, data);
+  return response.data;
+};
+
+export const apiDeleteBreedingPreset = async (id) => {
+  const response = await axiosInstance.delete(`/admin/presets/${id}`);
+  return response.data;
+};
+
+// Upload a preset image (admin only)
+export const apiUploadPresetImage = async (file) => {
+  const formData = new FormData();
+  formData.append("image", file);
+  const response = await axiosInstance.post("/upload/preset-image", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return response.data; // { imageUrl, imagePublicId }
+};
+

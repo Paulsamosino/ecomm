@@ -29,6 +29,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { logBreedingChange } from "@/utils/changeLogger";
+import { apiGetPublicBreedingPresets } from "@/api/admin";
+import { createBreedingLog } from "@/api/breedingLog";
 
 const STORAGE_KEY = "breeding_records_v2";
 const PRESETS_KEY = "breeding_presets_v2";
@@ -107,6 +109,7 @@ export default function BreedingManagementPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [previewPreset, setPreviewPreset] = useState(null);
 
   // Load data from localStorage
   useEffect(() => {
@@ -150,6 +153,16 @@ export default function BreedingManagementPage() {
     logBreedingChange('create', newRecord);
     setBreedingRecords(prev => [newRecord, ...prev]);
     setResult({ size: avgSize, eggProd: avgEgg, feather, color, details: { parents: [p1, p2] } });
+
+    // Post to global Breeder Logs feed
+    createBreedingLog({
+      parent1: { name: p1Name, size: p1.size, eggProd: p1.eggProd, feather: p1.feather, color: p1.color },
+      parent2: { name: p2Name, size: p2.size, eggProd: p2.eggProd, feather: p2.feather, color: p2.color },
+      offspring: { size: avgSize, eggProd: avgEgg, feather, color },
+      notes: newRecord.notes,
+    }).catch((err) => {
+      console.warn("[BreederLog] Failed to post log:", err?.response?.data || err?.message || err);
+    });
   };
 
   const openEditModal = (record) => {
@@ -195,25 +208,31 @@ export default function BreedingManagementPage() {
     { label: 'Gold', value: 'gold' },
   ];
 
-  // Breed presets with hex colors for cleaner swatches
-  const initialPresets = [
-    { name: 'Leghorn', size: 45, eggProd: 85, feather: 'smooth', colorName: 'White', color: '#F8FAFC' },
-    { name: 'Rhode Island Red', size: 70, eggProd: 70, feather: 'smooth', colorName: 'Red', color: '#E11D48' },
-    { name: 'Silkie', size: 30, eggProd: 35, feather: 'frizzle', colorName: 'White', color: '#F8FAFC' },
-    { name: 'Plymouth Rock', size: 75, eggProd: 60, feather: 'smooth', colorName: 'Brown', color: '#7F2A2A' },
-    { name: 'Ayam Cemani', size: 55, eggProd: 40, feather: 'smooth', colorName: 'Black', color: '#0F172A' },
-  ];
-  const [breedPresetsState, setBreedPresetsState] = useState(() => {
-    try {
-      // Try the new key first, fallback to the older key to migrate
-      const raw = localStorage.getItem(PRESETS_KEY) || localStorage.getItem('breeding_presets_v1');
-      if (raw) return JSON.parse(raw);
-    } catch (e) {}
-    return initialPresets;
-  });
-  // Persist presets when they change (use PRESETS_KEY)
+  // Preset state — loaded from admin API; localStorage used as offline cache only
+  const [breedPresetsState, setBreedPresetsState] = useState([]);
+
   useEffect(() => {
-    try { localStorage.setItem(PRESETS_KEY, JSON.stringify(breedPresetsState)); } catch (e) {}
+    apiGetPublicBreedingPresets()
+      .then((presets) => {
+        if (Array.isArray(presets) && presets.length > 0) {
+          setBreedPresetsState(presets);
+        }
+      })
+      .catch(() => {
+        try {
+          const cached = localStorage.getItem(PRESETS_KEY);
+          if (cached) setBreedPresetsState(JSON.parse(cached));
+        } catch (e) {}
+      });
+  }, []);
+
+  // Cache presets locally for offline fallback
+  useEffect(() => {
+    try {
+      if (breedPresetsState.length > 0) {
+        localStorage.setItem(PRESETS_KEY, JSON.stringify(breedPresetsState));
+      }
+    } catch (e) {}
   }, [breedPresetsState]);
   const [selectedPresetP1, setSelectedPresetP1] = useState(null);
   const [selectedPresetP2, setSelectedPresetP2] = useState(null);
@@ -423,26 +442,99 @@ export default function BreedingManagementPage() {
               <div className="flex items-center gap-2 mb-3">
                 <Heart className="text-orange-500" size={16} />
                 <span className="font-semibold text-gray-800">Quick Presets</span>
-                <span className="text-sm text-gray-500">Click to apply to selected parent</span>
+                <span className="text-sm text-gray-500">Click to preview &amp; apply</span>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-                {breedPresetsState.map((preset, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => applyPresetToParent(preset, applyTarget)}
-                    className="p-3 rounded-lg border border-orange-200 bg-orange-50/50 hover:bg-orange-100 transition text-left"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="w-4 h-4 rounded-full border" style={{ background: preset.color }} />
-                      <span className="text-sm font-medium text-gray-900">{preset.name}</span>
-                    </div>
-                    <div className="text-xs text-gray-600">
-                      Size: {preset.size}% • Eggs: {preset.eggProd}%
-                    </div>
-                  </button>
-                ))}
-              </div>
+              {breedPresetsState.length === 0 ? (
+                <p className="text-sm text-gray-400 italic">No presets available yet — an admin can add them from the Tools Hub.</p>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                  {breedPresetsState.map((preset, idx) => (
+                    <button
+                      key={preset._id || idx}
+                      onClick={() => setPreviewPreset(preset)}
+                      className="p-3 rounded-lg border border-orange-200 bg-orange-50/50 hover:bg-orange-100 transition text-left group"
+                    >
+                      {preset.imageUrl && (
+                        <img
+                          src={preset.imageUrl}
+                          alt={preset.name}
+                          className="w-full h-16 object-cover rounded mb-2 opacity-90 group-hover:opacity-100 transition"
+                        />
+                      )}
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="w-4 h-4 rounded-full border flex-shrink-0" style={{ background: preset.colorHex || preset.color || '#F8FAFC' }} />
+                        <span className="text-sm font-medium text-gray-900 truncate">{preset.name}</span>
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        Size: {preset.size}% • Eggs: {preset.eggProd}%
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
+
+            {/* Preset Preview Dialog */}
+            {previewPreset && (
+              <Dialog open={!!previewPreset} onOpenChange={(o) => !o && setPreviewPreset(null)}>
+                <DialogContent className="max-w-md bg-white text-gray-900">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded-full border" style={{ background: previewPreset.colorHex || previewPreset.color || '#F8FAFC' }} />
+                      {previewPreset.name}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    {previewPreset.imageUrl ? (
+                      <img
+                        src={previewPreset.imageUrl}
+                        alt={previewPreset.name}
+                        className="w-full h-52 object-cover rounded-xl"
+                      />
+                    ) : (
+                      <div className="w-full h-32 rounded-xl flex items-center justify-center" style={{ background: (previewPreset.colorHex || previewPreset.color || '#F8FAFC') + '33' }}>
+                        <Heart className="text-orange-400" size={40} />
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="bg-orange-50 rounded-lg p-3">
+                        <p className="text-gray-500 text-xs mb-1">Body Size</p>
+                        <p className="font-semibold text-gray-900">{previewPreset.size}% <span className="font-normal text-gray-500">({previewPreset.size < 33 ? 'Small' : previewPreset.size < 66 ? 'Medium' : 'Large'})</span></p>
+                      </div>
+                      <div className="bg-orange-50 rounded-lg p-3">
+                        <p className="text-gray-500 text-xs mb-1">Egg Production</p>
+                        <p className="font-semibold text-gray-900">{previewPreset.eggProd}% <span className="font-normal text-gray-500">({previewPreset.eggProd < 33 ? 'Low' : previewPreset.eggProd < 66 ? 'Moderate' : 'High'})</span></p>
+                      </div>
+                      <div className="bg-orange-50 rounded-lg p-3">
+                        <p className="text-gray-500 text-xs mb-1">Feather Type</p>
+                        <p className="font-semibold text-gray-900 capitalize">{previewPreset.feather}</p>
+                      </div>
+                      <div className="bg-orange-50 rounded-lg p-3 flex items-center gap-2">
+                        <div className="w-5 h-5 rounded-full border-2 border-white shadow flex-shrink-0" style={{ background: previewPreset.colorHex || previewPreset.color || '#F8FAFC' }} />
+                        <div>
+                          <p className="text-gray-500 text-xs">Color</p>
+                          <p className="font-semibold text-gray-900">{previewPreset.colorName || 'Unknown'}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        className="flex-1 bg-gradient-to-r from-orange-400 to-orange-500 text-white"
+                        onClick={() => { applyPresetToParent(previewPreset, 1); setPreviewPreset(null); }}
+                      >
+                        Apply to P1
+                      </Button>
+                      <Button
+                        className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white"
+                        onClick={() => { applyPresetToParent(previewPreset, 2); setPreviewPreset(null); }}
+                      >
+                        Apply to P2
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
             {/* Prediction Result */}
             {result && (
               <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">

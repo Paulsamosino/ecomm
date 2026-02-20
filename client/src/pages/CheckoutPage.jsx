@@ -28,7 +28,7 @@ const PAYMENT_METHODS = [
   { value: "wallet", label: "C&P Wallet", icon: Banknote, color: "#f59e0b" },
   { value: "cod", label: "Cash on Delivery", icon: Banknote, color: "#16a34a" },
   // GCASH is planned but not yet available
-  { value: "gcash", label: "GCash (coming soon)", icon: Banknote, color: "#0ea5a4", comingSoon: true }
+  { value: "gcash", label: "GCash Not Available", icon: Banknote, color: "#0ea5a4", comingSoon: true }
 ];
 
 // Location data based on deliveryController geocoding with ZIP codes
@@ -474,7 +474,7 @@ const PaymentMethodSelector = ({ paymentMethod, onPaymentMethodChange }) => (
         const Icon = method.icon;
         const isComing = method.comingSoon;
         return (
-          <button
+          <button 
             key={method.value}
             type="button"
             onClick={() => { if (!isComing) onPaymentMethodChange(method.value); }}
@@ -487,7 +487,7 @@ const PaymentMethodSelector = ({ paymentMethod, onPaymentMethodChange }) => (
           >
             <Icon className="h-6 w-6" style={{ color: method.color }} />
             <span className="font-medium text-gray-900 text-sm">{method.label}</span>
-            {isComing && <span className="text-xs text-gray-500 mt-1">(coming soon)</span>}
+            {isComing && <span className="text-xs text-gray-500 mt-1"></span>}
           </button>
         );
       })}

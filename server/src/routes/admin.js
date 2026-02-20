@@ -131,4 +131,64 @@ router.post("/delivery-sync/manual", auth, isAdmin, async (req, res) => {
 router.get('/maintenance', auth, isAdmin, adminController.getMaintenance);
 router.post('/maintenance', auth, isAdmin, adminController.setMaintenance);
 
+// ─── Breeding Preset Management ──────────────────────────────────────────────
+const BreedingPreset = require("../models/BreedingPreset");
+
+router.get("/presets", auth, isAdmin, async (req, res) => {
+  try {
+    const presets = await BreedingPreset.find({ isActive: true }).sort({ createdAt: -1 }).lean();
+    res.json(presets);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch presets" });
+  }
+});
+
+// Public route (no isAdmin) so buyers/sellers can fetch presets for the tool
+router.get("/presets/public", auth, async (req, res) => {
+  try {
+    const presets = await BreedingPreset.find({ isActive: true }).sort({ createdAt: -1 }).lean();
+    res.json(presets);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch presets" });
+  }
+});
+
+router.post("/presets", auth, isAdmin, async (req, res) => {
+  try {
+    const { name, size, eggProd, feather, colorName, colorHex, imageUrl, imagePublicId } = req.body;
+    if (!name) return res.status(400).json({ message: "Preset name is required" });
+    const preset = new BreedingPreset({
+      name, size, eggProd, feather, colorName, colorHex, imageUrl, imagePublicId,
+      createdBy: req.user._id,
+    });
+    await preset.save();
+    res.status(201).json(preset);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to create preset" });
+  }
+});
+
+router.put("/presets/:id", auth, isAdmin, async (req, res) => {
+  try {
+    const preset = await BreedingPreset.findByIdAndUpdate(
+      req.params.id,
+      { $set: req.body },
+      { new: true, runValidators: true }
+    );
+    if (!preset) return res.status(404).json({ message: "Preset not found" });
+    res.json(preset);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to update preset" });
+  }
+});
+
+router.delete("/presets/:id", auth, isAdmin, async (req, res) => {
+  try {
+    await BreedingPreset.findByIdAndUpdate(req.params.id, { isActive: false });
+    res.json({ message: "Preset deleted" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to delete preset" });
+  }
+});
+
 module.exports = router;
