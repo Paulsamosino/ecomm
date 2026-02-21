@@ -20,13 +20,14 @@ import {
   Archive,
   Eye,
   EyeOff,
-  Share2
+  Share2,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { logInventoryChange } from "@/utils/changeLogger";
-import { createInventoryLog } from "@/api/inventoryLog";
+import { createInventoryLog, deleteInventoryLog } from "@/api/inventoryLog";
 
 const STORAGE_KEY = "inventory_v2";
 const RECENT_KEY = "recent_purchases_v1";
@@ -45,9 +46,11 @@ export default function InventoryPage() {
   const [name, setName] = useState("");
   const [qty, setQty] = useState(1);
   const [showArchived, setShowArchived] = useState(false);
-  // lightweight UI mode: card/grid toggle could be added later
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
+  // Inline editing: { id, field, value }
+  const [inlineEdit, setInlineEdit] = useState(null);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -73,20 +76,54 @@ export default function InventoryPage() {
     }
   }, [inventory]);
 
+  // ─── Global Log Sync: upsert by sourceId (no delete, no race conditions) ───
+  const refreshGlobalLog = async (item) => {
+    try {
+      const created = await createInventoryLog({
+        itemName: item.name,
+        category: item.category || 'Uncategorized',
+        qty: item.qty,
+        action: item.archived ? 'archived' : 'posted',
+        sourceId: item.id, // server upserts by (user + sourceId)
+      });
+      return created._id;
+    } catch (err) {
+      console.warn('[InventoryLog] Refresh failed:', err?.response?.data || err?.message);
+      return null;
+    }
+  };
+
+  // Sync ALL posted items at once
+  const syncAllPosted = async () => {
+    const posted = inventory.filter(p => p.globalLogId);
+    if (posted.length === 0) return;
+    setSyncing(true);
+    // upsert each — server deduplicates by sourceId, no race conditions
+    await Promise.all(posted.map(item => refreshGlobalLog(item)));
+    setSyncing(false);
+  };
+
+  // Helper: after mutating a posted item, refresh its global log
+  const syncIfPosted = async (updatedItem) => {
+    if (!updatedItem.globalLogId) return;
+    await refreshGlobalLog(updatedItem); // upsert — same _id returned, no state update needed
+  };
+
   const addOrMerge = ({ name: n, qty: q, category: c }) => {
     const trimmed = (n || "").trim();
     if (!trimmed) return;
-    setInventory((prev) => {
-      const found = prev.find((p) => p.name.toLowerCase() === trimmed.toLowerCase());
-      if (found) {
-        const updatedItem = { ...found, qty: formatNumber(found.qty) + formatNumber(q), category: c || found.category };
-        logInventoryChange('update', updatedItem, { previousQty: found.qty, addedQty: q });
-        return prev.map((p) => (p.name.toLowerCase() === trimmed.toLowerCase() ? updatedItem : p));
-      }
+    const found = inventory.find((p) => p.name.toLowerCase() === trimmed.toLowerCase());
+    if (found) {
+      const newQty = formatNumber(found.qty) + formatNumber(q);
+      const updatedItem = { ...found, qty: newQty, category: c || found.category };
+      logInventoryChange('update', updatedItem, { previousQty: found.qty, addedQty: q });
+      setInventory(prev => prev.map(p => p.name.toLowerCase() === trimmed.toLowerCase() ? updatedItem : p));
+      syncIfPosted({ ...updatedItem, globalLogId: found.globalLogId });
+    } else {
       const newItem = { id: Date.now().toString(), name: trimmed, qty: formatNumber(q), category: c || "Uncategorized", createdAt: new Date().toISOString() };
       logInventoryChange('add', newItem);
-      return [...prev, newItem];
-    });
+      setInventory(prev => [...prev, newItem]);
+    }
   };
 
   const removeItem = (id) => {
@@ -94,26 +131,65 @@ export default function InventoryPage() {
     if (!it) return;
     if (!window.confirm(`Remove "${it.name}" from inventory?`)) return;
     logInventoryChange('delete', it);
+    if (it.globalLogId) {
+      deleteInventoryLog(it.globalLogId)
+        .catch(err => console.warn('[InventoryLog] Auto-remove on delete failed:', err?.response?.data || err?.message));
+    }
     setInventory((prev) => prev.filter((p) => p.id !== id));
     setSelected((prev) => prev.filter((x) => x !== id));
   };
 
-  const postItemToGlobalLog = (item) => {
-    createInventoryLog({
-      itemName: item.name,
-      category: item.category,
-      qty: item.qty,
-      action: "posted",
-    }).catch(err => console.warn("[InventoryLog] Post failed:", err?.response?.data || err?.message));
+  const startInlineEdit = (id, field, value) => setInlineEdit({ id, field, value });
+
+  const commitInlineEdit = () => {
+    if (!inlineEdit) return;
+    const { id, field, value } = inlineEdit;
+    const trimmed = value.trim();
+    if (!trimmed) { setInlineEdit(null); return; }
+    const item = inventory.find(p => p.id === id);
+    if (!item) { setInlineEdit(null); return; }
+    const updatedItem = { ...item, [field]: trimmed };
+    logInventoryChange('update', updatedItem, { field });
+    setInventory(prev => prev.map(p => p.id === id ? updatedItem : p));
+    syncIfPosted({ ...updatedItem, globalLogId: item.globalLogId });
+    setInlineEdit(null);
   };
+
+  const cancelInlineEdit = () => setInlineEdit(null);
+
+  const toggleGlobalLog = async (item) => {
+    if (item.globalLogId) {
+      // Unpost — remove from global logs
+      try { await deleteInventoryLog(item.globalLogId); } catch (_) { /* ok */ }
+      setInventory(prev => prev.map(p => p.id === item.id ? { ...p, globalLogId: undefined } : p));
+    } else {
+      // Post — upsert with sourceId
+      try {
+        const created = await createInventoryLog({
+          itemName: item.name,
+          category: item.category || 'Uncategorized',
+          qty: item.qty,
+          action: 'posted',
+          sourceId: item.id,
+        });
+        setInventory(prev => prev.map(p => p.id === item.id ? { ...p, globalLogId: created._id } : p));
+      } catch (err) {
+        console.warn('[InventoryLog] Post failed:', err?.response?.data || err?.message);
+      }
+    }
+  };
+
+
 
   const updateQty = (id, newQty) => {
     const item = inventory.find(p => p.id === id);
     if (!item) return;
     const previousQty = item.qty;
-    const updatedItem = { ...item, qty: formatNumber(newQty) };
-    logInventoryChange('update', updatedItem, { previousQty, newQty });
+    const parsed = formatNumber(newQty);
+    const updatedItem = { ...item, qty: parsed };
+    logInventoryChange('update', updatedItem, { previousQty, newQty: parsed });
     setInventory((prev) => prev.map((p) => (p.id === id ? updatedItem : p)));
+    syncIfPosted(updatedItem);
   };
 
   const adjustQty = (id, adjustment) => {
@@ -126,6 +202,7 @@ export default function InventoryPage() {
     setInventory((prev) => prev.map((p) =>
       p.id === id ? updatedItem : p
     ));
+    syncIfPosted(updatedItem);
   };
 
   const duplicateItem = (item) => {
@@ -142,19 +219,23 @@ export default function InventoryPage() {
   const archiveItem = (id) => {
     const item = inventory.find(p => p.id === id);
     if (!item) return;
-    logInventoryChange('archive', { ...item, archived: true });
+    const updatedItem = { ...item, archived: true };
+    logInventoryChange('archive', updatedItem);
     setInventory((prev) => prev.map((p) =>
-      p.id === id ? { ...p, archived: true } : p
+      p.id === id ? updatedItem : p
     ));
+    syncIfPosted(updatedItem);
   };
 
   const restoreItem = (id) => {
     const item = inventory.find(p => p.id === id);
     if (!item) return;
-    logInventoryChange('restore', { ...item, archived: false });
+    const updatedItem = { ...item, archived: false };
+    logInventoryChange('restore', updatedItem);
     setInventory((prev) => prev.map((p) =>
-      p.id === id ? { ...p, archived: false } : p
+      p.id === id ? updatedItem : p
     ));
+    syncIfPosted(updatedItem);
   };
 
   const exportJSON = () => {
@@ -272,7 +353,13 @@ export default function InventoryPage() {
     if (selected.length === 0) return;
     if (!window.confirm(`Remove ${selected.length} selected items from inventory?`)) return;
     const itemsToRemove = inventory.filter(p => selected.includes(p.id));
-    itemsToRemove.forEach(item => logInventoryChange('delete', item, { source: 'bulk_delete' }));
+    itemsToRemove.forEach(item => {
+      logInventoryChange('delete', item, { source: 'bulk_delete' });
+      if (item.globalLogId) {
+        deleteInventoryLog(item.globalLogId)
+          .catch(err => console.warn('[InventoryLog] Bulk auto-remove failed:', err?.response?.data || err?.message));
+      }
+    });
     logInventoryChange('delete', { count: selected.length }, { source: 'bulk_operation', itemIds: selected });
     setInventory((prev) => prev.filter((p) => !selected.includes(p.id)));
     setSelected([]);
@@ -319,6 +406,10 @@ export default function InventoryPage() {
     const it = inventory.find((p) => p.id === id);
     if (!it) return;
     if (!window.confirm(`Permanently delete archived item "${it.name}"? This cannot be undone.`)) return;
+    if (it.globalLogId) {
+      deleteInventoryLog(it.globalLogId)
+        .catch(err => console.warn('[InventoryLog] Auto-remove on delete failed:', err?.response?.data || err?.message));
+    }
     setInventory((prev) => prev.filter((p) => p.id !== id));
   };
 
@@ -406,6 +497,17 @@ export default function InventoryPage() {
               </div>
             </div>
             <div className="flex gap-3">
+              {inventory.some(p => p.globalLogId) && (
+                <Button
+                  variant="outline"
+                  className="border-2 border-emerald-300 hover:border-emerald-500 hover:bg-emerald-50 transition-all duration-200 font-semibold text-emerald-600"
+                  onClick={syncAllPosted}
+                  disabled={syncing}
+                >
+                  <RefreshCw className={`mr-2 ${syncing ? 'animate-spin' : ''}`} size={16} />
+                  {syncing ? 'Syncing...' : 'Sync All to Global Logs'}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 className="border-2 border-orange-300 hover:border-[#ffb761] hover:bg-[#ffb761]/5 transition-all duration-200 font-semibold"
@@ -717,17 +819,47 @@ export default function InventoryPage() {
                             className="w-5 h-5 text-[#ffb761] bg-orange-50 border-2 border-orange-300 rounded focus:ring-[#ffb761] focus:ring-2 transition-all duration-200"
                           />
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="font-semibold text-gray-900 text-lg">{it.name}</div>
+                        <td className="px-6 py-4 group" onDoubleClick={() => startInlineEdit(it.id, 'name', it.name)} title="Double-click to edit">
+                          {inlineEdit?.id === it.id && inlineEdit.field === 'name' ? (
+                            <input
+                              autoFocus
+                              className="font-semibold text-gray-900 text-lg border-b-2 border-[#ffb761] bg-transparent outline-none w-full min-w-[100px]"
+                              value={inlineEdit.value}
+                              onChange={e => setInlineEdit(ie => ({ ...ie, value: e.target.value }))}
+                              onBlur={commitInlineEdit}
+                              onKeyDown={e => { if (e.key === 'Enter') commitInlineEdit(); if (e.key === 'Escape') cancelInlineEdit(); }}
+                            />
+                          ) : (
+                            <div className="font-semibold text-gray-900 text-lg cursor-text group-hover:text-[#ff9500] transition-colors">
+                              {it.name}
+                            </div>
+                          )}
                         </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
-                            selected.includes(it.id)
-                              ? 'bg-[#ffb761]/20 text-[#8B4513]'
-                              : 'bg-gradient-to-r from-[#ffb761]/10 to-[#ff9500]/10 text-[#8B4513]'
-                          }`}>
-                            {it.category}
-                          </span>
+                        <td className="px-6 py-4 group" onDoubleClick={() => startInlineEdit(it.id, 'category', it.category || 'Uncategorized')} title="Double-click to edit">
+                          {inlineEdit?.id === it.id && inlineEdit.field === 'category' ? (
+                            <>
+                              <input
+                                autoFocus
+                                list="inline-category-suggestions"
+                                className="border-b-2 border-[#ffb761] bg-transparent outline-none text-sm font-semibold text-[#8B4513] w-full min-w-[80px]"
+                                value={inlineEdit.value}
+                                onChange={e => setInlineEdit(ie => ({ ...ie, value: e.target.value }))}
+                                onBlur={commitInlineEdit}
+                                onKeyDown={e => { if (e.key === 'Enter') commitInlineEdit(); if (e.key === 'Escape') cancelInlineEdit(); }}
+                              />
+                              <datalist id="inline-category-suggestions">
+                                {categories.map(c => <option key={c} value={c} />)}
+                              </datalist>
+                            </>
+                          ) : (
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold cursor-text ${
+                              selected.includes(it.id)
+                                ? 'bg-[#ffb761]/20 text-[#8B4513]'
+                                : 'bg-gradient-to-r from-[#ffb761]/10 to-[#ff9500]/10 text-[#8B4513]'
+                            }`}>
+                              {it.category}
+                            </span>
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
@@ -789,9 +921,13 @@ export default function InventoryPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => postItemToGlobalLog(it)}
-                              className="text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 transition-all duration-200 h-8 w-8 p-0 rounded-full"
-                              title="Post to Global Logs"
+                              onClick={() => toggleGlobalLog(it)}
+                              className={`transition-all duration-200 h-8 w-8 p-0 rounded-full ${
+                                it.globalLogId
+                                  ? "text-emerald-600 bg-emerald-100 hover:bg-emerald-200"
+                                  : "text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50"
+                              }`}
+                              title={it.globalLogId ? "Remove from Global Logs" : "Post to Global Logs"}
                             >
                               <Share2 size={14} />
                             </Button>
@@ -1026,6 +1162,7 @@ export default function InventoryPage() {
           </div>
         </div>
       </div>
+
     </div>
   );
 }

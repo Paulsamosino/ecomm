@@ -13,3 +13,15 @@ export const createBreedingLog = async (data) => {
   const response = await axiosInstance.post("/breeding-logs", data);
   return response.data;
 };
+
+// Update an existing breeding log (real-time sync)
+export const updateBreedingLog = async (id, data) => {
+  const response = await axiosInstance.patch(`/breeding-logs/${id}`, data);
+  return response.data;
+};
+
+// Remove a breeding log entry
+export const deleteBreedingLog = async (id) => {
+  const response = await axiosInstance.delete(`/breeding-logs/${id}`);
+  return response.data;
+};

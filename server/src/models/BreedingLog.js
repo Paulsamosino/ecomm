@@ -13,6 +13,7 @@ const ParentSchema = new mongoose.Schema(
 
 const OffspringSchema = new mongoose.Schema(
   {
+    name: { type: String, default: "" },
     size: { type: Number, default: 50 },
     eggProd: { type: Number, default: 50 },
     feather: { type: String, default: "smooth" },
@@ -43,11 +44,13 @@ const BreedingLogSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    sourceId: { type: String, default: null }, // local record id — for upsert dedup
   },
   { timestamps: true }
 );
 
 // Index for efficient newest-first queries
 BreedingLogSchema.index({ createdAt: -1 });
+BreedingLogSchema.index({ user: 1, sourceId: 1 }, { sparse: true });
 
 module.exports = mongoose.model("BreedingLog", BreedingLogSchema);

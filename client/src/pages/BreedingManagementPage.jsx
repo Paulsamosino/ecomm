@@ -15,7 +15,10 @@ import {
   Copy,
   Archive,
   Edit,
-  X
+  X,
+  Share2,
+  RefreshCw,
+  Dna,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +33,8 @@ import {
 } from "@/components/ui/dialog";
 import { logBreedingChange } from "@/utils/changeLogger";
 import { apiGetPublicBreedingPresets } from "@/api/admin";
-import { createBreedingLog } from "@/api/breedingLog";
+import { createBreedingLog, deleteBreedingLog } from "@/api/breedingLog";
+import { useAuth } from "@/contexts/AuthContext";
 
 const STORAGE_KEY = "breeding_records_v2";
 const PRESETS_KEY = "breeding_presets_v2";
@@ -86,11 +90,24 @@ const ToggleGroup = ({ label, options, value, onChange }) => {
 };
 
 export default function BreedingManagementPage() {
+  const { isAuthenticated } = useAuth();
   const defaultParent = {
     size: 60, // range 0-100: Small -> Large
     eggProd: 50, // 0-100 Low -> High
     feather: 'smooth',
-    color: 'white',
+    color: '#F8FAFC',
+  };
+
+  // Blend two colors (hex or CSS name) into a midpoint hex
+  const blendColors = (c1, c2) => {
+    const namedToHex = { white: '#F8FAFC', brown: '#A1640A', black: '#1E1E1E', red: '#DC2626', gold: '#EAB308' };
+    const toHex = (c) => (c && c.startsWith('#') ? c : namedToHex[c?.toLowerCase()] || '#808080');
+    const h1 = toHex(c1).replace('#', '');
+    const h2 = toHex(c2).replace('#', '');
+    const r = Math.round((parseInt(h1.substring(0,2),16) + parseInt(h2.substring(0,2),16)) / 2);
+    const g = Math.round((parseInt(h1.substring(2,4),16) + parseInt(h2.substring(2,4),16)) / 2);
+    const b = Math.round((parseInt(h1.substring(4,6),16) + parseInt(h2.substring(4,6),16)) / 2);
+    return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
   };
 
   const [breedingRecords, setBreedingRecords] = useState([]);
@@ -110,6 +127,8 @@ export default function BreedingManagementPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
   const [previewPreset, setPreviewPreset] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [inlineEdit, setInlineEdit] = useState(null); // { id, field, value }
 
   // Load data from localStorage
   useEffect(() => {
@@ -136,9 +155,8 @@ export default function BreedingManagementPage() {
     const avgEgg = Math.round((p1.eggProd + p2.eggProd) / 2);
     // Feather dominance: if parents match, child inherits; else pick one as dominant randomly
     const feather = p1.feather === p2.feather ? p1.feather : (Math.random() > 0.5 ? p1.feather : p2.feather);
-    // Color simple dominance map (demo): dark dominates light
-    const colorPriority = ['black', 'brown', 'red', 'white', 'gold'];
-    const color = [p1.color, p2.color].sort((a,b) => (colorPriority.indexOf(a) - colorPriority.indexOf(b)))[0] || p1.color;
+    // Color: blend the two parent colors
+    const color = blendColors(p1.color, p2.color);
 
     const newRecord = {
       id: Date.now().toString(),
@@ -153,17 +171,89 @@ export default function BreedingManagementPage() {
     logBreedingChange('create', newRecord);
     setBreedingRecords(prev => [newRecord, ...prev]);
     setResult({ size: avgSize, eggProd: avgEgg, feather, color, details: { parents: [p1, p2] } });
-
-    // Post to global Breeder Logs feed
-    createBreedingLog({
-      parent1: { name: p1Name, size: p1.size, eggProd: p1.eggProd, feather: p1.feather, color: p1.color },
-      parent2: { name: p2Name, size: p2.size, eggProd: p2.eggProd, feather: p2.feather, color: p2.color },
-      offspring: { size: avgSize, eggProd: avgEgg, feather, color },
-      notes: newRecord.notes,
-    }).catch((err) => {
-      console.warn("[BreederLog] Failed to post log:", err?.response?.data || err?.message || err);
-    });
   };
+
+  // ─── Breeding Log Sync: upsert by sourceId (no delete, no race conditions) ───
+  const refreshBreedingLog = async (record) => {
+    try {
+      const created = await createBreedingLog({
+        parent1: record.parent1,
+        parent2: record.parent2,
+        offspring: record.offspring,
+        notes: record.notes || '',
+        sourceId: record.id, // server upserts by (user + sourceId)
+      });
+      return created._id;
+    } catch (err) {
+      console.warn('[BreedingLog] Refresh failed:', err?.response?.data || err?.message);
+      return null;
+    }
+  };
+
+  const syncBreedingIfPosted = async (record) => {
+    if (!record.globalLogId) return;
+    await refreshBreedingLog(record); // upsert — same _id, no state update needed
+  };
+
+  // Toggle post/unpost to Global Logs
+  const toggleGlobalLog = async (record) => {
+    if (record.globalLogId) {
+      // Unpost — remove from global logs
+      try { await deleteBreedingLog(record.globalLogId); } catch (_) { /* ok */ }
+      setBreedingRecords(prev => prev.map(r => r.id === record.id ? { ...r, globalLogId: undefined } : r));
+    } else {
+      // Post — upsert with sourceId
+      try {
+        const created = await createBreedingLog({
+          parent1: record.parent1,
+          parent2: record.parent2,
+          offspring: record.offspring,
+          notes: record.notes || '',
+          sourceId: record.id,
+        });
+        setBreedingRecords(prev => prev.map(r => r.id === record.id ? { ...r, globalLogId: created._id } : r));
+      } catch (err) {
+        console.warn('[BreedingLog] Post failed:', err?.response?.data || err?.message);
+      }
+    }
+  };
+
+  // Sync ALL posted records at once
+  const syncAllPosted = async () => {
+    const posted = breedingRecords.filter(r => r.globalLogId);
+    if (posted.length === 0) return;
+    setSyncing(true);
+    // upsert each — server deduplicates by sourceId, no race conditions
+    await Promise.all(posted.map(record => refreshBreedingLog(record)));
+    setSyncing(false);
+  };
+
+  // Inline editing helpers
+  const startInlineEdit = (id, field, value) => setInlineEdit({ id, field, value });
+
+  const commitInlineEdit = () => {
+    if (!inlineEdit) return;
+    const { id, field, value } = inlineEdit;
+    const trimmed = value.trim();
+    if (!trimmed) { setInlineEdit(null); return; }
+    const record = breedingRecords.find(r => r.id === id);
+    if (!record) { setInlineEdit(null); return; }
+    let updatedRecord;
+    if (field === 'offspringName') {
+      updatedRecord = { ...record, offspring: { ...record.offspring, name: trimmed } };
+    } else if (field === 'notes') {
+      updatedRecord = { ...record, notes: trimmed };
+    } else {
+      setInlineEdit(null);
+      return;
+    }
+    logBreedingChange('edit', updatedRecord, { originalRecord: record, field });
+    setBreedingRecords(prev => prev.map(r => r.id === id ? updatedRecord : r));
+    syncBreedingIfPosted({ ...updatedRecord, globalLogId: record.globalLogId });
+    setInlineEdit(null);
+  };
+
+  const cancelInlineEdit = () => setInlineEdit(null);
 
   const openEditModal = (record) => {
     setEditingRecord({ ...record });
@@ -178,6 +268,8 @@ export default function BreedingManagementPage() {
     setBreedingRecords(prev =>
       prev.map(r => r.id === editingRecord.id ? editingRecord : r)
     );
+    // Sync: DELETE old log → POST new log with updated data
+    syncBreedingIfPosted(editingRecord);
     setIsEditModalOpen(false);
     setEditingRecord(null);
   };
@@ -207,14 +299,6 @@ export default function BreedingManagementPage() {
     { label: 'Smooth', value: 'smooth' },
     { label: 'Curly', value: 'curly' },
     { label: 'Frizzle', value: 'frizzle' },
-  ];
-
-  const colorOptions = [
-    { label: 'White', value: 'white' },
-    { label: 'Brown', value: 'brown' },
-    { label: 'Black', value: 'black' },
-    { label: 'Red', value: 'red' },
-    { label: 'Gold', value: 'gold' },
   ];
 
   // Preset state — loaded from admin API; localStorage used as offline cache only
@@ -381,13 +465,22 @@ export default function BreedingManagementPage() {
                   <Slider label={`Size: ${pretty.sizeLabel(p1.size)}`} minLabel="Small" maxLabel="Large" value={p1.size} onChange={(v) => setP1((s)=>({ ...s, size: v }))} />
                   <Slider label={`Egg Production: ${pretty.eggLabel(p1.eggProd)} (${pretty.eggRange(p1.eggProd)})`} minLabel="Low" maxLabel="High" value={p1.eggProd} onChange={(v) => setP1((s)=>({ ...s, eggProd: v }))} />
                   <ToggleGroup label="Feather Type" options={featherOptions} value={p1.feather} onChange={(v)=> setP1((s)=>({...s, feather: v }))} />
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <div className="text-sm font-medium text-gray-700">Color</div>
-                    <div className="flex gap-2">
-                      {colorOptions.map((c) => (
-                        <button key={c.value} onClick={() => setP1((s)=>({...s, color: c.value }))} className={`w-6 h-6 rounded-full border-2 ${p1.color === c.value ? 'ring-2 ring-orange-300' : ''}`} style={{ background: c.value === 'white' ? '#F8FAFC' : c.value }} />
-                      ))}
-                    </div>
+                    <label className="flex items-center gap-2.5 cursor-pointer group/c1 select-none w-fit">
+                      <div
+                        className="relative w-8 h-8 rounded-full border-2 border-gray-200 group-hover/c1:border-orange-400 transition-all shadow-sm overflow-hidden flex-shrink-0"
+                        style={{ background: p1.color }}
+                      >
+                        <input
+                          type="color"
+                          value={p1.color.startsWith('#') ? p1.color : '#F8FAFC'}
+                          onChange={(e) => setP1(s => ({ ...s, color: e.target.value }))}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                        />
+                      </div>
+                      <span className="text-xs font-mono text-gray-400 group-hover/c1:text-orange-500 transition-colors">{p1.color}</span>
+                    </label>
                   </div>
                 </div>
               </div>
@@ -412,13 +505,22 @@ export default function BreedingManagementPage() {
                   <Slider label={`Size: ${pretty.sizeLabel(p2.size)}`} minLabel="Small" maxLabel="Large" value={p2.size} onChange={(v) => setP2((s)=>({ ...s, size: v }))} />
                   <Slider label={`Egg Production: ${pretty.eggLabel(p2.eggProd)} (${pretty.eggRange(p2.eggProd)})`} minLabel="Low" maxLabel="High" value={p2.eggProd} onChange={(v) => setP2((s)=>({ ...s, eggProd: v }))} />
                   <ToggleGroup label="Feather Type" options={featherOptions} value={p2.feather} onChange={(v)=> setP2((s)=>({...s, feather: v }))} />
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <div className="text-sm font-medium text-gray-700">Color</div>
-                    <div className="flex gap-2">
-                      {colorOptions.map((c) => (
-                        <button key={c.value} onClick={() => setP2((s)=>({...s, color: c.value }))} className={`w-6 h-6 rounded-full border-2 ${p2.color === c.value ? 'ring-2 ring-orange-300' : ''}`} style={{ background: c.value === 'white' ? '#F8FAFC' : c.value }} />
-                      ))}
-                    </div>
+                    <label className="flex items-center gap-2.5 cursor-pointer group/c2 select-none w-fit">
+                      <div
+                        className="relative w-8 h-8 rounded-full border-2 border-gray-200 group-hover/c2:border-orange-400 transition-all shadow-sm overflow-hidden flex-shrink-0"
+                        style={{ background: p2.color }}
+                      >
+                        <input
+                          type="color"
+                          value={p2.color.startsWith('#') ? p2.color : '#F8FAFC'}
+                          onChange={(e) => setP2(s => ({ ...s, color: e.target.value }))}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                        />
+                      </div>
+                      <span className="text-xs font-mono text-gray-400 group-hover/c2:text-orange-500 transition-colors">{p2.color}</span>
+                    </label>
                   </div>
                 </div>
               </div>
@@ -566,261 +668,388 @@ export default function BreedingManagementPage() {
                     <span className="text-gray-600">Feather:</span>
                     <span className="font-medium ml-1 capitalize">{result.feather}</span>
                   </div>
-                  <div>
+                  <div className="flex items-center gap-1.5">
                     <span className="text-gray-600">Color:</span>
-                    <span className="font-medium ml-1 capitalize">{result.color}</span>
+                    <div className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0" style={{ background: result.color }} />
+                    <span className="font-mono text-sm font-medium">{result.color}</span>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Records Section */}
+            {/* Records Section — Redesigned */}
             <div className="border-t border-orange-100 pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800">Breeding Records</h3>
-                  <p className="text-sm text-gray-500">
-                    {breedingRecords.filter(r => !r.archived).length} active • {breedingRecords.filter(r => r.archived).length} archived
-                  </p>
+              {/* Header Row */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center shadow-md">
+                    <Dna className="text-white" size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Breeding Records</h3>
+                    <p className="text-sm text-gray-500">
+                      <span className="text-emerald-600 font-medium">{breedingRecords.filter(r => !r.archived).length}</span> active
+                      {' · '}
+                      <span className="text-gray-400">{breedingRecords.filter(r => r.archived).length} archived</span>
+                      {breedingRecords.some(r => r.globalLogId) && (
+                        <>
+                          {' · '}
+                          <span className="text-emerald-500 font-medium">{breedingRecords.filter(r => r.globalLogId).length} posted</span>
+                        </>
+                      )}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Input
-                    placeholder="Search records..."
-                    value={filter}
-                    onChange={(e) => setFilter(e.target.value)}
-                    className="w-48 border-orange-200 focus:border-[#ffb761]"
-                  />
+                <div className="flex items-center gap-2 flex-wrap">
+                  {breedingRecords.some(r => r.globalLogId) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-2 border-emerald-300 hover:border-emerald-500 hover:bg-emerald-50 transition-all duration-200 font-semibold text-emerald-600"
+                      onClick={syncAllPosted}
+                      disabled={syncing}
+                    >
+                      <RefreshCw className={`mr-2 ${syncing ? 'animate-spin' : ''}`} size={14} />
+                      {syncing ? 'Syncing...' : 'Sync All to Global Logs'}
+                    </Button>
+                  )}
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                    <Input
+                      placeholder="Search records..."
+                      value={filter}
+                      onChange={(e) => setFilter(e.target.value)}
+                      className="pl-8 w-48 h-9 text-sm border-orange-200 focus:border-[#ffb761]"
+                    />
+                  </div>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setShowArchived(!showArchived)}
-                    className={`border-orange-300 hover:border-[#ffb761] hover:bg-[#ffb761]/5 ${showArchived ? 'bg-orange-50' : ''}`}
+                    className={`border-orange-300 hover:border-[#ffb761] hover:bg-[#ffb761]/5 h-9 ${showArchived ? 'bg-orange-50' : ''}`}
                   >
-                    {showArchived ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {showArchived ? <EyeOff size={14} /> : <Eye size={14} />}
                     <span className="ml-1 text-xs">{showArchived ? 'Hide Archived' : 'Show Archived'}</span>
                   </Button>
                 </div>
               </div>
 
               {breedingRecords.filter(r => showArchived || !r.archived).length === 0 ? (
-                <div className="text-center py-12">
-                  <Heart className="text-orange-300 mx-auto mb-4" size={48} />
-                  <h4 className="text-xl font-semibold text-gray-900 mb-2">No Records Yet</h4>
-                  <p className="text-gray-600">Create your first breeding prediction above</p>
+                <div className="text-center py-16 bg-gradient-to-br from-orange-50/50 to-amber-50/50 rounded-2xl border border-dashed border-orange-200">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-orange-100 rounded-full flex items-center justify-center">
+                    <Heart className="text-orange-400" size={28} />
+                  </div>
+                  <h4 className="text-xl font-bold text-gray-900 mb-2">No Records Yet</h4>
+                  <p className="text-gray-500 text-sm">Create your first breeding prediction above to get started</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto rounded-xl border border-orange-200 shadow-sm">
                   {(() => {
-                    const visibleRecords = breedingRecords.filter(r => showArchived || !r.archived);
-                    const totalPages = Math.ceil(visibleRecords.length / itemsPerPage);
+                    const filtered = breedingRecords.filter(r => {
+                      if (!showArchived && r.archived) return false;
+                      if (!filter) return true;
+                      const q = filter.toLowerCase();
+                      return (
+                        (r.parent1?.name || '').toLowerCase().includes(q) ||
+                        (r.parent2?.name || '').toLowerCase().includes(q) ||
+                        (r.offspring?.name || '').toLowerCase().includes(q) ||
+                        (r.offspring?.color || '').toLowerCase().includes(q) ||
+                        (r.offspring?.feather || '').toLowerCase().includes(q) ||
+                        (r.notes || '').toLowerCase().includes(q)
+                      );
+                    });
+                    const totalPages = Math.ceil(filtered.length / itemsPerPage);
                     const startIndex = (currentPage - 1) * itemsPerPage;
                     const endIndex = startIndex + itemsPerPage;
-                    const paginatedRecords = visibleRecords.slice(startIndex, endIndex);
+                    const paginatedRecords = filtered.slice(startIndex, endIndex);
 
                     return (
                       <>
                         <table className="w-full">
-                          <thead className="bg-orange-50">
-                            <tr>
-                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">
+                          <thead>
+                            <tr className="bg-gradient-to-r from-orange-100 via-amber-50 to-orange-100">
+                              <th className="px-4 py-3 text-left w-10">
                                 <input
                                   type="checkbox"
-                                  checked={selected.length === visibleRecords.length && visibleRecords.length > 0}
+                                  checked={selected.length === filtered.length && filtered.length > 0}
                                   onChange={() => {
-                                    setSelected(selected.length === visibleRecords.length ? [] : visibleRecords.map(r => r.id));
+                                    setSelected(selected.length === filtered.length ? [] : filtered.map(r => r.id));
                                   }}
-                                  className="w-4 h-4 text-[#ffb761] bg-orange-50 border-orange-300 rounded focus:ring-[#ffb761]"
+                                  className="w-4 h-4 text-orange-500 bg-white border-orange-300 rounded focus:ring-orange-400"
                                 />
                               </th>
-                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Date</th>
-                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Parents</th>
-                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Offspring</th>
-                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Status</th>
-                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Actions</th>
+                              <th className="px-4 py-3 text-left text-xs font-bold text-orange-800 uppercase tracking-wider">Date</th>
+                              <th className="px-4 py-3 text-left text-xs font-bold text-orange-800 uppercase tracking-wider">Parents</th>
+                              <th className="px-4 py-3 text-left text-xs font-bold text-orange-800 uppercase tracking-wider">Offspring</th>
+                              <th className="px-4 py-3 text-left text-xs font-bold text-orange-800 uppercase tracking-wider">Traits</th>
+                              <th className="px-4 py-3 text-center text-xs font-bold text-orange-800 uppercase tracking-wider">Status</th>
+                              <th className="px-4 py-3 text-center text-xs font-bold text-orange-800 uppercase tracking-wider">Actions</th>
                             </tr>
                           </thead>
-                          <tbody>
+                          <tbody className="divide-y divide-orange-100">
                             {paginatedRecords.map((record) => (
-                        <tr key={record.id} className={`border-b border-orange-100 hover:bg-orange-50/50 transition ${selected.includes(record.id) ? 'bg-[#ffb761]/5' : ''} ${record.archived ? 'opacity-75' : ''}`}>
-                          <td className="px-4 py-3">
-                            <input
-                              type="checkbox"
-                              checked={selected.includes(record.id)}
-                              onChange={() => setSelected(prev =>
-                                prev.includes(record.id)
-                                  ? prev.filter(id => id !== record.id)
-                                  : [...prev, record.id]
-                              )}
-                              className="w-4 h-4 text-[#ffb761] bg-orange-50 border-orange-300 rounded focus:ring-[#ffb761]"
-                            />
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">
-                            {new Date(record.createdAt).toLocaleDateString()}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="text-sm">
-                              <div className="font-medium text-gray-900">{record.parent1.name || 'Parent 1'}</div>
-                              <div className="text-gray-600">{record.parent2.name || 'Parent 2'}</div>
+                              <tr
+                                key={record.id}
+                                className={`group hover:bg-orange-50/60 transition-all duration-150 ${
+                                  selected.includes(record.id) ? 'bg-amber-50/70' : ''
+                                } ${record.archived ? 'opacity-60' : ''}`}
+                              >
+                                {/* Checkbox */}
+                                <td className="px-4 py-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={selected.includes(record.id)}
+                                    onChange={() => setSelected(prev =>
+                                      prev.includes(record.id)
+                                        ? prev.filter(id => id !== record.id)
+                                        : [...prev, record.id]
+                                    )}
+                                    className="w-4 h-4 text-orange-500 bg-white border-orange-300 rounded focus:ring-orange-400"
+                                  />
+                                </td>
+
+                                {/* Date */}
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                                    <Calendar size={14} className="text-orange-400 flex-shrink-0" />
+                                    <span className="font-medium">{new Date(record.createdAt).toLocaleDateString()}</span>
+                                  </div>
+                                </td>
+
+                                {/* Parents */}
+                                <td className="px-4 py-3">
+                                  <div className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-1.5">
+                                      <div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
+                                        {(record.parent1?.name || 'P').charAt(0).toUpperCase()}
+                                      </div>
+                                      <span className="text-sm font-semibold text-gray-900 truncate max-w-[120px]">{record.parent1?.name || 'Parent 1'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      <div className="w-5 h-5 rounded-full bg-orange-600 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
+                                        {(record.parent2?.name || 'P').charAt(0).toUpperCase()}
+                                      </div>
+                                      <span className="text-sm text-gray-600 truncate max-w-[120px]">{record.parent2?.name || 'Parent 2'}</span>
+                                    </div>
+                                  </div>
+                                </td>
+
+                                {/* Offspring Name (inline editable) */}
+                                <td className="px-4 py-3">
+                                  {inlineEdit?.id === record.id && inlineEdit?.field === 'offspringName' ? (
+                                    <Input
+                                      autoFocus
+                                      value={inlineEdit.value}
+                                      onChange={(e) => setInlineEdit(prev => ({ ...prev, value: e.target.value }))}
+                                      onBlur={commitInlineEdit}
+                                      onKeyDown={(e) => { if (e.key === 'Enter') commitInlineEdit(); if (e.key === 'Escape') cancelInlineEdit(); }}
+                                      className="h-7 text-sm border-orange-300 focus:border-orange-500 w-full max-w-[160px]"
+                                    />
+                                  ) : (
+                                    <div
+                                      className="cursor-pointer group/name"
+                                      onDoubleClick={() => startInlineEdit(record.id, 'offspringName', record.offspring?.name || '')}
+                                      title="Double-click to edit name"
+                                    >
+                                      <div className="text-sm font-semibold text-gray-900 group-hover/name:text-orange-600 transition-colors flex items-center gap-1">
+                                        <Heart size={12} className="text-orange-400" />
+                                        {record.offspring?.name || <span className="italic text-gray-400">Unnamed</span>}
+                                        <Edit size={10} className="text-gray-300 opacity-0 group-hover/name:opacity-100 transition-opacity" />
+                                      </div>
+                                    </div>
+                                  )}
+                                </td>
+
+                                {/* Traits */}
+                                <td className="px-4 py-3">
+                                  <div className="flex flex-wrap gap-1">
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-[11px] font-medium">
+                                      Size: {record.offspring?.size}%
+                                    </span>
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-[11px] font-medium">
+                                      Eggs: {record.offspring?.eggProd}%
+                                    </span>
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 text-purple-700 rounded-full text-[11px] font-medium capitalize">
+                                      {record.offspring?.feather}
+                                    </span>
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium">
+                                      <div className="w-3 h-3 rounded-full border border-gray-300 flex-shrink-0" style={{ background: record.offspring?.color }} />
+                                      <span className="font-mono">{record.offspring?.color}</span>
+                                    </span>
+                                  </div>
+                                </td>
+
+                                {/* Status */}
+                                <td className="px-4 py-3 text-center">
+                                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                    record.archived
+                                      ? 'bg-gray-100 text-gray-500'
+                                      : 'bg-emerald-100 text-emerald-700'
+                                  }`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${record.archived ? 'bg-gray-400' : 'bg-emerald-500'}`} />
+                                    {record.archived ? 'Archived' : 'Active'}
+                                  </span>
+                                  {record.globalLogId && (
+                                    <div className="mt-1">
+                                      <span className="text-[10px] text-emerald-500 font-medium">Posted</span>
+                                    </div>
+                                  )}
+                                </td>
+
+                                {/* Actions */}
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center justify-center gap-0.5">
+                                    {/* Share2 Toggle */}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => toggleGlobalLog(record)}
+                                      className={`transition-all duration-200 h-8 w-8 p-0 rounded-full ${
+                                        record.globalLogId
+                                          ? "text-emerald-600 bg-emerald-100 hover:bg-emerald-200"
+                                          : "text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50"
+                                      }`}
+                                      title={record.globalLogId ? "Remove from Global Logs" : "Post to Global Logs"}
+                                    >
+                                      <Share2 size={14} />
+                                    </Button>
+                                    {/* Edit */}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => openEditModal(record)}
+                                      className="text-purple-500 hover:text-purple-700 hover:bg-purple-50 h-8 w-8 p-0 rounded-full transition-all duration-200"
+                                      title="Edit Record"
+                                    >
+                                      <Edit size={14} />
+                                    </Button>
+                                    {/* Duplicate */}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        const newRecord = { ...record, id: Date.now().toString() + '_copy', globalLogId: undefined };
+                                        logBreedingChange('duplicate', newRecord, { originalRecord: record });
+                                        setBreedingRecords(prev => [newRecord, ...prev]);
+                                      }}
+                                      className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 h-8 w-8 p-0 rounded-full transition-all duration-200"
+                                      title="Duplicate"
+                                    >
+                                      <Copy size={14} />
+                                    </Button>
+                                    {/* Archive/Restore */}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        const action = record.archived ? 'restore' : 'archive';
+                                        const updatedRecord = { ...record, archived: !record.archived };
+                                        logBreedingChange(action, updatedRecord, { originalRecord: record });
+                                        setBreedingRecords(prev => prev.map(r =>
+                                          r.id === record.id ? updatedRecord : r
+                                        ));
+                                        syncBreedingIfPosted({ ...updatedRecord, globalLogId: record.globalLogId });
+                                      }}
+                                      className={`h-8 w-8 p-0 rounded-full transition-all duration-200 ${
+                                        record.archived
+                                          ? 'text-green-500 hover:text-green-700 hover:bg-green-50'
+                                          : 'text-orange-500 hover:text-orange-700 hover:bg-orange-50'
+                                      }`}
+                                      title={record.archived ? "Restore" : "Archive"}
+                                    >
+                                      <Archive size={14} />
+                                    </Button>
+                                    {/* Delete */}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        if (window.confirm('Delete this record?')) {
+                                          logBreedingChange('delete', record);
+                                          // Also delete from global logs if posted
+                                          if (record.globalLogId) {
+                                            deleteBreedingLog(record.globalLogId)
+                                              .catch(err => console.warn('[BreedingLog] Auto-remove on delete failed:', err?.response?.data || err?.message));
+                                          }
+                                          setBreedingRecords(prev => prev.filter(r => r.id !== record.id));
+                                          setSelected(prev => prev.filter(id => id !== record.id));
+                                        }
+                                      }}
+                                      className="text-red-400 hover:text-red-600 hover:bg-red-50 h-8 w-8 p-0 rounded-full transition-all duration-200"
+                                      title="Delete"
+                                    >
+                                      <Trash2 size={14} />
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 py-4 bg-gradient-to-r from-orange-50/50 to-amber-50/50 border-t border-orange-200">
+                            <div className="flex items-center gap-4 text-sm text-gray-600">
+                              <span>
+                                Showing <span className="font-semibold text-gray-900">{startIndex + 1}</span> to <span className="font-semibold text-gray-900">{Math.min(endIndex, filtered.length)}</span> of <span className="font-semibold text-gray-900">{filtered.length}</span>
+                              </span>
+                              <select
+                                value={itemsPerPage}
+                                onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                                className="text-sm border border-orange-300 rounded-lg px-2 py-1 bg-white text-gray-900 focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+                              >
+                                <option value={5}>5 / page</option>
+                                <option value={10}>10 / page</option>
+                                <option value={25}>25 / page</option>
+                                <option value={50}>50 / page</option>
+                              </select>
                             </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="text-sm">
-                              <div className="font-medium text-gray-900">
-                                {record.offspring.name || `Offspring ${breedingRecords.filter(r => r.createdAt < record.createdAt).length + 1}`}
-                              </div>
-                              <div className="text-gray-600">Size: {record.offspring.size}% • Eggs: {record.offspring.eggProd}%</div>
-                              <div className="text-gray-600 capitalize">{record.offspring.feather} • {record.offspring.color}</div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                              record.archived
-                                ? 'bg-gray-100 text-gray-600'
-                                : 'bg-green-100 text-green-600'
-                            }`}>
-                              {record.archived ? 'Archived' : 'Active'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
                             <div className="flex items-center gap-1">
                               <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                onClick={() => openEditModal(record)}
-                                className="text-purple-500 hover:text-purple-700 hover:bg-purple-50 h-8 w-8 p-0"
-                                title="Edit Record"
+                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                disabled={currentPage === 1}
+                                className="border-orange-300 text-orange-700 hover:bg-orange-50 disabled:opacity-50 h-8"
                               >
-                                <Edit size={14} />
+                                Previous
                               </Button>
+                              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                let pageNum;
+                                if (totalPages <= 5) pageNum = i + 1;
+                                else if (currentPage <= 3) pageNum = i + 1;
+                                else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+                                else pageNum = currentPage - 2 + i;
+                                return (
+                                  <Button
+                                    key={pageNum}
+                                    variant={currentPage === pageNum ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => setCurrentPage(pageNum)}
+                                    className={`h-8 w-8 p-0 ${
+                                      currentPage === pageNum
+                                        ? "bg-orange-500 text-white hover:bg-orange-600"
+                                        : "border-orange-300 text-orange-700 hover:bg-orange-50"
+                                    }`}
+                                  >
+                                    {pageNum}
+                                  </Button>
+                                );
+                              })}
                               <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                onClick={() => {
-                                  const newRecord = { ...record, id: Date.now().toString() + '_copy' };
-                                  logBreedingChange('duplicate', newRecord, { originalRecord: record });
-                                  setBreedingRecords(prev => [newRecord, ...prev]);
-                                }}
-                                className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 h-8 w-8 p-0"
-                                title="Duplicate"
+                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                disabled={currentPage === totalPages}
+                                className="border-orange-300 text-orange-700 hover:bg-orange-50 disabled:opacity-50 h-8"
                               >
-                                <Copy size={14} />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  const action = record.archived ? 'restore' : 'archive';
-                                  const updatedRecord = { ...record, archived: !record.archived };
-                                  logBreedingChange(action, updatedRecord, { originalRecord: record });
-                                  setBreedingRecords(prev => prev.map(r =>
-                                    r.id === record.id ? updatedRecord : r
-                                  ));
-                                }}
-                                className={`h-8 w-8 p-0 ${
-                                  record.archived
-                                    ? 'text-green-500 hover:text-green-700 hover:bg-green-50'
-                                    : 'text-orange-500 hover:text-orange-700 hover:bg-orange-50'
-                                }`}
-                                title={record.archived ? "Unarchive" : "Archive"}
-                              >
-                                <Archive size={14} />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  if (window.confirm('Delete this record?')) {
-                                    logBreedingChange('delete', record);
-                                    setBreedingRecords(prev => prev.filter(r => r.id !== record.id));
-                                  }
-                                }}
-                                className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
-                                title="Delete"
-                              >
-                                <Trash2 size={14} />
+                                Next
                               </Button>
                             </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
-                  {/* Pagination */}
-                  {totalPages > 1 && (
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-orange-200">
-                      <div className="flex items-center gap-4 text-sm text-orange-700">
-                        <div className="text-sm text-orange-700">
-                          Showing {startIndex + 1} to {Math.min(endIndex, visibleRecords.length)} of {visibleRecords.length} entries
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <label className="text-orange-700">Show:</label>
-                          <select
-                            value={itemsPerPage}
-                            onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                            className="text-sm border border-orange-300 rounded-md px-2 py-1 bg-white text-orange-900 focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
-                          >
-                            <option value={5}>5</option>
-                            <option value={10}>10</option>
-                            <option value={25}>25</option>
-                            <option value={50}>50</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                          disabled={currentPage === 1}
-                          className="border-orange-300 text-orange-700 hover:bg-orange-50 disabled:opacity-50"
-                        >
-                          Previous
-                        </Button>
-
-                        <div className="flex items-center gap-1">
-                          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                            let pageNum;
-                            if (totalPages <= 5) {
-                              pageNum = i + 1;
-                            } else if (currentPage <= 3) {
-                              pageNum = i + 1;
-                            } else if (currentPage >= totalPages - 2) {
-                              pageNum = totalPages - 4 + i;
-                            } else {
-                              pageNum = currentPage - 2 + i;
-                            }
-
-                            return (
-                              <Button
-                                key={pageNum}
-                                variant={currentPage === pageNum ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => setCurrentPage(pageNum)}
-                                className={currentPage === pageNum
-                                  ? "bg-orange-500 text-white"
-                                  : "border-orange-300 text-orange-700 hover:bg-orange-50"
-                                }
-                              >
-                                {pageNum}
-                              </Button>
-                            );
-                          })}
-                        </div>
-
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                          disabled={currentPage === totalPages}
-                          className="border-orange-300 text-orange-700 hover:bg-orange-50 disabled:opacity-50"
-                        >
-                          Next
-                        </Button>
-                      </div>
-                    </div>
-                    )}
-                </>
+                          </div>
+                        )}
+                      </>
                     );
                   })()}
                 </div>
@@ -828,8 +1057,8 @@ export default function BreedingManagementPage() {
 
               {/* Bulk Actions */}
               {selected.length > 0 && (
-                <div className="flex items-center gap-2 mt-4 pt-4 border-t border-orange-100">
-                  <span className="text-sm text-gray-600">{selected.length} selected</span>
+                <div className="flex items-center gap-3 mt-4 p-3 bg-amber-50 rounded-xl border border-amber-200">
+                  <span className="text-sm font-semibold text-amber-800">{selected.length} selected</span>
                   <Button
                     variant="outline"
                     size="sm"
@@ -848,23 +1077,45 @@ export default function BreedingManagementPage() {
                         if (selected.includes(r.id)) {
                           const updatedRecord = { ...r, archived: !r.archived };
                           logBreedingChange(r.archived ? 'restore' : 'archive', updatedRecord, { originalRecord: r, source: 'bulk_operation' });
+                          syncBreedingIfPosted({ ...updatedRecord, globalLogId: r.globalLogId });
                           return updatedRecord;
                         }
                         return r;
                       }));
                       setSelected([]);
                     }}
-                    className="border-orange-300 hover:border-orange-500 hover:bg-orange-50 text-orange-600"
+                    className="border-orange-300 hover:border-orange-500 hover:bg-orange-50 text-orange-700 font-medium"
                   >
-                    Toggle Archive Status
+                    <Archive size={14} className="mr-1.5" />
+                    Toggle Archive
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setSelected([])}
-                    className="border-gray-300 hover:border-gray-500 hover:bg-gray-50"
+                    onClick={() => {
+                      if (!window.confirm(`Delete ${selected.length} selected records permanently?`)) return;
+                      const toDelete = breedingRecords.filter(r => selected.includes(r.id));
+                      toDelete.forEach(r => {
+                        logBreedingChange('delete', r);
+                        if (r.globalLogId) {
+                          deleteBreedingLog(r.globalLogId).catch(() => {});
+                        }
+                      });
+                      setBreedingRecords(prev => prev.filter(r => !selected.includes(r.id)));
+                      setSelected([]);
+                    }}
+                    className="border-red-300 hover:border-red-500 hover:bg-red-50 text-red-600 font-medium"
                   >
-                    Clear Selection
+                    <Trash2 size={14} className="mr-1.5" />
+                    Delete Selected
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelected([])}
+                    className="text-gray-500 hover:text-gray-700 ml-auto"
+                  >
+                    Clear
                   </Button>
                 </div>
               )}
@@ -1049,9 +1300,25 @@ export default function BreedingManagementPage() {
                           <span className="text-gray-600">Feather:</span>
                           <span className="font-medium capitalize">{editingRecord.offspring?.feather}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between items-center">
                           <span className="text-gray-600">Color:</span>
-                          <span className="font-medium capitalize">{editingRecord.offspring?.color}</span>
+                          <label className="flex items-center gap-1.5 cursor-pointer group/ec select-none">
+                            <div
+                              className="relative w-5 h-5 rounded-full border border-gray-300 group-hover/ec:border-green-500 transition-all overflow-hidden flex-shrink-0"
+                              style={{ background: editingRecord.offspring?.color }}
+                            >
+                              <input
+                                type="color"
+                                value={(editingRecord.offspring?.color || '#F8FAFC').startsWith('#') ? (editingRecord.offspring?.color || '#F8FAFC') : '#F8FAFC'}
+                                onChange={(e) => setEditingRecord(prev => ({
+                                  ...prev,
+                                  offspring: { ...prev.offspring, color: e.target.value }
+                                }))}
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                              />
+                            </div>
+                            <span className="font-mono text-xs text-gray-500">{editingRecord.offspring?.color}</span>
+                          </label>
                         </div>
                       </div>
                     </div>

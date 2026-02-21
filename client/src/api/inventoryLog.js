@@ -13,3 +13,15 @@ export const createInventoryLog = async (data) => {
   const response = await axiosInstance.post("/inventory-logs", data);
   return response.data;
 };
+
+// Update an existing inventory log (real-time qty / name sync)
+export const updateInventoryLog = async (id, data) => {
+  const response = await axiosInstance.patch(`/inventory-logs/${id}`, data);
+  return response.data;
+};
+
+// Remove a log entry (unpost)
+export const deleteInventoryLog = async (id) => {
+  const response = await axiosInstance.delete(`/inventory-logs/${id}`);
+  return response.data;
+};

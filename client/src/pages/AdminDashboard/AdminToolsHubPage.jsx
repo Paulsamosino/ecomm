@@ -123,6 +123,7 @@ function PresetFormDialog({ open, onClose, initialData, onSaved }) {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef(null);
+  const colorRef = useRef(null);
 
   // Reset form whenever dialog opens
   useEffect(() => {
@@ -301,34 +302,30 @@ function PresetFormDialog({ open, onClose, initialData, onSaved }) {
           </div>
 
           {/* Color */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="pColorName">Color Name</Label>
-              <Input
-                id="pColorName"
-                value={form.colorName}
-                onChange={(e) => setForm((f) => ({ ...f, colorName: e.target.value }))}
-                placeholder="e.g. White"
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label htmlFor="pColorHex">Color Swatch</Label>
-              <div className="flex items-center gap-2 mt-1">
+          <div>
+            <Label>Breed Color</Label>
+            <div className="flex items-center gap-3 mt-1.5">
+              <div className="relative">
+                <div
+                  className="w-10 h-10 rounded-full border-2 border-white shadow cursor-pointer"
+                  style={{ background: form.colorHex }}
+                  onClick={() => colorRef.current?.click()}
+                />
                 <input
-                  id="pColorHex"
+                  ref={colorRef}
                   type="color"
                   value={form.colorHex}
-                  onChange={(e) => setForm((f) => ({ ...f, colorHex: e.target.value }))}
-                  className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer p-0.5"
-                />
-                <Input
-                  value={form.colorHex}
-                  onChange={(e) => setForm((f) => ({ ...f, colorHex: e.target.value }))}
-                  placeholder="#F8FAFC"
-                  className="font-mono text-sm"
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      colorHex: e.target.value,
+                      colorName: e.target.value,
+                    }))
+                  }
+                  className="absolute inset-0 opacity-0 w-0 h-0"
                 />
               </div>
+              <span className="font-mono text-sm text-gray-500">{form.colorHex}</span>
             </div>
           </div>
         </div>

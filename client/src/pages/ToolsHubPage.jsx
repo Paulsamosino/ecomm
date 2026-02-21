@@ -4,7 +4,7 @@ import BreedingManagementPage from "@/pages/BreedingManagementPage";
 import ChangeHistoryPage from "@/pages/ChangeHistoryPage";
 import { getAllBreedingLogs } from "@/api/breedingLog";
 import { getAllInventoryLogs } from "@/api/inventoryLog";
-import { Package, Heart, History, Settings, Globe2, RefreshCw, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { Package, Heart, History, Settings, Globe2, ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -34,233 +34,415 @@ function GlobalLogsTab() {
   const [inventoryLogs, setInventoryLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [page, setPage] = useState(1);
-  const PAGE_SIZE = 15;
+  const [breedSearch, setBreedSearch] = useState("");
+  const [invSearch, setInvSearch] = useState("");
+  const [breedPage, setBreedPage] = useState(1);
+  const [invPage, setInvPage] = useState(1);
+  const [selectedLog, setSelectedLog] = useState(null); // { type: 'breeding'|'inventory', data: {} }
+  const PAGE = 10;
 
-  const fetchAll = useCallback(async () => {
-    setLoading(true);
+  const fetchAll = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const [bData, iData] = await Promise.all([
         getAllBreedingLogs(1, 100),
         getAllInventoryLogs(1, 100),
       ]);
-      setBreedingLogs((bData.logs || []).map(l => ({ ...l, _type: "breeding" })));
-      setInventoryLogs((iData.logs || []).map(l => ({ ...l, _type: "inventory" })));
+      setBreedingLogs(bData.logs || []);
+      setInventoryLogs(iData.logs || []);
     } catch (err) {
       console.error("[GlobalLogs] Fetch failed:", err?.response?.data || err?.message || err);
-      setError("Could not load logs. Please try refreshing.");
+      if (!silent) setError("Could not load logs. Please try refreshing.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const allLogs = useMemo(() =>
-    [...breedingLogs, ...inventoryLogs].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
-    [breedingLogs, inventoryLogs]
+  // Auto-refresh: re-fetch when document becomes visible again (user switches tabs)
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchAll(true); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [fetchAll]);
+
+  // Auto-poll every 2 seconds — real-time updates
+  useEffect(() => {
+    const id = setInterval(() => fetchAll(true), 2000);
+    return () => clearInterval(id);
+  }, [fetchAll]);
+
+  const filteredBreeding = useMemo(() => {
+    const q = breedSearch.toLowerCase().trim();
+    if (!q) return breedingLogs;
+    return breedingLogs.filter(l =>
+      l.sellerName?.toLowerCase().includes(q) ||
+      l.parent1?.name?.toLowerCase().includes(q) ||
+      l.parent2?.name?.toLowerCase().includes(q) ||
+      l.offspring?.feather?.toLowerCase().includes(q) ||
+      l.offspring?.color?.toLowerCase().includes(q)
+    );
+  }, [breedingLogs, breedSearch]);
+
+  const filteredInventory = useMemo(() => {
+    const q = invSearch.toLowerCase().trim();
+    if (!q) return inventoryLogs;
+    return inventoryLogs.filter(l =>
+      l.sellerName?.toLowerCase().includes(q) ||
+      l.itemName?.toLowerCase().includes(q) ||
+      l.category?.toLowerCase().includes(q)
+    );
+  }, [inventoryLogs, invSearch]);
+
+  const bTotalPages = Math.max(1, Math.ceil(filteredBreeding.length / PAGE));
+  const bSafePage   = Math.min(breedPage, bTotalPages);
+  const bRows       = filteredBreeding.slice((bSafePage - 1) * PAGE, bSafePage * PAGE);
+
+  const iTotalPages = Math.max(1, Math.ceil(filteredInventory.length / PAGE));
+  const iSafePage   = Math.min(invPage, iTotalPages);
+  const iRows       = filteredInventory.slice((iSafePage - 1) * PAGE, iSafePage * PAGE);
+
+  const SkeletonRows = ({ cols }) => (
+    [...Array(4)].map((_, i) => (
+      <tr key={i} className="border-b border-gray-100">
+        {[...Array(cols)].map((__, c) => (
+          <td key={c} className="px-3 py-2.5">
+            <div className="h-4 bg-gray-100 rounded animate-pulse" style={{ width: c === 0 ? "80%" : "60%" }} />
+          </td>
+        ))}
+      </tr>
+    ))
   );
 
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    return allLogs.filter(l => {
-      if (typeFilter !== "all" && l._type !== typeFilter) return false;
-      if (!q) return true;
-      if (l.sellerName?.toLowerCase().includes(q)) return true;
-      if (l._type === "breeding") {
-        return (
-          l.parent1?.name?.toLowerCase().includes(q) ||
-          l.parent2?.name?.toLowerCase().includes(q) ||
-          l.offspring?.color?.toLowerCase().includes(q) ||
-          l.offspring?.feather?.toLowerCase().includes(q)
-        );
-      }
-      if (l._type === "inventory") {
-        return (
-          l.itemName?.toLowerCase().includes(q) ||
-          l.category?.toLowerCase().includes(q) ||
-          l.action?.toLowerCase().includes(q)
-        );
-      }
-      return false;
-    });
-  }, [allLogs, search, typeFilter]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-  const breedingCount = allLogs.filter(l => l._type === "breeding").length;
-  const inventoryCount = allLogs.filter(l => l._type === "inventory").length;
-  const handleTypeFilter = (f) => { setTypeFilter(f); setPage(1); };
-  const handleSearch = (v) => { setSearch(v); setPage(1); };
+  if (error) return (
+    <div className="text-center py-14 text-sm text-red-400">{error}</div>
+  );
 
   return (
     <div>
-      {/* Controls */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          {[
-            { key: "all", label: `All (${allLogs.length})` },
-            { key: "breeding", label: `Breeding (${breedingCount})` },
-            { key: "inventory", label: `Inventory (${inventoryCount})` },
-          ].map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => handleTypeFilter(key)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
-                typeFilter === key
-                  ? "bg-emerald-500 text-white border-emerald-500"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-emerald-300 hover:text-emerald-600"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+      {/* Top bar */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Globe2 size={16} className="text-emerald-500" />
+          <span className="text-sm font-semibold text-gray-700">
+            {breedingLogs.length + inventoryLogs.length} total entries
+          </span>
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-60">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <Input
-              value={search}
-              onChange={e => handleSearch(e.target.value)}
-              placeholder="Search seller, item, breed..."
-              className="pl-8 h-8 text-sm border-gray-200 focus:border-emerald-400"
-            />
-          </div>
-          <Button variant="outline" size="sm" onClick={fetchAll} disabled={loading}
-            className="border-emerald-200 hover:border-emerald-400 gap-1.5 h-8">
-            <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
-            Refresh
-          </Button>
+        <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          Live
         </div>
       </div>
 
-      {/* Error */}
-      {error && !loading && (
-        <div className="text-center py-10 text-sm text-red-500">{error}</div>
-      )}
+      {/* Two-panel layout */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
 
-      {/* Table */}
-      {!error && (
-        <div className="rounded-xl border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+        {/* ── LEFT: Breeding Logs ── */}
+        <div className="flex flex-col rounded-xl border border-rose-100 overflow-hidden">
+          {/* Panel header */}
+          <div className="flex items-center justify-between px-4 py-3 bg-rose-50 border-b border-rose-100">
+            <div className="flex items-center gap-2">
+              <Heart size={14} className="text-rose-500" />
+              <span className="text-sm font-bold text-rose-700">Breeding Logs</span>
+              <span className="text-xs text-rose-400 font-medium">({breedingLogs.length})</span>
+            </div>
+            <div className="relative w-44">
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Input value={breedSearch} onChange={e => { setBreedSearch(e.target.value); setBreedPage(1); }}
+                placeholder="Search..." className="pl-7 h-7 text-xs border-rose-200 focus:border-rose-400"
+                list="breed-seller-suggestions" />
+              <datalist id="breed-seller-suggestions">
+                {[...new Set(breedingLogs.map(l => l.sellerName).filter(Boolean))].map(name => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto flex-1">
+            <table className="w-full text-xs">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-4 py-3 text-left font-semibold text-gray-600 w-32">Type</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-600 w-36">Seller</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-600">Details</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-600 w-24">Time</th>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="px-3 py-2.5 text-left font-semibold text-gray-500">Seller</th>
+                  <th className="px-3 py-2.5 text-left font-semibold text-gray-500">Parents</th>
+                  <th className="px-3 py-2.5 text-left font-semibold text-gray-500">Offspring</th>
+                  <th className="px-3 py-2.5 text-left font-semibold text-gray-500 w-16">Time</th>
                 </tr>
               </thead>
               <tbody>
-                {loading && [...Array(6)].map((_, i) => (
-                  <tr key={i} className="border-b border-gray-100">
-                    <td className="px-4 py-3"><div className="h-5 w-20 bg-gray-100 rounded-full animate-pulse" /></td>
-                    <td className="px-4 py-3"><div className="h-5 w-24 bg-gray-100 rounded animate-pulse" /></td>
-                    <td className="px-4 py-3"><div className="h-5 w-full bg-gray-100 rounded animate-pulse" /></td>
-                    <td className="px-4 py-3"><div className="h-5 w-16 bg-gray-100 rounded animate-pulse" /></td>
-                  </tr>
-                ))}
-                {!loading && paginated.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-14 text-center">
-                      <Globe2 size={36} className="mx-auto mb-3 text-gray-300" />
-                      <p className="text-gray-400 text-sm">
-                        {search || typeFilter !== "all"
-                          ? "No logs match your search or filter."
-                          : "No activity yet. Post an inventory item or run a breeding prediction."}
-                      </p>
-                    </td>
-                  </tr>
-                )}
-                {!loading && paginated.map((log) => (
-                  <tr key={`${log._type}-${log._id}`}
-                    className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                    {/* Type */}
-                    <td className="px-4 py-3">
-                      {log._type === "breeding" ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-600 border border-rose-100">
-                          <Heart size={10} /> Breeding
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-100">
-                          <Package size={10} /> Inventory
-                        </span>
-                      )}
-                    </td>
-                    {/* Seller */}
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                {loading ? <SkeletonRows cols={4} /> : bRows.length === 0 ? (
+                  <tr><td colSpan={4} className="px-3 py-10 text-center text-gray-400">
+                    {breedSearch ? "No matches." : "No breeding activity yet."}
+                  </td></tr>
+                ) : bRows.map(log => (
+                  <tr key={log._id} onClick={() => setSelectedLog({ type: 'breeding', data: log })} className="border-b border-gray-100 hover:bg-rose-50/60 cursor-pointer transition-colors">
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0">
                           {log.sellerName?.charAt(0)?.toUpperCase() || "?"}
                         </div>
-                        <span className="font-medium text-gray-800 truncate">{log.sellerName || "Anonymous"}</span>
+                        <span className="font-medium text-gray-800 truncate max-w-[80px]">{log.sellerName || "Anon"}</span>
                       </div>
                     </td>
-                    {/* Details */}
-                    <td className="px-4 py-3 text-gray-700">
-                      {log._type === "breeding" ? (
-                        <span>
-                          <span className="font-semibold text-gray-900">{log.parent1?.name || "P1"}</span>
-                          <span className="text-gray-400 mx-1">×</span>
-                          <span className="font-semibold text-gray-900">{log.parent2?.name || "P2"}</span>
-                          <span className="text-gray-400 mx-1.5">→</span>
-                          <span className="text-emerald-700">
-                            Size {log.offspring?.size ?? "?"}%
-                            {" · "}Eggs {log.offspring?.eggProd ?? "?"}% ({eggRange(log.offspring?.eggProd)})
-                            {" · "}{log.offspring?.feather || "smooth"}
-                            {" · "}{log.offspring?.color || "white"}
-                          </span>
-                        </span>
-                      ) : (
-                        <span>
-                          <span className="font-semibold text-gray-900">{log.itemName}</span>
-                          <span className="text-gray-400 mx-1.5">·</span>
-                          <span className="text-blue-700 font-medium">{log.qty} units</span>
-                          <span className="text-gray-400 mx-1.5">·</span>
-                          <span className="text-gray-500">{log.category}</span>
-                          {log.action && log.action !== "posted" && (
-                            <span className="ml-2 text-xs px-1.5 py-0.5 bg-gray-100 rounded text-gray-400 capitalize">{log.action}</span>
-                          )}
-                          {log.note && (
-                            <span className="ml-2 text-xs text-gray-400 italic">{log.note}</span>
-                          )}
-                        </span>
+                    <td className="px-3 py-2.5 text-gray-700">
+                      <span className="font-semibold text-gray-900">{log.parent1?.name || "P1"}</span>
+                      <span className="text-gray-400 mx-1">×</span>
+                      <span className="font-semibold text-gray-900">{log.parent2?.name || "P2"}</span>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {log.offspring?.name && (
+                        <div className="font-semibold text-gray-900 text-sm mb-0.5">{log.offspring.name}</div>
                       )}
+                      <div className="text-emerald-700 leading-relaxed text-xs">
+                        <span>{log.offspring?.size ?? "?"}% size</span>
+                        <span className="text-gray-300 mx-1">·</span>
+                        <span>{eggRange(log.offspring?.eggProd)}</span>
+                        <span className="text-gray-300 mx-1">·</span>
+                        <span className="capitalize">{log.offspring?.feather || "smooth"}</span>
+                        <span className="text-gray-300 mx-1">·</span>
+                        <span className="capitalize">{log.offspring?.color || "white"}</span>
+                      </div>
                     </td>
-                    {/* Time */}
-                    <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
-                      {timeAgo(log.createdAt)}
-                    </td>
+                    <td className="px-3 py-2.5 text-gray-400 whitespace-nowrap">{timeAgo(log.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </div>
-      )}
 
-      {/* Pagination */}
-      {!loading && !error && totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
-          <span className="text-xs text-gray-400">
-            {filtered.length} entries · Page {safePage} of {totalPages}
-          </span>
-          <div className="flex items-center gap-1.5">
-            <Button variant="outline" size="sm" disabled={safePage <= 1}
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              className="h-7 px-2 border-gray-200">
-              <ChevronLeft size={14} />
-            </Button>
-            <Button variant="outline" size="sm" disabled={safePage >= totalPages}
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              className="h-7 px-2 border-gray-200">
-              <ChevronRight size={14} />
-            </Button>
+          {/* Pagination */}
+          {!loading && bTotalPages > 1 && (
+            <div className="flex items-center justify-between px-3 py-2 border-t border-rose-100 bg-rose-50/30">
+              <span className="text-[11px] text-gray-400">Page {bSafePage}/{bTotalPages}</span>
+              <div className="flex gap-1">
+                <Button variant="outline" size="sm" disabled={bSafePage <= 1}
+                  onClick={() => setBreedPage(p => p - 1)} className="h-6 w-6 p-0 border-rose-200">
+                  <ChevronLeft size={12} />
+                </Button>
+                <Button variant="outline" size="sm" disabled={bSafePage >= bTotalPages}
+                  onClick={() => setBreedPage(p => p + 1)} className="h-6 w-6 p-0 border-rose-200">
+                  <ChevronRight size={12} />
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── RIGHT: Inventory Logs ── */}
+        <div className="flex flex-col rounded-xl border border-blue-100 overflow-hidden">
+          {/* Panel header */}
+          <div className="flex items-center justify-between px-4 py-3 bg-blue-50 border-b border-blue-100">
+            <div className="flex items-center gap-2">
+              <Package size={14} className="text-blue-500" />
+              <span className="text-sm font-bold text-blue-700">Inventory Logs</span>
+              <span className="text-xs text-blue-400 font-medium">({inventoryLogs.length})</span>
+            </div>
+            <div className="relative w-44">
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Input value={invSearch} onChange={e => { setInvSearch(e.target.value); setInvPage(1); }}
+                placeholder="Search..." className="pl-7 h-7 text-xs border-blue-200 focus:border-blue-400"
+                list="inv-search-suggestions" />
+              <datalist id="inv-search-suggestions">
+                {[...new Set([
+                  ...inventoryLogs.map(l => l.sellerName),
+                  ...inventoryLogs.map(l => l.itemName),
+                  ...inventoryLogs.map(l => l.category),
+                ].filter(Boolean))].map(val => (
+                  <option key={val} value={val} />
+                ))}
+              </datalist>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto flex-1">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="px-3 py-2.5 text-left font-semibold text-gray-500">Product Name</th>
+                  <th className="px-3 py-2.5 text-left font-semibold text-gray-500">Stock Qty</th>
+                  <th className="px-3 py-2.5 text-left font-semibold text-gray-500">Category</th>
+                  <th className="px-3 py-2.5 text-left font-semibold text-gray-500">Seller</th>
+                  <th className="px-3 py-2.5 text-left font-semibold text-gray-500 w-16">Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? <SkeletonRows cols={5} /> : iRows.length === 0 ? (
+                  <tr><td colSpan={5} className="px-3 py-10 text-center text-gray-400">
+                    {invSearch ? "No matches." : "No inventory posts yet. Hit the Post button on an inventory item."}
+                  </td></tr>
+                ) : iRows.map(log => (
+                  <tr key={log._id} onClick={() => setSelectedLog({ type: 'inventory', data: log })} className="border-b border-gray-100 hover:bg-blue-50/60 cursor-pointer transition-colors">
+                    <td className="px-3 py-2.5 font-semibold text-gray-900">{log.itemName}</td>
+                    <td className="px-3 py-2.5">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-100">
+                        {log.qty}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-100 capitalize">
+                        {log.category || "Uncategorized"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0">
+                          {log.sellerName?.charAt(0)?.toUpperCase() || "?"}
+                        </div>
+                        <span className="font-medium text-gray-800 truncate max-w-[80px]">{log.sellerName || "Anon"}</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 text-gray-400 whitespace-nowrap">{timeAgo(log.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {!loading && iTotalPages > 1 && (
+            <div className="flex items-center justify-between px-3 py-2 border-t border-blue-100 bg-blue-50/30">
+              <span className="text-[11px] text-gray-400">Page {iSafePage}/{iTotalPages}</span>
+              <div className="flex gap-1">
+                <Button variant="outline" size="sm" disabled={iSafePage <= 1}
+                  onClick={() => setInvPage(p => p - 1)} className="h-6 w-6 p-0 border-blue-200">
+                  <ChevronLeft size={12} />
+                </Button>
+                <Button variant="outline" size="sm" disabled={iSafePage >= iTotalPages}
+                  onClick={() => setInvPage(p => p + 1)} className="h-6 w-6 p-0 border-blue-200">
+                  <ChevronRight size={12} />
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+      </div>
+      {/* ── Detail Modal ── */}
+      {selectedLog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setSelectedLog(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            {selectedLog.type === 'breeding' ? (
+              <>
+                {/* Breeding modal */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-rose-100 bg-rose-50 rounded-t-2xl">
+                  <div className="flex items-center gap-2">
+                    <Heart size={15} className="text-rose-500" />
+                    <span className="font-bold text-rose-700">Breeding Log</span>
+                  </div>
+                  <button onClick={() => setSelectedLog(null)} className="p-1 rounded-full hover:bg-rose-100 text-rose-400 transition">
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="p-5 space-y-4">
+                  {/* Seller */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                      {selectedLog.data.sellerName?.charAt(0)?.toUpperCase() || '?'}
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Seller</p>
+                      <p className="font-semibold text-gray-900">{selectedLog.data.sellerName || 'Anonymous'}</p>
+                    </div>
+                    <span className="ml-auto text-xs text-gray-400">{timeAgo(selectedLog.data.createdAt)}</span>
+                  </div>
+                  {/* Parents */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {[{ label: 'Parent 1', p: selectedLog.data.parent1 }, { label: 'Parent 2', p: selectedLog.data.parent2 }].map(({ label, p }) => (
+                      <div key={label} className="bg-rose-50 rounded-xl p-3 border border-rose-100">
+                        <p className="text-[10px] text-rose-400 font-semibold mb-1">{label}</p>
+                        <p className="font-bold text-gray-900 text-sm mb-1">{p?.name || '—'}</p>
+                        <p className="text-xs text-gray-500">Size: {p?.size ?? '?'}%</p>
+                        <p className="text-xs text-gray-500">Eggs: {p?.eggProd ?? '?'}% ({eggRange(p?.eggProd)})</p>
+                        <p className="text-xs text-gray-500 capitalize">Feather: {p?.feather || '—'}</p>
+                        <p className="text-xs text-gray-500 capitalize">Color: {p?.color || '—'}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Offspring */}
+                  <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
+                    <p className="text-[10px] text-emerald-500 font-semibold mb-2">PREDICTED OFFSPRING</p>
+                    {selectedLog.data.offspring?.name && (
+                      <p className="font-bold text-gray-900 text-base mb-2">{selectedLog.data.offspring.name}</p>
+                    )}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                      <span className="text-gray-500">Size</span>
+                      <span className="font-semibold text-gray-900">{selectedLog.data.offspring?.size ?? '?'}%</span>
+                      <span className="text-gray-500">Egg Production</span>
+                      <span className="font-semibold text-emerald-700">{selectedLog.data.offspring?.eggProd ?? '?'}% · {eggRange(selectedLog.data.offspring?.eggProd)}</span>
+                      <span className="text-gray-500">Feather</span>
+                      <span className="font-semibold text-gray-900 capitalize">{selectedLog.data.offspring?.feather || '—'}</span>
+                      <span className="text-gray-500">Color</span>
+                      <span className="font-semibold text-gray-900 capitalize">{selectedLog.data.offspring?.color || '—'}</span>
+                    </div>
+                  </div>
+                  {selectedLog.data.notes && (
+                    <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 text-sm text-gray-600 italic">
+                      {selectedLog.data.notes}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Inventory modal */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-blue-100 bg-blue-50 rounded-t-2xl">
+                  <div className="flex items-center gap-2">
+                    <Package size={15} className="text-blue-500" />
+                    <span className="font-bold text-blue-700">Inventory Log</span>
+                  </div>
+                  <button onClick={() => setSelectedLog(null)} className="p-1 rounded-full hover:bg-blue-100 text-blue-400 transition">
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="p-5 space-y-4">
+                  {/* Seller */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                      {selectedLog.data.sellerName?.charAt(0)?.toUpperCase() || '?'}
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Posted by</p>
+                      <p className="font-semibold text-gray-900">{selectedLog.data.sellerName || 'Anonymous'}</p>
+                    </div>
+                    <span className="ml-auto text-xs text-gray-400">{timeAgo(selectedLog.data.createdAt)}</span>
+                  </div>
+                  {/* Item details */}
+                  <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-[10px] text-blue-400 font-semibold mb-0.5">PRODUCT NAME</p>
+                        <p className="font-bold text-gray-900 text-lg">{selectedLog.data.itemName}</p>
+                      </div>
+                      <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-semibold border border-blue-200 capitalize">
+                        {selectedLog.data.action || 'posted'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-white rounded-lg p-3 border border-blue-100 text-center">
+                        <p className="text-[10px] text-gray-400 mb-1">STOCK QTY</p>
+                        <p className="text-2xl font-bold text-blue-700">{selectedLog.data.qty}</p>
+                      </div>
+                      <div className="bg-white rounded-lg p-3 border border-orange-100 text-center">
+                        <p className="text-[10px] text-gray-400 mb-1">CATEGORY</p>
+                        <p className="text-sm font-bold text-orange-700 capitalize">{selectedLog.data.category || 'Uncategorized'}</p>
+                      </div>
+                    </div>
+                  </div>
+                  {selectedLog.data.note && (
+                    <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 text-sm text-gray-600 italic">
+                      {selectedLog.data.note}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
